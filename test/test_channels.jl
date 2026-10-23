@@ -38,7 +38,7 @@ _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys))
     ]
     @named sys = assembly(connections, pump, bc, ch)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     # T_out ≈ T_inlet — no heating
     @test isapprox(sol[ssys.ch.T_out], T_INLET; rtol=1e-5)
@@ -55,7 +55,7 @@ end
     ]
     @named sys = assembly(connections, pump, bc, chf)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.chf.T_out], T_INLET; rtol=1e-5)
 end
@@ -73,7 +73,7 @@ end
     ]
     @named sys = assembly(connections, pump, bc, ch)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_INLET
     # The wall heats the coolant, so the heat flow into every cell is positive. A circular
@@ -96,7 +96,7 @@ end
     ]
     @named sys = assembly(connections, pump, bc, chf)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.chf.T_out] > T_INLET
     @test all(isapprox.(sol[ssys.chf.q_wall_outer], expected, rtol=1e-7))
@@ -120,7 +120,7 @@ end
     ]
     @named sys = assembly(connections, pump, bc, chf)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => ṁ])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     dT = q * geom.heated.outer * dz / (ṁ * cp_mock)
     Tc = sol[ssys.chf.T]
@@ -143,8 +143,8 @@ end
     ]
     @named sys = assembly(connections, pump, bc, ch)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
-    hot = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5, T_w => T_WALL + 50.0])
+    sol = solve_steady(ssys)
+    hot = solve_steady(ssys, [T_w => T_WALL + 50.0])
     @test sol.retcode == ReturnCode.Success
     @test hot.retcode == ReturnCode.Success
     @test all(sol[ssys.ch.T_wall_outer[i]] == T_WALL for i in 1:n)
@@ -165,7 +165,7 @@ end
     ]
     @named sys = assembly(conns, pump, bc, ch)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
     @named ch2 = Channel(; n=n, geometry=geom,
@@ -177,7 +177,7 @@ end
     ]
     @named sys2 = assembly(conns, pump, bc, ch2)
     ssys2 = mtkcompile(sys2)
-    sol2 = solve_steady(ssys2, [ssys2.ch2.inlet.ṁ => 0.5])
+    sol2 = solve_steady(ssys2)
     @test sol2.retcode == ReturnCode.Success
     @test all(isapprox.(sol2[ssys2.ch2.T], sol[ssys.ch.T], rtol=1e-6))
     @test all(isapprox.(sol2[ssys2.ch2.q_wall_outer], sol[ssys.ch.q_wall_outer], rtol=1e-6))
@@ -199,7 +199,7 @@ end
     @named sys = assembly(conns, pump, bc, ch)
     ssys = mtkcompile(sys)
     # Callable parameter goes into the same op dict as ICs.
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5, ssys.ch.h_fn => h_fn])
+    sol = solve_steady(ssys, [ssys.ch.h_fn => h_fn])
     @named ch2 = Channel(; n=n, geometry=geom,
                            h=H_DEFAULT)
     conns = [
@@ -210,7 +210,7 @@ end
     @named sys2 = assembly(conns, pump, bc, ch2)
     ssys2 = mtkcompile(sys2)
     # Callable parameter goes into the same op dict as ICs.
-    sol2 = solve_steady(ssys2, [ssys2.ch2.inlet.ṁ => 0.5])
+    sol2 = solve_steady(ssys2)
     @test sol.retcode == ReturnCode.Success
     @test all(isapprox.(sol2[ssys2.ch2.T], sol[ssys.ch.T], rtol=1e-6))
     @test all(isapprox.(sol2[ssys2.ch2.q_wall_outer], sol[ssys.ch.q_wall_outer], rtol=1e-6))
@@ -265,7 +265,7 @@ end
         ]
         @named sys = assembly(conns, pump, bc, cac, ct_l)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
+        sol = solve_steady(ssys)
         return ssys, sol
     end
 
@@ -295,7 +295,7 @@ end
     conns = [inseries(pump, bc, ch, pump), pump.inlet.p ~ 1.0e5, ch.T_wall_left .~ T_WALL]
     @named sys = assembly(conns, pump, bc, ch)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.1])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_INLET
     @test sol[ssys.ch.q_wall] == sol[ssys.ch.q_wall_left]
@@ -315,7 +315,7 @@ end
     @named sys = assembly([inseries(pump, bc, riser, pump), pump.inlet.p ~ 1.0e5],
                           pump, bc, riser)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.riser.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.riser.T_out] ≈ T_INLET
     @test all(iszero, sol[ssys.riser.q_wall])
@@ -339,7 +339,7 @@ const GEOM_SIGN       = Duct(0.6, Circular(0.01))
     ]
     @named sys = assembly(conns, pump, bc, ch)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => ṁ_NEG])
+    sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
 
@@ -365,7 +365,7 @@ end
     ]
     @named sys = assembly(conns, pump, bc, cac, ct_l)
     ssys = mtkcompile(sys; fully_determined=false)
-    sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => ṁ_NEG])
+    sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
 
@@ -396,7 +396,7 @@ end
     ]
     @named sys = assembly(conns, pump, bc, chf)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => ṁ_NEG])
+    sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
 
@@ -540,7 +540,7 @@ end
         ]
         @named sys = assembly(conns, pump, bc, cac, ct_l)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
+        sol = solve_steady(ssys)
         return ssys, sol
     end
 
@@ -642,7 +642,7 @@ end
     # ρv²/2 below it, so that is what the channel reports as P and reads T_sat and T_ONB at.
     n = 5
     ssys = build_loop(; n=n)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     ch = ssys.ch
 
@@ -659,8 +659,8 @@ end
     # cancel around the loop, apart from a few kelvin of buoyancy. The flow is the flat loop's,
     # and the channel's own drop grows by ρgL.
     flat, upright = build_loop(), build_loop(; g_acc=G_EARTH)
-    sol_flat = solve_steady(flat, [flat.ch.inlet.ṁ => 0.5])
-    sol = solve_steady(upright, [upright.ch.inlet.ṁ => 0.5])
+    sol_flat = solve_steady(flat)
+    sol = solve_steady(upright)
     @test sol.retcode == ReturnCode.Success
     @test sol[upright.ch.inlet.ṁ] ≈ sol_flat[flat.ch.inlet.ṁ] rtol = 1e-3
     head = sum(ρ(H2O, T) for T in sol[upright.ch.T]) / 10 * G_EARTH * 0.6
@@ -670,7 +670,7 @@ end
 @testset "a wall cooler than the coolant reports saturation as its ONB temperature" begin
     # The coolant enters at 40 °C over a 30 °C wall, so heat flows into the wall in every cell.
     ssys = build_loop(; n=5, T_wall=30.0)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test all(sol[ssys.ch.q_wall] .< 0)
     @test sol[ssys.ch.T_ONB] == sol[ssys.ch.T_sat]

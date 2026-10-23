@@ -34,7 +34,7 @@ connections = [
 ]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol = solve_steady(sys)
 sol[sys.ch.T_out]
 ```
 
@@ -57,7 +57,7 @@ Bind the wall to a parameter. Its value then goes in the operating point of each
 connections = [inseries(pump, hx, ch, pump), pump.inlet.p ~ 1.0e5, ch.T_wall_outer .~ T_wall]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
-[round(solve_steady(sys, [sys.ch.inlet.ṁ => 0.5, T_wall => Tw])[sys.ch.T_out]; digits=2)
+[round(solve_steady(sys, [T_wall => Tw])[sys.ch.T_out]; digits=2)
  for Tw in (80.0, 100.0, 120.0)]
 ```
 
@@ -100,7 +100,7 @@ connections = [
 ]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol = solve_steady(sys)
 sol[sys.ch.T_out]
 ```
 

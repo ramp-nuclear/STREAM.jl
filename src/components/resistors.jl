@@ -22,19 +22,16 @@ function FrictionResistor(;
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    vars = @variables begin
-        Re(t)
-        f(t)
-    end
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
+    two = HydraulicTwoPort(; name)
+    @unpack inlet, Δp, ṁ = two
+    @variables Re(t) f(t)
     T_in = instream(inlet.T)
-    eqs = Equation[
-        Re ~ STREAM.Re(liquid, T_in, inlet.ṁ, geometry),
-        f ~ darcy(T_in, inlet.ṁ, liquid, geometry),
-        inlet.p - outlet.p ~ darcy_weisbach_dp(inlet.ṁ, ρ(liquid, T_in), f, geometry),
+    eqs = [
+        Re ~ STREAM.Re(liquid, T_in, ṁ, geometry),
+        f ~ darcy(T_in, ṁ, liquid, geometry),
+        Δp ~ -darcy_weisbach_dp(ṁ, ρ(liquid, T_in), f, geometry),
     ]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars)
+    return flow_relation(two, eqs)
 end
 
 """
@@ -52,12 +49,10 @@ Hydrostatic pressure change for a vertical elevation change, `ΔP = ρ g H`.
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Gravity(H, g=G_EARTH; name, liquid::AbstractLiquid=H2O)
-    pars = @parameters H = H
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    T_in = instream(inlet.T)
-    eqs = Equation[inlet.p - outlet.p ~ ρ(liquid, T_in) * g * H]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    two = HydraulicTwoPort(; name)
+    @unpack inlet, Δp = two
+    @parameters H = H
+    return flow_relation(two, [Δp ~ -ρ(liquid, instream(inlet.T)) * g * H])
 end
 
 """
@@ -73,11 +68,10 @@ Generic flow resistance with a fixed resistance coefficient.
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Resistor(R; name)
-    pars = @parameters R = R
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    eqs = Equation[inlet.p - outlet.p ~ R * inlet.ṁ]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    two = HydraulicTwoPort(; name)
+    @unpack Δp, ṁ = two
+    @parameters R = R
+    return flow_relation(two, [Δp ~ -R * ṁ])
 end
 
 """
@@ -137,12 +131,10 @@ function ResistorFromKnownPoint(;
     end
 
     K = 2 * abs(dp) * ρ(liquid, T) / ṁ^2
-    pars = @parameters K = K
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    rho = ρ(liquid, instream(inlet.T))
-    eqs = Equation[inlet.p - outlet.p ~ K * inlet.ṁ * abs(inlet.ṁ) / (2 * rho)]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    two = HydraulicTwoPort(; name)
+    @unpack inlet, Δp, ṁ = two
+    @parameters K = K
+    return flow_relation(two, [Δp ~ -K * ṁ * abs(ṁ) / (2 * ρ(liquid, instream(inlet.T)))])
 end
 
 """
@@ -174,22 +166,18 @@ function VolumetricFlowResistor(;
     klow::Real=0.0,
     density::Union{Real,Function}=(T -> ρ(H2O, T)),
 )
-    pars = @parameters klow = klow
-    if k isa Real
-        kpars = @parameters k = k
-        k_expr = kpars[1]
+    two = HydraulicTwoPort(; name)
+    @unpack inlet, Δp, ṁ = two
+    @parameters klow = klow
+    k_now = if k isa Real
+        only(@parameters k = k)
     else  # a function or other callable: a time-varying resistance as a callable parameter
         FType = typeof(k)
-        kpars = @parameters (k_fn::FType)(..)
-        k_expr = kpars[1](t)
+        only(@parameters (k_fn::FType)(..))(t)
     end
-    pars = Any[pars...; kpars...]
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
     rho = density isa Real ? density : density(instream(inlet.T))
-    q = inlet.ṁ / rho
-    eqs = Equation[inlet.p - outlet.p ~ (k_expr * q * abs(q) + klow * q)]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    q = ṁ / rho
+    return flow_relation(two, [Δp ~ -(k_now * q * abs(q) + klow * q)])
 end
 
 """
@@ -212,11 +200,9 @@ the roles swapped under reversal. The `ṁ·|ṁ|` form keeps the drop direction
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function LocalPressureDrop(; name, A1, A2, liquid::AbstractLiquid=H2O)
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
+    two = HydraulicTwoPort(; name)
+    @unpack inlet, Δp, ṁ = two
     T_in = instream(inlet.T)
-    A = min(A1, A2)
-    f = LocalLoss.factor(inlet.ṁ, A1, A2, μ(liquid, T_in))
-    eqs = Equation[inlet.p - outlet.p ~ dp(inlet.ṁ, ρ(liquid, T_in), f, A)]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs)
+    K = LocalLoss.factor(ṁ, A1, A2, μ(liquid, T_in))
+    return flow_relation(two, [Δp ~ -dp(ṁ, ρ(liquid, T_in), K, min(A1, A2))])
 end

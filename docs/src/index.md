@@ -45,7 +45,7 @@ connections = [
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
 
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol = solve_steady(sys)
 (ṁ=sol[sys.ch.inlet.ṁ], T_out=sol[sys.ch.T_out])
 ```
 

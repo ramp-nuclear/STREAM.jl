@@ -15,6 +15,14 @@ const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
     @test connect_type == ModelingToolkit.Flow
 end
 
+@testset "a port's flow starts in its usual direction" begin
+    @named fp = FlowPort()
+    @named out = FlowPort(; ṁ=-Components.FLOW_START)
+    flow(p) = only(filter(v -> ModelingToolkit.getname(v) == :ṁ, unknowns(p)))
+    @test ModelingToolkit.getdefault(flow(fp)) == Components.FLOW_START > 0
+    @test ModelingToolkit.getdefault(flow(out)) == -Components.FLOW_START
+end
+
 @testset "T is a Stream variable" begin
     @named fp = FlowPort()
     T_var = only(filter(v -> ModelingToolkit.getname(v) == :T, unknowns(fp)))

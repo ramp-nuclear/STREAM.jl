@@ -238,8 +238,9 @@ Components state equations and consume their physics from [`HTC`](@ref STREAM.HT
 [`LocalLoss`](@ref).
 
 - **Connectors.** [`FlowPort`](@ref) carries pressure, mass flow and stream temperature;
-  [`ThermalPort`](@ref) carries a wall temperature and a heat flow. `HydraulicTwoPort` is the
-  shared shell behind every one-inlet, one-outlet component.
+  [`ThermalPort`](@ref) carries a wall temperature and a heat flow. [`HydraulicTwoPort`](@ref)
+  is the shared shell behind every one-inlet, one-outlet component, and
+  [`flow_relation`](@ref) builds a new one from its relation between pressure rise and flow.
 - **Channels.** [`Channel`](@ref), [`ChannelHeatFlux`](@ref) and
   [`ChannelAndContacts`](@ref) share a finite-volume core and differ in how heat arrives: a
   given coefficient, a prescribed flux, or per-cell thermal ports.
@@ -293,7 +294,7 @@ include("components/sources.jl")
 include("components/channels.jl")
 include("components/heat_diffusion.jl")
 include("components/point_kinetics.jl")
-export FlowPort, ThermalPort
+export FlowPort, ThermalPort, HydraulicTwoPort, flow_relation
 export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
 export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
 export ResistorFromKnownPoint

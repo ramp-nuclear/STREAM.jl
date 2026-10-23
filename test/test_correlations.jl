@@ -27,7 +27,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         ]
         @named sys = assembly(conns, pump, bc, cac, wall)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
+        sol = solve_steady(ssys)
 
         @test sol.retcode == ReturnCode.Success
         @test all(isapprox.(sol[ssys.cac.Nu_outer], 8.235, rtol=1e-4))
@@ -61,7 +61,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             conns, pump, bc, cac, ct_l, ct_r
         )
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 8.8e-4])
+        sol = solve_steady(ssys)
 
         @test sol.retcode == ReturnCode.Success
         @test sol[ssys.cac.dP] > 0.0
@@ -124,8 +124,8 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         ]
         @named sys = assembly(conns, pump, bc, cac, ct_l, ct_r)
         ssys = mtkcompile(sys)
-        sol_lam = solve_steady(ssys, [ssys.cac.inlet.ṁ => 1e-4])
-        sol_turb = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.250, ssys.pump.dP_pump => dP_turb])
+        sol_lam = solve_steady(ssys)
+        sol_turb = solve_steady(ssys, [ssys.pump.dP_pump => dP_turb])
         @test sol_lam.retcode == ReturnCode.Success
         @test sol_turb.retcode == ReturnCode.Success
         @test sol_lam[ssys.cac.Re[1]] < 2300.0
@@ -343,10 +343,10 @@ end
         n = 5;
         T_inlet = 40.0;
         T_wall = 100.0;
-        dP_pump = 30.0
-        # Rectangular geom with aspect_ratio = depth/width = 0.1 (a circular geom would
-        # give aspect_ratio = 1.0, a different correlation point).
-        geom = Duct(0.6, Rectangular(1.0, 0.1))
+        dP_pump = 10.0
+        # Aspect ratio depth/width = 0.1 (a circular geom would give 1.0, a different
+        # correlation point). The head keeps the flow laminar, Re ≈ 900.
+        geom = Duct(0.6, Rectangular(0.05, 0.005))
         htc_fd_lam = HTC.FullyDevelopedLaminar()
 
         @named pump_fd = Pump(dP_pump)
@@ -372,7 +372,7 @@ end
         ssys_fd = @test_nowarn mtkcompile(sys_fd)
         @test ssys_fd !== nothing
 
-        sol_fd = solve_steady(ssys_fd, [ssys_fd.cac_fd.inlet.ṁ => 1e-3])
+        sol_fd = solve_steady(ssys_fd)
         @test sol_fd.retcode == ReturnCode.Success
     end
 
@@ -380,10 +380,10 @@ end
         n = 5;
         T_inlet = 40.0;
         T_wall = 100.0;
-        dP_pump = 30.0
-        # Rectangular geom with aspect_ratio = 0.1; Dh follows from the edges
-        # (4 * 1.0*0.1 / (2*(1.0+0.1)) ≈ 0.1818). develop_length stays mandatory.
-        geom = Duct(0.6, Rectangular(1.0, 0.1))
+        dP_pump = 10.0
+        # Aspect ratio depth/width = 0.1, and the head keeps the flow laminar, Re ≈ 900.
+        # develop_length stays mandatory.
+        geom = Duct(0.6, Rectangular(0.05, 0.005))
         htc_dev_lam = HTC.DevelopingLaminar(; develop_length=0.3)
 
         @named pump_dev = Pump(dP_pump)
@@ -410,7 +410,7 @@ end
         ssys_dev = @test_nowarn mtkcompile(sys_dev)
         @test ssys_dev !== nothing
 
-        sol_dev = solve_steady(ssys_dev, [ssys_dev.cac_dev.inlet.ṁ => 1e-3])
+        sol_dev = solve_steady(ssys_dev)
         @test sol_dev.retcode == ReturnCode.Success
     end
 end

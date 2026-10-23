@@ -355,7 +355,7 @@ end
     # Built from a solution rather than by hand, which is what exercises the extraction.
     geo = Duct(0.6, Circular(0.01))
     ssys = build_loop(; n=5)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
 
     # A plain Channel has no `velocity` variable (only ChannelAndContacts declares it), so
     # the extraction has to fall back to the signed `v` and take its magnitude.
@@ -384,8 +384,7 @@ end
     # sets both of its ports, so what reaches the channel is still its 40 °C, while the
     # first cell is now the hot end.
     back = build_loop(; n=5, dP_pump=-3.0e4)
-    op_back = [back.ch.inlet.ṁ => -0.5]
-    reversed = ChannelState(solve_steady(back, op_back), back.ch)
+    reversed = ChannelState(solve_steady(back), back.ch)
     @test reversed.ṁ < 0
     @test reversed.T_inlet ≈ 40.0
     @test reversed.T_inlet < last(reversed.T_bulk) < first(reversed.T_bulk)
@@ -398,7 +397,7 @@ end
     n = 5
     geo = Duct(0.6, Circular(0.01))
     ssys = build_loop(; n=n)
-    sol_ss = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol_ss = solve_steady(ssys)
     sol = solve_transient(
         ssys, sol_ss, range(0.0, 0.5; length=6); overrides=[ssys.pump.dP_pump => 0.0]
     )
@@ -472,10 +471,7 @@ end
     ]
     @named sys = assembly(conns, pump, bc, chf)
     ssys = mtkcompile(sys)
-    ic = [
-        ssys.chf.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
     err = try

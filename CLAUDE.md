@@ -237,13 +237,12 @@ only ones. Both were checked against the Python source, so do not re-derive them
   controlled by, or the controller holding it. The standards tables are not in this repo and
   never should be: point `DecayHeat.standards_dir!` at them, or set
   `STREAM_DECAY_HEAT_STANDARDS`.
-- **Seed a loss-of-flow steady solve with its flows.** Solve the pump-on state with
-  `solve_steady(...; solver=DynamicSS(Rodas5P()))`, which integrates to where the model
-  settles, and start the flow unknowns `mtkcompile` keeps away from zero: started at zero, the
-  solve stays at ṁ = 0 and fails. The bypass loss-of-flow testset in `test/test_valves.jl`
-  seeds the pump head, its two kept flows at the head over `ext_res` and the dummy derivative,
-  and nothing else. If a change to a channel equation changes which flows `mtkcompile` keeps,
-  that list is the first thing to look at.
+- **A loss-of-flow steady solve integrates to where the model settles.** Solve the pump-on
+  state with `solve_steady(...; solver=DynamicSS(Rodas5P()))`. Its flows need no values: every
+  `FlowPort` flow defaults to `FLOW_START`, 0.1 kg/s, in the port's usual direction, so none
+  starts at the ṁ = 0 a quadratic law stalls at. The bypass loss-of-flow testset in
+  `test/test_valves.jl` gives the pump head and the dummy derivative `mtkcompile` introduces,
+  and nothing else.
 
   Do not "fix" a failed solve with a sign constraint on ṁ. This loop's flow legitimately
   reverses after the pump trips, so forbidding negative flow would forbid the physics.
@@ -280,7 +279,7 @@ bottom. That friction is intentional: it is what stopped the list growing to 145
 
 ## MTK in this repo
 
-General MTK v11 usage is in the skill. Two choices specific to this codebase:
+General MTK v11 usage is in the skill. Choices specific to this codebase:
 
 - **Coolant properties are plain arithmetic, not `@register_symbolic`.** MTK traces through
   them, so dispatch on the liquid happens once while equations are built and the solver gets
@@ -290,6 +289,17 @@ General MTK v11 usage is in the skill. Two choices specific to this codebase:
 - **Diagnostics go in `observed`.** Components pass `observed=[...]` to `System` for quantities
   nothing else reads (`Re`, `Nu`, `htc`). A quantity another equation references must be a
   plain unknown.
+- **A two-port states its law through `flow_relation`.** `HydraulicTwoPort(; name)` holds the
+  ports, mass conservation and the temperature pass-through, and observes
+  `Δp = outlet.p - inlet.p` and `ṁ = inlet.ṁ`. A component unpacks them, states its law, and
+  hands it over: `flow_relation(two, [Δp ~ -R * ṁ])`. `Δp` and `ṁ` stay observables: as unknowns they change
+  which variables `mtkcompile` keeps, and a shut flapper's `Δp` once started inconsistent with
+  the loop and aborted a time-integrating steady solve.
+- **Flows start away from zero.** A closed loop has a solution with no flow, and a quadratic
+  law has no slope there, so every `FlowPort` flow defaults to `FLOW_START`, 0.1 kg/s, in the
+  port's usual direction: a component builds its outlet with `ṁ=-FLOW_START`. A steady solve
+  then does not depend on which of a loop's equal flows `mtkcompile` keeps. Put a flow in an
+  operating point only where you know better than the default.
 
 ## Running the code
 

@@ -496,10 +496,7 @@ _fa_pair(left, right) = (left, :thermal_right) => (right, :thermal_left)
     ssys = mtkcompile(full; build_initializeprob=false)
     # A Dt(...) => 0.0 guess for every channel's inlet flow: mtkcompile keeps only one of
     # them as a differential state and which one is not known ahead of time.
-    ic = [
-        [ch.inlet.ṁ => 0.2 for ch in (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)]...,
-        [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)]...,
-    ]
+    ic = [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
 end
@@ -537,10 +534,7 @@ end
     @named full = assembly(conns, asm, pump, bc)
     ssys = mtkcompile(full; build_initializeprob=false)
     channels = (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)
-    ic = [
-        [ch.inlet.ṁ => 0.2 for ch in channels]...,
-        [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in channels]...,
-    ]
+    ic = [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in channels]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
 end
@@ -607,7 +601,7 @@ end
         # The tuple weighted returns is both the path to wire and the systems to compose.
         @named sys = assembly(conns, pump, hx, branch...)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+        sol = solve_steady(ssys)
         @test sol.retcode == ReturnCode.Success
         return ssys, sol
     end

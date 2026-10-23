@@ -194,7 +194,7 @@ function _setup(geometry, n)
     q_face = _per_face(:q_wall_, faces, n)
 
     @named inlet = FlowPort()
-    @named outlet = FlowPort()
+    @named outlet = FlowPort(; ṁ=-FLOW_START)
 
     cells = map(scalarize, (; T, dp, Re, Pe, v, P, T_sat, T_ONB, q_wall))
     vars = (; cells..., T_in, T_out, dP, T_wall, q_face)

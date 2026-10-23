@@ -20,7 +20,7 @@ using STREAM.Components
     )
     @named sys = assembly([corner.(0:7); pump.inlet.p ~ 1.0e5], pump, values(r)...)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.r01.inlet.ṁ => 0.1])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
     ṁ = dP / (5 / 6 * R)
@@ -41,7 +41,7 @@ end
     ]
     @named sys = assembly(conns, pump, hx, vfr)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.vfr.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     ṁ = sol[ssys.vfr.inlet.ṁ]
     @test isapprox(ṁ, sqrt(dP / k); rtol=1e-6)         # k*Q^2 = dP, Q = ṁ (rho=1)
@@ -64,7 +64,7 @@ end
     ]
     @named sys = assembly(conns, pump, hx, vfr)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.vfr.inlet.ṁ => 0.4])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     q = sol[ssys.vfr.inlet.ṁ]                         # rho=1 ⇒ Q = ṁ
     @test isapprox(
@@ -159,7 +159,7 @@ end
     ]
     @named sys = assembly(conns, pump, hx, lpd)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.lpd.inlet.ṁ => ṁ])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     A = min(A1, A2)
     f = STREAM.LocalLoss.factor(ṁ, A1, A2, μ(H2O, Tin))
@@ -178,7 +178,7 @@ end
         conns = [inseries(pump, hx, r, pump), pump.inlet.p ~ 1.0e5]
         @named sys = assembly(conns, pump, hx, r)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.r.inlet.ṁ => guess])
+        sol = solve_steady(ssys)
         @test sol.retcode == ReturnCode.Success
         return sol[ssys.r.inlet.ṁ]
     end
