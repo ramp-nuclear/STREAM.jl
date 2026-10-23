@@ -69,18 +69,15 @@ end
     # `DittusBoelter` and require it to reproduce Python's reference h_tc to machine precision.
     # This is why the connected-face HTC matches Python to 0.000% in the live parity:
     # the formula is exact, and `_h_eff` selects the physically-meaningful (q≠0) face.
-    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-    Dh = geom.Dh
-    A = geom.A
+    geom = Duct(0.6, Rectangular(0.07, 0.00127))
     htc = HTC.DittusBoelter()
     for i in 1:length(PARITY_MTR_ASYM_H_TC_LEFT_R)
         h_julia = htc(
             PARITY_MTR_ASYM_T_WALL_LEFT_R[i],
             PARITY_MTR_ASYM_T_CELLS_R[i],
             PARITY_MTR_ASYM_ṁ_R,
-            Dh,
-            A,
             H2O,
+            geom,
         )
         @test isapprox(h_julia, PARITY_MTR_ASYM_H_TC_LEFT_R[i]; rtol=1e-6)
     end
@@ -116,12 +113,12 @@ end
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
-    geom_simple = PipeGeometry_circular(0.6, 0.01)
+    geom_simple = Duct(0.6, Circular(0.01))
     assert_equivalence_geometry(geom_simple,
         0.01,                    # Dh
         π * 0.01^2 / 4,          # A
         π * 0.01,                # wet_perimeter
-        (π * 0.01, 0.0);         # circular: full perimeter on one face, (πD, 0) — not annular
+        (π * 0.01, 0.0);         # Python's circular parts, (πD, 0): one heated face
         rtol=1e-12)
     assert_equivalence_anchors()
 
@@ -131,17 +128,13 @@ end
     @named pump = Pump(3.0e4)
     @named hx = HeatExchanger(T_inlet)
     @named cac = ChannelAndContacts(; n=n, geometry=geom_simple)
-    @named ct_l = ConstantTemperature(T_wall; n=n)
-    @named ct_r = ConstantTemperature(T_wall; n=n)
+    @named wall = ConstantTemperature(T_wall; n=n)
     conns = [
         inseries(pump, hx, cac, pump),
         pump.inlet.p ~ 1.0e5,
-        faces(
-            (ct_l, :thermal) => (cac, :thermal_left),
-            (ct_r, :thermal) => (cac, :thermal_right),
-        ),
+        faces((wall, :thermal) => (cac, :thermal_outer)),
     ]
-    @named sys = assembly(conns, pump, hx, cac, ct_l, ct_r)
+    @named sys = assembly(conns, pump, hx, cac, wall)
     ssys = mtkcompile(sys)
 
     op = [ssys.cac.inlet.ṁ => 0.5]
@@ -171,37 +164,22 @@ end
     end
 
     dz = 0.6 / n
-    heated_l = geom_simple.heated_parts[1]   # circular: full perimeter πD on one face
-    heated_r = geom_simple.heated_parts[2]   # circular: 0 (no second heated face)
-    full_perim = heated_l + heated_r          # πD
+    # Python's circular pipe puts its whole perimeter on its left face and carries a second,
+    # zero-width one. Julia's has the one face, `outer`, so it is compared with Python's
+    # left, and Python's empty right face has nothing to match.
+    heated = geom_simple.heated.outer
     for i in 1:n
-        push!(rows, parity_check("simple_loop", "T_wall_left[$i]",
-                                 sol[port(ssys.cac, :thermal_left, i).T],
+        push!(rows, parity_check("simple_loop", "T_wall_outer[$i]",
+                                 sol[port(ssys.cac, :thermal_outer, i).T],
                                  PARITY_SIMPLE_T_WALL_LEFT[i]))
-        push!(rows, parity_check("simple_loop", "T_wall_right[$i]",
-                                 sol[port(ssys.cac, :thermal_right, i).T],
-                                 PARITY_SIMPLE_T_WALL_RIGHT[i]))
-        push!(rows, parity_check("simple_loop", "h_tc_left[$i]",
-                                 sol[ssys.cac.h_tc_left[i]],
+        push!(rows, parity_check("simple_loop", "h_tc_outer[$i]",
+                                 sol[ssys.cac.h_tc_outer[i]],
                                  PARITY_SIMPLE_H_TC_LEFT[i];
                                  note="Gap #2 candidate (HTC film-T vs bulk-T)"))
-        push!(rows, parity_check("simple_loop", "h_tc_right[$i]",
-                                 sol[ssys.cac.h_tc_right[i]],
-                                 PARITY_SIMPLE_H_TC_RIGHT[i];
-                                 note="Gap #2 candidate (HTC film-T vs bulk-T)"))
-        push!(rows, parity_check("simple_loop", "q_density_left[$i]",
-                                 sol[ssys.cac.q_wall_left[i]] / (heated_l * dz),
+        push!(rows, parity_check("simple_loop", "q_density_outer[$i]",
+                                 sol[ssys.cac.q_wall_outer[i]] / (heated * dz),
                                  PARITY_SIMPLE_Q_DENSITY_LEFT[i]))
-        # Circular geometry has no second heated face (heated_parts[2]=0), so a
-        # per-face q_density_right is undefined (0/0). q_wall_right is identically 0;
-        # the comparison is carried by q_density_left and q_density_total below.
-        if heated_r > 0
-            push!(rows, parity_check("simple_loop", "q_density_right[$i]",
-                                     sol[ssys.cac.q_wall_right[i]] / (heated_r * dz),
-                                     PARITY_SIMPLE_Q_DENSITY_RIGHT[i]))
-        end
-        q_total_julia = (sol[ssys.cac.q_wall_left[i]] + sol[ssys.cac.q_wall_right[i]]) /
-                        (full_perim * dz)
+        q_total_julia = sol[ssys.cac.q_wall_outer[i]] / (heated * dz)
         q_total_python = (PARITY_SIMPLE_Q_DENSITY_LEFT[i] + PARITY_SIMPLE_Q_DENSITY_RIGHT[i]) / 2
         push!(rows, parity_check("simple_loop", "q_density_total[$i]",
                                  q_total_julia, q_total_python;
@@ -219,7 +197,7 @@ end
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
-    geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    geom_mtr = Duct(0.6, Rectangular(0.07, 0.00127))
     assert_equivalence_geometry(geom_mtr,
         PARITY_MTR_GEOM_DH,
         PARITY_MTR_GEOM_AREA,
@@ -291,7 +269,7 @@ end
                                  sol[ssys.cac_r.T[i]], PARITY_MTR_SYM_T_CELLS_R[i]))
     end
     dz = 0.6 / nz
-    heated_part = geom_mtr.heated_parts[1]   # 0.07 m
+    heated_part = geom_mtr.heated.left   # 0.07 m
     for i in 1:nz
         # Left channel
         push!(rows, parity_check("mtr_symmetric", "T_wall_left_l[$i]",
@@ -355,7 +333,7 @@ end
 # Clad MTR: the symmetric loop with a clad plate, 2 aluminium cells either side of 3 meat
 # cells, power in the meat only.
 @testset "Python parity: MTR clad" begin
-    geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    geom_mtr = Duct(0.6, Rectangular(0.07, 0.00127))
     nz = 10
     x = Utilities.x_boundaries(2, 3, 0.4e-3, 0.47e-3)
     meat = repeat(permutedims(1:7 .∈ Ref(3:5)), nz)
@@ -395,7 +373,7 @@ end
                                  sol[port(ssys.cac_l, :thermal_right, i).T],
                                  PARITY_MTR_CLAD_T_WALL_RIGHT_L[i]))
         push!(rows, parity_check("mtr_clad", "q_right_l[$i]",
-                                 sol[ssys.cac_l.q_wall_right[i]] / (geom_mtr.heated_parts[2] * dz),
+                                 sol[ssys.cac_l.q_wall_right[i]] / (geom_mtr.heated.right * dz),
                                  PARITY_MTR_CLAD_Q_RIGHT_L[i]))
     end
     for z in 1:nz, j in 1:7
@@ -415,7 +393,7 @@ end
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
-    geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    geom_mtr = Duct(0.6, Rectangular(0.07, 0.00127))
     assert_equivalence_geometry(geom_mtr,
         PARITY_MTR_GEOM_DH, PARITY_MTR_GEOM_AREA,
         PARITY_MTR_GEOM_WETPERIM, PARITY_MTR_GEOM_HEATED;
@@ -491,7 +469,7 @@ end
     end
 
     dz = 0.6 / nz
-    heated_part = geom_mtr.heated_parts[1]
+    heated_part = geom_mtr.heated.left
     for i in 1:nz
         # Left channel
         push!(rows, parity_check("mtr_asymmetric", "T_wall_left_l[$i]",
@@ -561,7 +539,7 @@ end
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
-    geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    geom_mtr = Duct(0.6, Rectangular(0.07, 0.00127))
     assert_equivalence_geometry(geom_mtr,
         PARITY_MTR_GEOM_DH, PARITY_MTR_GEOM_AREA,
         PARITY_MTR_GEOM_WETPERIM, PARITY_MTR_GEOM_HEATED;
@@ -577,7 +555,7 @@ end
     slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
                   material=Solid(2700.0, 900.0, 200.0))
     @named hd = HeatDiffusion(slab; power=1e4)
-    scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
+    scc = single_channel(cac_l, hd; fuel_side=:left, name=:scc)
     cac = scc.cac_l
     fuel = scc.hd
     conns = [
@@ -615,7 +593,7 @@ end
     end
 
     dz = 0.6 / nz
-    heated_part = geom_mtr.heated_parts[1]
+    heated_part = geom_mtr.heated.left
     for i in 1:nz
         push!(rows, parity_check("mtr_one_sided", "T_wall_left_l[$i]",
                                  sol[port(cac_s, :thermal_left, i).T],
@@ -754,7 +732,7 @@ end
     @named pump_v02 = Pump(3.0e4)
     @named hx_v02 = HeatExchanger(T_in_v02)
     @named cac_v02 = ChannelAndContacts(;
-        n=nz_v02, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+        n=nz_v02, geometry=Duct(0.6, Rectangular(0.07, 0.00127))
     )
     slab = Slab(; x=range(0, 0.00127, nx_v02 + 1), z=range(0, 0.6, nz_v02 + 1), y=0.07,
                   material=Solid(2700.0, 900.0, 200.0))

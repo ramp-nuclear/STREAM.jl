@@ -192,7 +192,7 @@ function HeatDiffusion(body::Union{Slab,Cylinder}; name, axial::Bool=false, powe
     along = (1, ports(:top, nx), ports(:bottom, nx), Az, diff(z), z_contacts)
     directions = axial ? (across, along) : (across,)
 
-    T = collect(T)
+    T = scalarize(T)
     eqs, net = Equation[], zeros(nz, nx)
     for (dims, lo, hi, A, Δ, contacts) in directions
         q, port_eqs = _conduction(T, lo, hi, A, Δ ./ 2κs, contacts, dims)

@@ -22,7 +22,7 @@ function build_loop(; n=10, dP_pump=3.0e4, T_inlet=40.0, T_wall=100.0, g_acc=0.0
     L = 0.6
     @named pump = Pump(dP_pump)
     @named bc = HeatExchanger(T_inlet)
-    @named ch = Channel(; n, geometry=PipeGeometry_circular(L, 0.01), g=g_acc, h_left=5000.0)
+    @named ch = Channel(; n, geometry=Duct(L, Circular(0.01)), g=g_acc, h=5000.0)
     parts = Any[pump, bc, ch]
     iszero(g_acc) || push!(parts, Gravity(-L, g_acc; name=:ret))
     pars, wall = [], T_wall
@@ -34,8 +34,7 @@ function build_loop(; n=10, dP_pump=3.0e4, T_inlet=40.0, T_wall=100.0, g_acc=0.0
     connections = [
         inseries(parts..., pump),
         pump.inlet.p ~ 1.0e5,
-        ch.T_wall_left .~ wall,
-        ch.T_wall_right .~ T_inlet,   # inert: h_right is 0
+        ch.T_wall_outer .~ wall,
     ]
     @named sys = assembly(connections, parts...; parameters=pars)
     return mtkcompile(sys)
@@ -53,9 +52,9 @@ with the flow and every temperature at `T_inlet`.
 """
 function build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, P0=1.0, feedback=nothing,
                        power_input=nothing)
-    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    geom = Duct(0.6, Rectangular(0.070, 0.0025))
     @named cac = ChannelAndContacts(; n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=8.235),
-                                    darcy=Friction.RectangularLaminar(geom))
+                                    darcy=Friction.RectangularLaminar())
     slab = Slab(; x=range(0, 0.005, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
                 material=Solid(19300.0, 116.0, 174.0))
     @named fuel = HeatDiffusion(slab)

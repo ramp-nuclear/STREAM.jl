@@ -19,7 +19,7 @@ Here the knob is the channel gap, and the plate keeps its thickness:
 
 ```@example knob
 gap = @design_knob gap = 0.0024
-geometry = PipeGeometry_rectangular(0.6, 0.067, gap, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, gap); heated=0.063)
 
 n = 10
 plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
@@ -35,8 +35,8 @@ sys = mtkcompile(loop)
 nothing # hide
 ```
 
-[`PipeGeometry_rectangular`](@ref) and [`PipeGeometry_circular`](@ref) accept a knob for any
-length, and the area, hydraulic diameter and perimeters follow it. A knob used in several
+A [`Duct`](@ref) and its shape accept a knob for any length, and the area, hydraulic diameter
+and perimeters follow it. A knob used in several
 components is one parameter: changing it moves all of them.
 
 ## Solve at each value

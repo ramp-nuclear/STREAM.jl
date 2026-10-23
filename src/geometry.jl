@@ -1,152 +1,347 @@
 """
-    PipeGeometry{T}
+    AbstractShape
 
-The cross-section and length of a channel or pipe. Build one with
-[`PipeGeometry_rectangular`](@ref) or [`PipeGeometry_circular`](@ref).
+The cross-section of a [`Duct`](@ref): [`Rectangular`](@ref), [`Circular`](@ref),
+[`Annular`](@ref), or [`Effective`](@ref) for one known only by its area and perimeter.
 
-The fields are `Float64` for a fixed geometry. When a dimension is a design knob (see
-[`@design_knob`](@ref)) they are symbolic, so `remake` can change the geometry without
-rebuilding the model.
-
-# Fields
-- `L`: length [m]
-- `Dh`: hydraulic diameter `4A / wet_perimeter` [m]
-- `A`: flow area [m²]
-- `heated_perimeter`: total heated perimeter [m], the sum of `heated_parts`
-- `wet_perimeter`: wetted perimeter [m]
-- `heated_parts`: heated perimeter of the left and right faces [m]
-- `width`: the longer cross-section edge [m], `D` for a circle
-- `depth`: the shorter cross-section edge [m], `D` for a circle
+A new shape defines [`flow_area`](@ref), [`wetted_perimeter`](@ref) and [`walls`](@ref).
+Correlations that only hold for one shape dispatch on it, as `Duct{<:Rectangular}`.
 """
-struct PipeGeometry{T<:Real}
-    L                ::T
-    Dh               ::T
-    A                ::T
-    heated_perimeter ::T
-    wet_perimeter    ::T
-    heated_parts     ::NTuple{2,T}
-    width            ::T
-    depth            ::T
-end
+abstract type AbstractShape end
 
-# Coerce a length input: plain numbers become Float64 (the fixed-geometry behavior); a
-# design knob or any other Num passes through so geometry derives symbolically.
-_lenparam(x::Num) = x
-_lenparam(x::Real) = Float64(x)
+"""
+    _lengths(xs...) -> Tuple
 
-@doc raw"""
-    PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
+Coerce lengths to one element type: `Float64` for a fixed geometry, or `Num` as soon as one of
+them is a design knob, so the geometry derives symbolically.
+"""
+_lengths(xs...) = any(x -> x isa Num, xs) ? map(Num, xs) : map(Float64, xs)
 
-A rectangular channel, such as the gap between two fuel plates:
+"""
+    _ordered(a, b) -> (larger, smaller)
 
-```math
-A = e_1 e_2, \qquad P_{wet} = 2 (e_1 + e_2), \qquad D_h = 4A / P_{wet}
-```
+Two lengths, larger first. `ifelse` rather than `max` and `min`, so a knob-driven length
+orders correctly at whatever value the knob takes.
+"""
+_ordered(a, b) = (ifelse(a >= b, a, b), ifelse(a >= b, b, a))
 
-Any length may be a design knob.
+"""
+    Rectangular(edge1, edge2) <: AbstractShape
+
+A rectangular cross-section, such as the gap between two fuel plates. The edges go in either
+order: `width` is the longer and `depth` the shorter. Either may be a design knob.
+
+Its heatable walls are the two long ones, `left` and `right`.
 
 # Arguments
-- `L`: length [m]
-- `edge1`, `edge2`: the two cross-section edges [m], in either order, such as the plate width
-  and the channel gap
-- `heated_edge`: heated width of each face [m]
-- `one_sided`: `:left` or `:right` to heat one face only, or `nothing` for both (default)
+- `edge1`, `edge2`: the two edges [m]
 
 # Returns
-A [`PipeGeometry`](@ref).
-
-# Examples
-A 70 mm by 1.27 mm MTR channel, 0.6 m long:
-```jldoctest
-julia> g = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-PipeGeometry
-  L      0.6 m
-  Dh     0.0024947 m
-  A      8.89e-5 m^2
-  width  0.07 m
-  depth  0.00127 m
-  perimeter  wet 0.14254 m, heated 0.14 m
-  heated_parts  (0.07, 0.07) m
-
-julia> g.Dh
-0.0024947383190683323
-```
-"""
-function PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
-    _L = _lenparam(L)
-    _e1 = _lenparam(edge1)
-    _e2 = _lenparam(edge2)
-    _he = _lenparam(heated_edge)
-    # If any length is symbolic, promote all flow lengths to Num so the struct fields share
-    # one element type. A fixed (all-numeric) geometry never enters this branch.
-    if any(x -> x isa Num, (_L, _e1, _e2, _he))
-        _L, _e1, _e2, _he = Num(_L), Num(_e1), Num(_e2), Num(_he)
-    end
-    area = _e1 * _e2
-    wet_perimeter = 2.0 * (_e1 + _e2)
-    Dh = 4.0 * area / wet_perimeter
-    if one_sided === nothing
-        heated_perimeter = 2.0 * _he
-        heated_parts = (_he, _he)
-    elseif one_sided === :left
-        heated_perimeter = _he
-        heated_parts = (_he, zero(_he))
-    elseif one_sided === :right
-        heated_perimeter = _he
-        heated_parts = (zero(_he), _he)
-    else
-        throw(ArgumentError("one_sided must be :left, :right, or nothing; got $one_sided"))
-    end
-    # Symbolic-safe ordering: ifelse evaluates correctly at any knob value, so a knob-driven
-    # edge scans through width/depth (and the correlations that read them). For a fixed
-    # geometry it folds to the same Float64 as max/min.
-    _width = ifelse(_e1 >= _e2, _e1, _e2)
-    _depth = ifelse(_e1 >= _e2, _e2, _e1)
-    return PipeGeometry(
-        _L, Dh, area, heated_perimeter, wet_perimeter, heated_parts, _width, _depth
-    )
-end
-
-"""
-    PipeGeometry_circular(L, D)
-
-A circular pipe, `Dh = D`. Its whole perimeter counts as the left face, so
-`heated_parts = (πD, 0)`. Either length may be a design knob.
-
-# Arguments
-- `L`: length [m]
-- `D`: diameter [m]
-
-# Returns
-A [`PipeGeometry`](@ref).
+A `Rectangular` with fields `width` and `depth`.
 
 # Examples
 ```jldoctest
-julia> PipeGeometry_circular(1.0, 0.01).A
+julia> Rectangular(0.00127, 0.07)
+Rectangular(0.07, 0.00127)
+```
+"""
+struct Rectangular{T<:Real} <: AbstractShape
+    width::T
+    depth::T
+    function Rectangular(edge1::Real, edge2::Real)
+        width, depth = _ordered(_lengths(edge1, edge2)...)
+        return new{typeof(width)}(width, depth)
+    end
+end
+
+"""
+    Circular(D) <: AbstractShape
+
+A circular cross-section of diameter `D` [m], which may be a design knob. Its one wall is
+`outer`.
+
+# Examples
+```jldoctest
+julia> flow_area(Circular(0.01))
 7.853981633974483e-5
 ```
 """
-function PipeGeometry_circular(L, D)
-    _L = _lenparam(L)
-    _D = _lenparam(D)
-    if _L isa Num || _D isa Num
-        _L, _D = Num(_L), Num(_D)
-    end
-    area = π * _D^2 / 4
-    perimeter = π * _D
-    heated_parts = (perimeter, zero(perimeter))
-    return PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _D, _D)
+struct Circular{T<:Real} <: AbstractShape
+    D::T
+    Circular(D::Real) = (d = only(_lengths(D)); new{typeof(d)}(d))
 end
 
-function Base.show(io::IO, ::MIME"text/plain", g::PipeGeometry)
-    r(x) = x isa Real ? round(x; sigdigits=5) : x
-    print(io, "PipeGeometry")
-    print(io, "\n  L      ", r(g.L), " m")
-    print(io, "\n  Dh     ", r(g.Dh), " m")
-    print(io, "\n  A      ", r(g.A), " m^2")
-    print(io, "\n  width  ", r(g.width), " m")
-    print(io, "\n  depth  ", r(g.depth), " m")
-    print(io, "\n  perimeter  wet ", r(g.wet_perimeter),
-          " m, heated ", r(g.heated_perimeter), " m")
-    print(io, "\n  heated_parts  (", r(g.heated_parts[1]), ", ", r(g.heated_parts[2]), ") m")
+"""
+    Annular(D1, D2) <: AbstractShape
+
+The ring between two concentric circles, such as the coolant gap around a fuel rod in a tube.
+The diameters go in either order: `D_in` is the smaller and `D_out` the larger. Either may be
+a design knob. Its walls are `inner` and `outer`.
+
+# Arguments
+- `D1`, `D2`: the two diameters [m]
+
+# Returns
+An `Annular` with fields `D_in` and `D_out`.
+
+# Examples
+```jldoctest
+julia> hydraulic_diameter(Annular(0.016, 0.010))
+0.006
+```
+"""
+struct Annular{T<:Real} <: AbstractShape
+    D_in::T
+    D_out::T
+    function Annular(D1::Real, D2::Real)
+        D_out, D_in = _ordered(_lengths(D1, D2)...)
+        return new{typeof(D_in)}(D_in, D_out)
+    end
+end
+
+"""
+    Effective(; area, wetted_perimeter) <: AbstractShape
+
+A cross-section known only by its flow area [m²] and wetted perimeter [m], as Python STREAM's
+`EffectivePipe` takes them. Its walls are whatever its duct names as heated. Correlations that
+need a shape's edges do not accept it.
+
+# Examples
+```jldoctest
+julia> hydraulic_diameter(Effective(; area=1.0, wetted_perimeter=1.0))
+4.0
+```
+"""
+struct Effective{T<:Real} <: AbstractShape
+    area::T
+    wetted_perimeter::T
+    function Effective(; area::Real, wetted_perimeter::Real)
+        a, p = _lengths(area, wetted_perimeter)
+        return new{typeof(a)}(a, p)
+    end
+end
+
+"""
+    walls(shape) -> NamedTuple
+
+The walls of a shape that can be heated, by name, with each one's width [m].
+[`Effective`](@ref) has no fixed walls and returns `nothing`.
+
+# Examples
+```jldoctest
+julia> walls(Annular(0.010, 0.016))
+(inner = 0.031415926535897934, outer = 0.05026548245743669)
+```
+"""
+walls(s::Rectangular) = (left=s.width, right=s.width)
+walls(s::Circular) = (outer=π * s.D,)
+walls(s::Annular) = (inner=π * s.D_in, outer=π * s.D_out)
+walls(::Effective) = nothing
+
+@doc raw"""
+    Duct(L, shape; heated)
+
+A straight duct of length `L` and constant cross-section, heated over some of its walls.
+
+Each heated wall is one face of a channel built on the duct, with its own wall temperature
+and heat flow, named after the wall: `left` and `right` for a rectangle, `outer` for a
+circle, `inner` and `outer` for an annulus. A wall left out of `heated` is not heated, and
+the channel gives it no face. The defaults heat both long walls of a rectangle across their
+width, a circle's whole wall, and an annulus's inner wall, the rod. An [`Effective`](@ref)
+duct has no default.
+
+```math
+D_h = 4A / P_{wet}
+```
+
+Any length may be a design knob (see [`@design_knob`](@ref)).
+
+# Arguments
+- `L`: length [m]
+- `shape`: the cross-section, an [`AbstractShape`](@ref)
+- `heated`: the heated width of each heated wall [m], as a named tuple such as
+  `(left=0.063, right=0.063)`. A number gives every default wall that width.
+
+# Returns
+A `Duct` with fields `L`, `shape` and `heated`. [`flow_area`](@ref),
+[`hydraulic_diameter`](@ref), [`wetted_perimeter`](@ref) and [`heated_perimeter`](@ref) give
+the rest.
+
+# Throws
+- `ArgumentError`: for a wall the shape does not have, or a heated width that is not
+  positive or is wider than its wall
+
+# Examples
+A 70 mm by 1.27 mm MTR channel, 0.6 m long, and the same channel heated on one side:
+```jldoctest
+julia> d = Duct(0.6, Rectangular(0.07, 0.00127))
+Duct, 0.6 m long, Rectangular(0.07, 0.00127)
+  flow area           8.89e-5 m^2
+  hydraulic diameter  0.0024947 m
+  heated              0.07 m left, 0.07 m right
+
+julia> Duct(0.6, Rectangular(0.07, 0.00127); heated=(left=0.063,)).heated
+(left = 0.063,)
+```
+"""
+struct Duct{S<:AbstractShape,T<:Real,H<:NamedTuple}
+    L::T
+    shape::S
+    heated::H
+end
+
+function Duct(L::Real, shape::AbstractShape; heated=_default_heated(shape))
+    faces = heated isa Real ? map(_ -> heated, _default_heated(shape)) : heated
+    faces isa NamedTuple ||
+        throw(ArgumentError("`heated` is a named tuple of widths, such as (left=0.063,)"))
+    _check_heated(shape, faces)
+    L, widths... = _lengths(L, values(faces)...)
+    return Duct(L, shape, NamedTuple{keys(faces)}(widths))
+end
+
+"""
+    _default_heated(shape) -> NamedTuple
+
+The heated widths a [`Duct`](@ref) gets when given none: every wall of the shape at its full
+width, except an annulus, heated on its inner wall only.
+
+# Throws
+- `ArgumentError`: for an [`Effective`](@ref) shape, which has no walls to default to
+"""
+_default_heated(s::AbstractShape) = walls(s)
+_default_heated(s::Annular) = (inner=π * s.D_in,)
+_default_heated(s::Effective) =
+    throw(ArgumentError("an Effective duct needs `heated`, naming its heated walls"))
+
+"""
+    _check_heated(shape, heated)
+
+Throw an `ArgumentError` for a heated wall the shape does not have, or a fixed heated width
+that is not positive or is wider than its wall. A knob-driven width is not checked.
+"""
+function _check_heated(shape, heated)
+    available = walls(shape)
+    for (wall, width) in pairs(heated)
+        if available !== nothing && !haskey(available, wall)
+            throw(ArgumentError("$(nameof(typeof(shape))) has no wall :$wall to heat; " *
+                                "its walls are $(join(repr.(keys(available)), ", "))"))
+        end
+        (width isa Num || available isa Nothing || available[wall] isa Num) && continue
+        0 < width <= available[wall] * (1 + 1e-12) || throw(ArgumentError(
+            "heated width $width of wall :$wall is outside (0, $(available[wall])]"))
+    end
+end
+
+"""
+    flow_area(x) -> m^2
+
+The flow area of a [`Duct`](@ref) or of its shape.
+"""
+flow_area(s::Rectangular) = s.width * s.depth
+flow_area(s::Circular) = π * s.D^2 / 4
+flow_area(s::Annular) = π * (s.D_out^2 - s.D_in^2) / 4
+flow_area(s::Effective) = s.area
+flow_area(d::Duct) = flow_area(d.shape)
+
+"""
+    wetted_perimeter(x) -> m
+
+The perimeter the coolant wets, of a [`Duct`](@ref) or of its shape.
+"""
+wetted_perimeter(s::Rectangular) = 2 * (s.width + s.depth)
+wetted_perimeter(s::Circular) = π * s.D
+wetted_perimeter(s::Annular) = π * (s.D_out + s.D_in)
+wetted_perimeter(s::Effective) = s.wetted_perimeter
+wetted_perimeter(d::Duct) = wetted_perimeter(d.shape)
+
+"""
+    hydraulic_diameter(x) -> m
+
+`4A / P_wet`, of a [`Duct`](@ref) or of its shape. A circle's is its diameter, and an
+annulus's the difference of its two.
+"""
+hydraulic_diameter(s::AbstractShape) = 4 * flow_area(s) / wetted_perimeter(s)
+hydraulic_diameter(s::Circular) = s.D
+hydraulic_diameter(s::Annular) = s.D_out - s.D_in
+hydraulic_diameter(d::Duct) = hydraulic_diameter(d.shape)
+
+"""
+    heated_perimeter(d::Duct) -> m
+
+The heated width of every heated wall together.
+"""
+heated_perimeter(d::Duct) = sum(values(d.heated); init=zero(d.L))
+
+"""
+    aspect_ratio(x) -> Float64
+
+`depth / width` of a rectangular [`Duct`](@ref) or shape, in (0, 1]. Only rectangles have one.
+
+# Examples
+```jldoctest
+julia> round(aspect_ratio(Rectangular(0.07, 0.0014)); digits=6)
+0.02
+```
+"""
+aspect_ratio(s::Rectangular) = s.depth / s.width
+aspect_ratio(d::Duct) = aspect_ratio(d.shape)
+
+"""
+    _DuctKey
+
+The metadata key a channel stores its [`Duct`](@ref) under, read back by [`duct`](@ref).
+"""
+struct _DuctKey end
+
+"""
+    duct(channel) -> Duct
+
+The [`Duct`](@ref) a channel was built with. Every STREAM channel carries its own, compiled
+or not, so analysis reads the geometry off the channel rather than being handed it again.
+
+# Arguments
+- `channel`: a channel system, such as `ssys.cell.ch`
+
+# Returns
+The channel's `Duct`.
+
+# Throws
+- `ArgumentError`: for a system that is not a STREAM channel
+
+# Example
+```julia
+@named ch = Components.Channel(; n=10, geometry=Duct(0.6, Circular(0.01)))
+duct(ch)   # Duct, 0.6 m long, Circular(0.01)
+```
+"""
+function duct(sys::ModelingToolkit.AbstractSystem)
+    d = ModelingToolkit.getmetadata(sys, _DuctKey, nothing)
+    d === nothing && throw(ArgumentError(
+        "$(nameof(sys)) carries no duct: only a channel built by STREAM does"))
+    return d
+end
+
+"""
+    _with_duct(sys, d::Duct) -> System
+
+`sys` carrying `d`, for [`duct`](@ref) to read back.
+"""
+_with_duct(sys, d::Duct) = ModelingToolkit.setmetadata(sys, _DuctKey, d)
+
+# A duct is one value in a broadcast, as a coolant is.
+Base.broadcastable(d::Duct) = Ref(d)
+
+Base.show(io::IO, s::Rectangular) = print(io, "Rectangular(", s.width, ", ", s.depth, ")")
+Base.show(io::IO, s::Circular) = print(io, "Circular(", s.D, ")")
+Base.show(io::IO, s::Annular) = print(io, "Annular(", s.D_in, ", ", s.D_out, ")")
+Base.show(io::IO, s::Effective) =
+    print(io, "Effective(; area=", s.area, ", wetted_perimeter=", s.wetted_perimeter, ")")
+
+function Base.show(io::IO, ::MIME"text/plain", d::Duct)
+    r(x) = x isa Real && !(x isa Num) ? round(x; sigdigits=5) : x
+    print(io, "Duct, ", r(d.L), " m long, ", d.shape)
+    print(io, "\n  flow area           ", r(flow_area(d)), " m^2")
+    print(io, "\n  hydraulic diameter  ", r(hydraulic_diameter(d)), " m")
+    faces = ["$(r(w)) m $f" for (f, w) in pairs(d.heated)]
+    print(io, "\n  heated              ", isempty(faces) ? "nowhere" : join(faces, ", "))
 end

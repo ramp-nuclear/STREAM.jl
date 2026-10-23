@@ -43,13 +43,8 @@ function HeatExchanger(T_bc; UA=nothing, liquid::AbstractLiquid=H2O, name)
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     if UA === nothing
-        eqs = Equation[
-            inlet.ṁ + outlet.ṁ ~ 0,
-            inlet.p - outlet.p ~ 0,
-            outlet.T ~ T_bc,
-            inlet.T ~ T_bc,
-        ]
-        return compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+        eqs = [inlet.ṁ + outlet.ṁ ~ 0, inlet.p ~ outlet.p, outlet.T ~ T_bc, inlet.T ~ T_bc]
+        return assembly(eqs, inlet, outlet; name)
     end
     vars = @variables T_in(t) C(t) ΔT(t) Q(t)
     UA_val, ua_pars, ua_vars, ua_eqs = _conductance(UA, inlet.ṁ)

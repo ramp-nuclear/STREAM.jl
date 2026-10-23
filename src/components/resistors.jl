@@ -9,7 +9,7 @@ laminar/turbulent blend and, if asked for, the heated-wall viscosity correction.
 
 # Arguments
 - `name`: system name (Symbol)
-- `geometry`: pipe geometry descriptor ([`PipeGeometry`](@ref))
+- `geometry`: the [`Duct`](@ref)
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref)
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
 
@@ -18,11 +18,10 @@ laminar/turbulent blend and, if asked for, the heated-wall viscosity correction.
 """
 function FrictionResistor(;
     name,
-    geometry::PipeGeometry,
+    geometry::Duct,
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    geom = geometry
     vars = @variables begin
         Re(t)
         f(t)
@@ -30,25 +29,24 @@ function FrictionResistor(;
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
-    Ax, Dh, Lx = geom.A, geom.Dh, geom.L
     eqs = Equation[
-        Re ~ STREAM.Re(liquid, T_in, inlet.ṁ, Ax, Dh),
-        f ~ darcy(T_in, inlet.ṁ, liquid, geom),
-        inlet.p - outlet.p ~ darcy_weisbach_dp(inlet.ṁ, ρ(liquid, T_in), f, Lx, Dh, Ax),
+        Re ~ STREAM.Re(liquid, T_in, inlet.ṁ, geometry),
+        f ~ darcy(T_in, inlet.ṁ, liquid, geometry),
+        inlet.p - outlet.p ~ darcy_weisbach_dp(inlet.ṁ, ρ(liquid, T_in), f, geometry),
     ]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, vars)
 end
 
 """
-    Gravity(H; name) -> System
+    Gravity(H, g=G_EARTH; name, liquid=H2O) -> System
 
-Hydrostatic pressure change for a vertical elevation change.
+Hydrostatic pressure change for a vertical elevation change, `ΔP = ρ g H`.
 
 # Arguments
 - `H`: elevation change [m], positive = upward
-- `g`: gravitational acceleration [m/s^2]
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
+- `g`: gravitational acceleration [m/s^2] (default [`G_EARTH`](@ref))
 - `name`: system name (Symbol)
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
@@ -156,7 +154,7 @@ volumetric flow rate. The `Q·|Q|` form keeps the drop direction-correct under f
 A **time-dependent** resistance (the "transistor" pattern: a branch whose resistance
 collapses or grows over time) is expressed by passing `k` as a callable `(t) -> k`; the user
 then supplies `vfr.k_fn => fn` in the solve `op` dict (the MTK callable-parameter idiom, the
-same one `Channel`'s `h_left` uses).
+same one `Channel`'s `h` uses).
 
 # Arguments
 - `name`: system name (Symbol)
@@ -188,12 +186,7 @@ function VolumetricFlowResistor(;
     pars = Any[pars...; kpars...]
     @named inlet = FlowPort()
     @named outlet = FlowPort()
-    T_in = instream(inlet.T)
-    rho = if density isa Real
-        Num(density)
-    else
-        density(T_in)
-    end
+    rho = density isa Real ? density : density(instream(inlet.T))
     q = inlet.ṁ / rho
     eqs = Equation[inlet.p - outlet.p ~ (k_expr * q * abs(q) + klow * q)]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)

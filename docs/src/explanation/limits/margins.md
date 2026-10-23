@@ -51,8 +51,8 @@ global ones, and say which one an acceptance criterion is written for.
 ## Which face
 
 A plate between two channels heats each from one face, and the two faces can carry different
-fluxes. The threshold functions on a `ChannelState` take a `direction`, or [`chfr`](@ref Thresholds.chfr)
-does: `:left`, `:right`, or `:max` for the larger flux, the conservative default. A face that
+fluxes. The threshold functions on a `ChannelState` take a `face`, or [`chfr`](@ref Thresholds.chfr)
+does: one of the channel's faces, or `:max` for the largest flux, the conservative default. A face that
 is not heating the coolant gives an infinite ratio, since a wall the coolant is cooling cannot
 reach CHF.
 

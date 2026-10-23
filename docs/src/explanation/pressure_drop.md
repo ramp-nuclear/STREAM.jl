@@ -107,10 +107,10 @@ the pressure drop itself, ``\propto f\,\text{Re}^2``, goes smoothly to zero.
 ```@example dp
 using STREAM, CairoMakie
 
-geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
+geom = Duct(0.6, Rectangular(0.067, 0.0024))
 Re = 10 .^ range(2, 5; length=300)
-k_R = Friction.rectangular_correction(geom.depth / geom.width)
-rd = Friction.RegimeDependent(; k_R)
+k_R = Friction.rectangular_correction(geom)
+rd = Friction.RegimeDependent(; k_R=Friction.rectangular_correction)
 
 fig = Figure(size=(700, 440))
 ax = Axis(fig[1, 1]; xscale=log10, yscale=log10, xlabel="Reynolds number",
@@ -120,7 +120,7 @@ lines!(ax, Re, Friction.laminar.(Re .* k_R); label="laminar, plate channel")
 lines!(ax, Re, Friction.blasius.(Re); label="Blasius")
 lines!(ax, Re, Friction.turbulent.(Re); label="Colebrook-White, smooth")
 # The model takes a mass flow, so turn each Reynolds number into one at 40 °C.
-ṁ = Re .* geom.A .* μ(H2O, 40.0) ./ geom.Dh
+ṁ = Re .* flow_area(geom) .* μ(H2O, 40.0) ./ hydraulic_diameter(geom)
 lines!(ax, Re, [rd(40.0, 40.0, m, H2O, geom) for m in ṁ];
        label="regime dependent, plate channel", linewidth=3, color=(:black, 0.35))
 axislegend(ax; position=:rt)
@@ -201,8 +201,7 @@ than its falling leg has a net buoyancy head
 ```
 
 which drives natural circulation. This is why the sign of ``g`` on every channel and gravity
-element matters, and [`check_gravity_mismatch`](@ref STREAM.Assemblies.check_gravity_mismatch)
-checks that the channels of a loop agree about which way is up.
+element matters.
 
 ## Inertia
 

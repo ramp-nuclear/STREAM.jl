@@ -43,13 +43,21 @@ function assembly(connections, components...; name, parameters=[],
 end
 
 """
+    _flat(xs...) -> Vector{Equation}
+
+Every equation in `xs`, in order, however they nest: single equations, vectors and tuples of
+them, and the symbolic arrays a broadcast `.~` over a symbolic array gives.
+"""
+_flat(xs...) = _flatten_eqs!(Equation[], xs)
+
+"""
     _flatten_eqs!(eqs, x) -> Vector{Equation}
 
 Append every equation in `x` to `eqs`, descending into vectors, tuples and symbolic arrays.
 """
 _flatten_eqs!(eqs, x::Equation) = push!(eqs, x)
-# Iterating a symbolic array yields bare symbolic terms; collect materialises the equations.
-_flatten_eqs!(eqs, x::ModelingToolkit.Symbolics.Arr) = _flatten_eqs!(eqs, collect(x))
+# Iterating a symbolic array yields bare symbolic terms; scalarize materialises the equations.
+_flatten_eqs!(eqs, x::ModelingToolkit.Symbolics.Arr) = _flatten_eqs!(eqs, scalarize(x))
 function _flatten_eqs!(eqs, x::Union{AbstractArray,Tuple})
     foreach(e -> _flatten_eqs!(eqs, e), x)
     return eqs

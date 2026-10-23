@@ -37,7 +37,7 @@ T_in = 35.0                    # inlet temperature [°C]
 p_out = 1.67e5                 # pressure at the channel outlets, under the pool [Pa]
 dp_pump = 1.0e5                # pump head [Pa]
 
-geometry = PipeGeometry_rectangular(L, 0.0666, gap, heated_width)
+geometry = Duct(L, Rectangular(0.0666, gap); heated=heated_width)
 
 # ## The plates
 #

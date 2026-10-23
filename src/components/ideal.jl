@@ -109,10 +109,8 @@ function ConstantTemperature(T; n::Int=(T isa AbstractVector ? length(T) : 1), n
         length(T) == n ||
             throw(DimensionMismatch("T has length $(length(T)), expected n=$n"))
         @parameters T_bc[1:n] = T
-        eqs = [thermal[i].T ~ T_bc[i] for i in 1:n]
     else
         @parameters T_bc = T
-        eqs = [thermal[i].T ~ T_bc for i in 1:n]
     end
-    return compose(System(eqs, t, [], [T_bc]; name=name), thermal...)
+    return assembly(port(thermal, :T) .~ T_bc, thermal...; name)
 end

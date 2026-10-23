@@ -573,7 +573,7 @@ end
     T_cold = 20.0
     T_hot = 80.0    # Python 80 C
     g_acc = G_EARTH
-    geom = PipeGeometry_circular(1.0, D_pipe)
+    geom = Duct(1.0, Circular(D_pipe))
     nz = 9            # Python z_boundaries = linspace(0, L, 10) -> 9 cells
     # Friction model: the faithful Python correlation,
     # friction_factor("regime_dependent", re_bounds=(2000,5000), k_R=1.0) — laminar 64/Re below
@@ -621,8 +621,8 @@ end
     # against the two channels' friction in series; the steady balance grav_dp = Σ f·|m|·m/(2ρA²)·(L/Dh)
     # fixes a finite |ṁ| ceiling. Any point in the window has driving head ≤ grav_dp, so the
     # reversed flow can never exceed this ceiling. The runaway surrogate had no such ceiling.
-    A = geom.A
-    Dh = geom.Dh
+    A = flow_area(geom)
+    Dh = hydraulic_diameter(geom)
     L_ch = geom.L
     # Friction head of the two channels in series at flow m.
     loop_friction(m) = sum(
@@ -714,8 +714,8 @@ end
     nx = 1
     k_s = 1.0
     Lx = 1.0
-    # Mock one-sided pipe (heated_parts = (0, 1), area 1) + mock solid (all 1).
-    geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
+    # Mock one-sided pipe (heated only on the right, area 1) + mock solid (all 1).
+    geom = Duct(1.0, Effective(; area=1.0, wetted_perimeter=1.0); heated=(right=1.0,))
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
     slab = Slab(; x=[0.0, Lx], z=range(0, 1.0, nz + 1), y=1.0, material=Solid(1.0, 1.0, k_s))
@@ -726,9 +726,6 @@ end
     conns = [
         inseries(pump, bc, osc.cac, pump),
         pump.inlet.p ~ 1.0e5,
-        # Unheated left face (heated_parts[1]=0 ⇒ Q=0) has a floating wall T; pin it to the
-        # coolant temp (an insulated wall carries no heat, so this is just a closure).
-        port(osc.cac, :thermal_left, :T) .~ osc.cac.T,
     ]
     full = assembly(conns, osc, pump, bc; name=:sys4)
     ssys = mtkcompile(full)
@@ -766,7 +763,7 @@ end
     nx = 1
     ṁs = [1.0, 0.7, 0.4]        # distinct ṁs ⇒ distinct slopes off the shared power
     N = length(ṁs)
-    geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
+    geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=(left=1.0, right=1.0))
     # Distinct names per channel/fuel so the shared PK gets a distinct T_source_<name> feedback
     # group for each component (temperature_feedback keys off nameof).
     cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
@@ -904,7 +901,7 @@ end
     n = 7
     nz = 7
     nx = 1
-    geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
+    geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=(left=1.0, right=1.0))
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
     slab = Slab(; x=[0.0, 1.0], z=range(0, 1.2, nz + 1), y=1.0, material=Solid(1.0, 1.0, 1.0))

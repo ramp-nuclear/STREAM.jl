@@ -42,8 +42,7 @@ function solve_steady(
     # Dense output would only feed interpolation, which DynamicSS never reads, and with it
     # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
     inner = solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
-    sol = solve(prob, solver; abstol=abstol, reltol=reltol, inner...)
-    return sol
+    return solve(prob, solver; abstol, reltol, inner...)
 end
 
 """
@@ -87,19 +86,10 @@ function solve_transient(
     initializealg=SciMLBase.NoInit(), build_initializeprob=nothing, kwargs...,
 )
     tspan = (Float64(t[1]), Float64(t[end]))
-    prob = build_initializeprob === nothing ?
-        ODEProblem(ssys, op, tspan; warn_initialize_determined=false) :
-        ODEProblem(ssys, op, tspan; warn_initialize_determined=false,
-                   build_initializeprob=build_initializeprob)
-    sol = solve(
-        prob,
-        solver;
-        saveat=t,
-        callback=callbacks,
-        initializealg=initializealg,
-        merge(values(kwargs), _saved_steps(prob, t, kwargs))...,
-    )
-    return sol
+    init = build_initializeprob === nothing ? (;) : (; build_initializeprob)
+    prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false, init...)
+    return solve(prob, solver; saveat=t, callback=callbacks, initializealg,
+                 merge(values(kwargs), _saved_steps(prob, t, kwargs))...)
 end
 
 """

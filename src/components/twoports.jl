@@ -45,7 +45,9 @@ Phenomena", Modelica Conference 2009.
 - `pars`: parameters the component introduces (default none)
 
 # Returns
-An uncompiled `System` with `inlet` and `outlet` composed in.
+An uncompiled `System` with `inlet` and `outlet` composed in. It also observes `Δp`, the
+pressure rise `outlet.p - inlet.p` as Python STREAM's `dp_out`, and `ṁ`, the flow in at the
+inlet, so `sol[ssys.r.Δp]` reads any two-port's pressure change.
 """
 function HydraulicTwoPort(; name, inlet, outlet, eqs, vars=[], pars=[])
     full_eqs = Equation[
@@ -54,5 +56,7 @@ function HydraulicTwoPort(; name, inlet, outlet, eqs, vars=[], pars=[])
         outlet.T ~ instream(inlet.T),
         inlet.T ~ instream(outlet.T),
     ]
-    return compose(System(full_eqs, t, vars, pars; name=name), inlet, outlet)
+    @variables Δp(t) ṁ(t)
+    obs = [Δp ~ outlet.p - inlet.p, ṁ ~ inlet.ṁ]
+    return compose(System(full_eqs, t, [vars; Δp; ṁ], pars; observed=obs, name), inlet, outlet)
 end

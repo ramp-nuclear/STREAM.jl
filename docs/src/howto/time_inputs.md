@@ -24,7 +24,7 @@ a parameter of the model, a *callable parameter*:
 | Component | Argument | Parameter | Needs it in the operating point |
 |:---|:---|:---|:---|
 | [`Pump`](@ref STREAM.Components.Pump) | the head, `Pump(f)` | `dP_pump_fn` | yes |
-| [`Channel`](@ref STREAM.Components.Channel) | `h_left`, `h_right` | `h_left_fn`, `h_right_fn` | yes |
+| [`Channel`](@ref STREAM.Components.Channel) | `h`, or one face's entry in it | `h_fn`, or `h_<face>_fn` such as `h_left_fn` | yes |
 | [`VolumetricFlowResistor`](@ref STREAM.Components.VolumetricFlowResistor) | `k` | `k_fn` | yes |
 | [`PointKinetics`](@ref STREAM.Components.PointKinetics) | the control reactivity | `rho_c_fn` | no, it stores its default |
 | [`PointKinetics`](@ref STREAM.Components.PointKinetics) | `power_input` | `power_input_fn` | no, it stores its default |

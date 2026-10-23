@@ -1,6 +1,10 @@
-# The Sudo-Kaminaga CHF correlation is a maximum over three branch expressions; these are the
-# branches. Kept private because only q_CHF_sudo_kaminaga has any use for them.
+"""
+    _SKq1(G_star), _SKq2(A_ratio, G_star, dT_inlet),
+    _SKq3(A_ratio, w, lamda, dT_inlet, rho_v, rho_l), _SKq4(G_star, dT_outlet)
 
+The four dimensionless branches [`q_CHF_sudo_kaminaga`](@ref) selects between. `_SKq4` is
+infinite at no flow, where it would divide by zero.
+"""
 function _SKq1(G_star)
     return 0.005 * abs(G_star)^0.611
 end
@@ -16,6 +20,15 @@ end
 function _SKq4(G_star, dT_outlet)
     return iszero(G_star) ? Inf : _SKq1(G_star) * (1 + 5000 * dT_outlet / abs(G_star))
 end
+
+"""
+    _width(shape) -> m
+
+The channel width `_SKq3` reads: a rectangle's long edge, and, as in Python STREAM, the
+hydraulic diameter of a circular or annular channel.
+"""
+_width(s::Rectangular) = s.width
+_width(s::Union{Circular,Annular}) = hydraulic_diameter(s)
 
 # #### Public API
 
@@ -80,7 +93,7 @@ function q_boiling_onset(ṁ, T_sat, T_inlet, cp)
 end
 
 @doc raw"""
-    q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe) -> Q [W]
+    q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, duct) -> Q [W]
 
 Channel power at the onset of flow instability, from the Whittle-Forgan correlation
 [WhittleForgan1967](@cite) with Fabrèga's flow-dependent `η` [Fabrega1971](@cite):
@@ -96,7 +109,7 @@ correlation was fitted. See [Onset of flow instability](@ref) for the physics.
 - `ṁ`: mass flow rate [kg/s] (sign-insensitive; uses `abs(ṁ)`)
 - `T_sat`: saturation temperature [°C]
 - `T_inlet`: coolant inlet temperature [°C]
-- `pipe`: channel geometry [`PipeGeometry`]
+- `duct`: the channel's [`Duct`](@ref)
 
 - `liquid`: the coolant whose `cₚ` is integrated (default [`H2O`](@ref))
 
@@ -105,21 +118,21 @@ OFI limit power `Q_OFI` [W].
 
 # Examples
 ```jldoctest
-julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
+julia> duct = Duct(0.6, Rectangular(0.0671, 0.0024));  # 2.4 mm MTR gap
 
-julia> round(Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe); sigdigits=7)
+julia> round(Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, duct); sigdigits=7)
 135474.3
 ```
 """
-function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=H2O)
-    G = abs(ṁ) / pipe.A
+function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, duct; liquid::AbstractLiquid=H2O)
+    G = abs(ṁ) / flow_area(duct)
     G_cgs = G / 10  # SI to CGS conversion (G must be in CGS per Whittle-Forgan)
     integral_cp, _ = quadgk(T -> cₚ(liquid, T), T_inlet, T_sat)
-    return abs(ṁ) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
+    return abs(ṁ) * integral_cp / (1.0 + 3.15 * (hydraulic_diameter(duct) / duct.L) * (1.08 * G_cgs)^0.29)
 end
 
 @doc raw"""
-    q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing) -> q_OSV [W/m^2]
+    q_OSV_saha_zuber(T_inlet, ṁ, duct, coolant; flux_shape=nothing, dz=nothing) -> q_OSV [W/m^2]
 
 Onset of significant void (OSV) heat flux per cell, from Saha and Zuber
 [SahaZuber1974](@cite), with the bulk temperature computed as though the channel ran at the
@@ -140,50 +153,51 @@ end, so under reversed flow it starts at the last cell. This is Python STREAM's
 # Arguments
 - `T_inlet`: temperature of the coolant entering the channel [°C]
 - `ṁ`: mass flow rate [kg/s]; its sign says which end is upstream
-- `pipe`: channel geometry [`PipeGeometry`]
+- `duct`: the channel's [`Duct`](@ref)
 - `coolant`: coolant properties per cell as a [`Liquid`](@ref), at the bulk temperature and
   pressure, e.g. `H2O(T_bulk, P)`. Supplies cₚ, κ and Tsat.
 - `flux_shape`: axial heat flux per cell, in any normalization; default uniform
-- `dz`: axial cell lengths [m]; default `pipe.L / n`
+- `dz`: axial cell lengths [m]; default `duct.L / n`
 
 # Returns
 OSV heat flux per cell [W/m²].
 
 # Examples
 ```jldoctest
-julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
+julia> duct = Duct(0.6, Rectangular(0.0671, 0.0024));  # 2.4 mm MTR gap
 
 julia> coolant = H2O(fill(26.85, 10), fill(1e5, 10));  # 10 cells at 26.85 °C and 1 bar
 
-julia> round(last(Thresholds.q_OSV_saha_zuber(26.85, 0.5, pipe, coolant)); sigdigits=9)
+julia> round(last(Thresholds.q_OSV_saha_zuber(26.85, 0.5, duct, coolant)); sigdigits=9)
 1.44385224e6
 ```
 """
 function q_OSV_saha_zuber(
-    T_inlet, ṁ, pipe, coolant::Liquid; flux_shape=nothing, dz=nothing
+    T_inlet, ṁ, duct, coolant::Liquid; flux_shape=nothing, dz=nothing
 )
     n = flux_shape === nothing ? length(coolant.ρ) : length(flux_shape)
-    cells(x) = x isa AbstractArray ? collect(x) : fill(x, n)
-    shape = flux_shape === nothing ? ones(n) : collect(float.(flux_shape))
-    dz_c = dz === nothing ? fill(pipe.L / n, n) : cells(dz)
+    cells(x) = x isa AbstractArray ? x : fill(x, n)
+    shape = flux_shape === nothing ? ones(n) : float.(flux_shape)
+    dz_c = dz === nothing ? fill(duct.L / n, n) : cells(dz)
     cp_c, κ_c, T_sat = cells(coolant.cₚ), cells(coolant.κ), cells(coolant.Tsat)
 
-    G = abs(ṁ) / pipe.A
-    Pe_c = G * pipe.Dh .* cp_c ./ κ_c
-    X = ifelse.(Pe_c .<= 7e4, κ_c ./ pipe.Dh .* 455.0, 0.0065 .* G .* cp_c)
+    G = abs(ṁ) / flow_area(duct)
+    Dh = hydraulic_diameter(duct)
+    Pe_c = G * Dh .* cp_c ./ κ_c
+    X = ifelse.(Pe_c .<= 7e4, κ_c ./ Dh .* 455.0, 0.0065 .* G .* cp_c)
 
     # The coolant reaching a cell has been heated by every cell before it in the flow, so
     # the running sum starts at whichever end the flow enters. Reversing twice does that
     # under reversed flow and hands the result back in cell order.
     upstream(a) = ṁ >= 0 ? a : reverse(a)
     heated = upstream(cumsum(upstream(shape .* dz_c)))
-    power_factor = pipe.heated_perimeter ./ (abs(ṁ) .* cp_c)
+    power_factor = heated_perimeter(duct) ./ (abs(ṁ) .* cp_c)
     denominator = 1 .+ X .* power_factor .* heated ./ shape
     return X .* (T_sat .- T_inlet) ./ denominator
 end
 
 """
-    q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant) -> q_CHF [W/m^2]
+    q_CHF_sudo_kaminaga(T_bulk, ṁ, duct, gravity, sat_coolant) -> q_CHF [W/m^2]
 
 Critical heat flux from the Sudo-Kaminaga correlation for plate-type fuel
 [SudoKaminaga1993, Kaminaga1998](@cite). See [Critical heat flux](@ref) for the physics and
@@ -205,13 +219,13 @@ and q3 are driven by the temperature difference at the **inlet** and q4 by the o
 **outlet**. Only those two differences come from the channel ends; the `cp/hfg` factor
 multiplying them stays per cell, as in Python STREAM.
 
-`q3` reads the channel width `pipe.width`, not half the heated perimeter, following the
+`q3` reads the channel width, not half the heated perimeter, following the
 experiments it was fitted to. This is Python STREAM's `Sudo_Kaminaga_CHF`.
 
 # Arguments
 - `T_bulk`: bulk coolant temperature, per cell [°C]
 - `ṁ`: mass flow rate [kg/s]
-- `pipe`: channel geometry [`PipeGeometry`]
+- `duct`: the channel's [`Duct`](@ref)
 - `gravity`: gravitational acceleration [m/s^2]. Only its size is used. The branch
   follows the sign of the flow, positive taken as downward, as in Python STREAM
 - `sat_coolant`: saturated-coolant properties as a [`Liquid`](@ref), supplying ρ, ρᵥ, cₚ,
@@ -225,23 +239,23 @@ CHF heat flux `q_CHF` [W/m²], shaped like the inputs.
 # Examples
 Downward flow at 0.5 kg/s with the bulk at 46.85 °C, against book values for water at 1 atm:
 ```jldoctest
-julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
+julia> duct = Duct(0.6, Rectangular(0.0671, 0.0024));  # 2.4 mm MTR gap
 
 julia> sat = Substances.Liquid(; ρ=958.4, ρᵥ=0.598, cₚ=4217.0, hfg=2257e3, σ=0.059, Tsat=100.0);
 
-julia> round(Thresholds.q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat); sigdigits=9)
+julia> round(Thresholds.q_CHF_sudo_kaminaga(46.85, 0.5, duct, 9.81, sat); sigdigits=9)
 1.39178807e6
 ```
 """
-function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
+function q_CHF_sudo_kaminaga(T_bulk, ṁ, duct, gravity, sat_coolant::Liquid)
     g_abs = abs(gravity)
     rho_l, rho_v = sat_coolant.ρ, sat_coolant.ρᵥ
     hfg, cp, T_sat = sat_coolant.hfg, sat_coolant.cₚ, sat_coolant.Tsat
 
     drho = rho_l .- rho_v
     lamda = sqrt.(sat_coolant.σ ./ drho ./ g_abs)
-    G_star = ṁ ./ pipe.A ./ sqrt.(lamda .* drho .* rho_v .* g_abs)
-    A_ratio = pipe.A / (sum(pipe.heated_parts) * pipe.L)
+    G_star = ṁ ./ flow_area(duct) ./ sqrt.(lamda .* drho .* rho_v .* g_abs)
+    A_ratio = flow_area(duct) / (heated_perimeter(duct) * duct.L)
 
     # The driving temperature differences are the channel's, taken at its two ends. The
     # cp/hfg factor in front of them is local.
@@ -250,7 +264,7 @@ function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
 
     q1 = _SKq1.(G_star)
     q2 = _SKq2.(A_ratio, G_star, dT_inlet)
-    q3 = _SKq3.(A_ratio, pipe.width, lamda, dT_inlet, rho_v, rho_l)
+    q3 = _SKq3.(A_ratio, _width(duct.shape), lamda, dT_inlet, rho_v, rho_l)
     q4 = _SKq4.(G_star, dT_outlet)
 
     # Downward or horizontal flow takes the forced selection; upward flow also admits q1.
@@ -295,7 +309,7 @@ function q_CHF_mirshak(T_bulk, T_sat, pressure, v)
 end
 
 @doc raw"""
-    q_CHF_fabrega(T_inlet, T_sat, pipe) -> q_CHF [W/m^2]
+    q_CHF_fabrega(T_inlet, T_sat, duct) -> q_CHF [W/m^2]
 
 Critical heat flux from Fabrèga's low-flow correlation [Fabrega1971](@cite), for slow flows
 (`v < 0.5` m/s):
@@ -309,21 +323,21 @@ in W/m², with `Dh` in m. See [Critical heat flux](@ref).
 # Arguments
 - `T_inlet`: coolant bulk temperature at inlet [°C]
 - `T_sat`: saturation temperature [°C]
-- `pipe`: channel geometry [`PipeGeometry`] (uses `pipe.Dh`)
+- `duct`: the channel's [`Duct`](@ref), for its hydraulic diameter
 
 # Returns
 CHF heat flux `q_CHF` [W/m²].
 
 # Examples
 ```jldoctest
-julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
+julia> duct = Duct(0.6, Rectangular(0.0671, 0.0024));  # 2.4 mm MTR gap
 
-julia> Thresholds.q_CHF_fabrega(26.85, 100.0, pipe)
+julia> Thresholds.q_CHF_fabrega(26.85, 100.0, duct)
 289290.40230215824
 ```
 """
-function q_CHF_fabrega(T_inlet, T_sat, pipe)
-    return 1e7 * pipe.Dh * (0.023 * (T_sat - T_inlet) + 4.56)
+function q_CHF_fabrega(T_inlet, T_sat, duct)
+    return 1e7 * hydraulic_diameter(duct) * (0.023 * (T_sat - T_inlet) + 4.56)
 end
 
 @doc raw"""
