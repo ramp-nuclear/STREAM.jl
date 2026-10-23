@@ -186,7 +186,7 @@ end
     # Python: test_inertia_with_friction_in_PCS_coastdown
     # Inertia + quadratic friction, pump shutdown: ṁ = ṁ0/(1 + α·ṁ0·t),
     # α = |dp_out(ṁ=1)|/inertia. Python's fixed-f Friction has dp = (dp0/ṁ0²)·ṁ|ṁ|
-    # (the density cancels), so a VolumetricFlowResistor(k=dp0/ṁ0²) on a unit-density Liquid reproduces it.
+    # (the density cancels), so a VolumetricFlowResistor(k=dp0/ṁ0², density=1) reproduces it.
     inertia = 8.0e3
     T = 20.0
     dp0 = 1.6e5
@@ -196,7 +196,7 @@ end
     alpha = K / inertia
     @named pump = Pump(dp0)
     @named L_el = Inertia(inertia)
-    @named R = VolumetricFlowResistor(; k=K, liquid=Substances.Liquid())
+    @named R = VolumetricFlowResistor(; k=K, density=1.0)
     @named hx = HeatExchanger(T)
     conns = [
         inseries(pump, L_el, R, hx, pump),
@@ -232,8 +232,8 @@ end
     alpha = total_k / inertia
     @named pump = Pump(total_k * ṁ0^2)   # head that holds ṁ0 through the parallel block
     @named L_el = Inertia(inertia)
-    @named R1 = VolumetricFlowResistor(; k=k1, liquid=Substances.Liquid())
-    @named R2 = VolumetricFlowResistor(; k=k2, liquid=Substances.Liquid())
+    @named R1 = VolumetricFlowResistor(; k=k1, density=1.0)
+    @named R2 = VolumetricFlowResistor(; k=k2, density=1.0)
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, L_el),
@@ -435,7 +435,7 @@ end
     ṁ0 = 1.0
     @named pump = Pump(k * ṁ0^2)      # holds ṁ0 through R while the flapper is closed
     @named ine = Inertia(1.0e3)
-    @named R = VolumetricFlowResistor(; k=k, liquid=Substances.Liquid())
+    @named R = VolumetricFlowResistor(; k=k, density=1.0)
     machine = StateMachine(; initial_state=:CLOSED)
     # The loop settles at |Δp| ≈ 0.3 Pa across the flapper, inside the default 1 Pa band where
     # the flow law is rounded off, so the band is narrowed as Python's test narrows it.
@@ -476,8 +476,8 @@ end
     total_k0 = k1 * k2 / (sqrt(k1) + sqrt(k2))^2   # combined coeff at t=0 (transistor still stiff)
     @named pump = Pump(total_k0)                    # holds ṁ0=1 through the parallel block
     @named ine = Inertia(1.0e3)
-    @named R = VolumetricFlowResistor(; k=k1, liquid=Substances.Liquid())
-    @named transistor = VolumetricFlowResistor(; k=kfn, liquid=Substances.Liquid())
+    @named R = VolumetricFlowResistor(; k=k1, density=1.0)
+    @named transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(hx, pump, ine),

@@ -51,19 +51,9 @@ Hydrostatic pressure change for a vertical elevation change, `ΔP = ρ g H`.
 function Gravity(H, g=G_EARTH; name, liquid::AbstractLiquid=H2O)
     two = HydraulicTwoPort(; name)
     @unpack inlet, Δp = two
-    elevation = H   # @parameters rebinds H to the symbol
     @parameters H = H
-    sys = flow_relation(two, [Δp ~ -ρ(liquid, instream(inlet.T)) * g * H])
-    return ModelingToolkit.setmetadata(sys, _ElevationKey, elevation)
+    return flow_relation(two, [Δp ~ -ρ(liquid, instream(inlet.T)) * g * H])
 end
-
-"""
-    _ElevationKey
-
-The metadata key a [`Gravity`](@ref) component stores its elevation change `H` [m] under, for
-`check_gravity_mismatch` to read.
-"""
-struct _ElevationKey end
 
 """
     Resistor(R; name) -> System
@@ -148,7 +138,7 @@ function ResistorFromKnownPoint(;
 end
 
 """
-    VolumetricFlowResistor(; name, k, klow=0.0, liquid=H2O) -> System
+    VolumetricFlowResistor(; name, k, klow=0.0, density=(T -> ρ(H2O, T))) -> System
 
 Resistor quadratic in volumetric flow: `ΔP = k·Q·|Q| + klow·Q`, where `Q = ṁ/ρ` is the
 volumetric flow rate. The `Q·|Q|` form keeps the drop direction-correct under flow reversal.
@@ -163,9 +153,9 @@ same one `Channel`'s `h` uses).
 - `k`: quadratic resistance coefficient [kg/m^7]; `Real` (fixed) or `Function` (time-varying
   via `k_fn` callable parameter)
 - `klow`: linear (low-flow) coefficient [kg/(m^4·s)], default `0.0`
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), whose density at the inlet
-  stream temperature turns mass flow into volumetric flow. A fixed
-  [`Liquid`](@ref STREAM.Substances.Liquid) gives a constant density.
+- `density`: the density [kg/m^3] used to turn mass flow into volumetric flow; `Real` for a
+  constant, or `Function` `(T) -> rho` evaluated at the inlet stream temperature. Defaults to
+  light water at the inlet temperature.
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
@@ -174,7 +164,7 @@ function VolumetricFlowResistor(;
     name,
     k::Union{Real,Function},
     klow::Real=0.0,
-    liquid::AbstractLiquid=H2O,
+    density::Union{Real,Function}=(T -> ρ(H2O, T)),
 )
     two = HydraulicTwoPort(; name)
     @unpack inlet, Δp, ṁ = two
@@ -185,7 +175,8 @@ function VolumetricFlowResistor(;
         FType = typeof(k)
         only(@parameters (k_fn::FType)(..))(t)
     end
-    q = ṁ / ρ(liquid, instream(inlet.T))
+    rho = density isa Real ? density : density(instream(inlet.T))
+    q = ṁ / rho
     return flow_relation(two, [Δp ~ -(k_now * q * abs(q) + klow * q)])
 end
 

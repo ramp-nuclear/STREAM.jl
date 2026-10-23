@@ -1,64 +1,31 @@
 """
-    _carried(sys, key) -> Vector
-
-The `key` metadata of `sys` and of every system nested in it, skipping those that carry none.
-A compiled system is read through the system it was compiled from, which keeps the nesting.
-"""
-function _carried(sys, key)
-    while ModelingToolkit.has_parent(sys) && ModelingToolkit.get_parent(sys) !== nothing
-        sys = ModelingToolkit.get_parent(sys)
-    end
-    own = ModelingToolkit.getmetadata(sys, key, nothing)
-    found = own === nothing ? Any[] : Any[own]
-    for sub in ModelingToolkit.get_systems(sys)
-        append!(found, _carried(sub, key))
-    end
-    return found
-end
-
-"""
-    check_gravity_mismatch(sys) -> Symbol
-
-Check whether the gravity terms of a hydraulic loop are balanced: when a channel runs with
-`g > 0`, the loop needs a [`Gravity`](@ref) component with `H > 0` for the return leg.
-
-# Arguments
-- `sys`: the loop, compiled or not
-
-# Returns
-`:ok` if balanced, or if no channel carries gravity, and `:mismatch`, with a warning, if
-channels carry gravity but there is no return-leg `Gravity` component.
-"""
-function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
-    any(g -> g isa Real && g > 0, _carried(sys, _GravityKey)) || return :ok
-    any(H -> H isa Real && H > 0, _carried(sys, _ElevationKey)) && return :ok
-    @warn "check_gravity_mismatch: channels have g > 0 but no Gravity return component " *
-          "found; loop gravity terms may be unbalanced"
-    return :mismatch
-end
-
-"""
     _sole_face(channel) -> Symbol
 
-The face of a channel whose duct is heated on one wall, or `:left` for one with more.
+The face of a channel whose duct is heated on one wall.
+
+# Throws
+- `ArgumentError`: for a channel with more than one face, which needs its side named
 """
 function _sole_face(channel)
     faces = keys(duct(channel).heated)
-    return length(faces) == 1 ? only(faces) : :left
+    length(faces) == 1 || throw(ArgumentError(
+        "$(nameof(channel)) has faces $(join(repr.(faces), ", ")); name the one to wire"))
+    return only(faces)
 end
 
 """
     _check_side(channel, side)
 
-Throw an `ArgumentError` unless `side` is `:left` or `:right` and the channel has a face there.
+Check that `side` names a wall of a rectangular channel. Throw an `ArgumentError` unless
+`side` is `:left` or `:right` and the channel has a face there.
 """
 function _check_side(channel, side)
-    side in (:left, :right) ||
-        throw(ArgumentError("side must be :left or :right, got :$side"))
+    side in (:left, :right) || throw(ArgumentError(
+        "side must be :left or :right for a rectangular channel, got :$side"))
     faces = keys(duct(channel).heated)
     side in faces || throw(ArgumentError(
-        "$(nameof(channel)) has no :$side face; its faces are $(join(repr.(faces), ", "))"))
-    return nothing
+        "$(nameof(channel)) has no :$side face, which a rectangular channel should have; " *
+        "its faces are $(join(repr.(faces), ", "))"))
 end
 
 """
@@ -126,11 +93,12 @@ face and nothing left dangling.
 - `channel`: uncompiled `ChannelAndContacts` instance
 - `fuel`: uncompiled `HeatDiffusion` instance
 - `side`: the channel's face, `:left` or `:right`. Defaults to the channel's only face when
-  its duct is heated on one wall, and to `:left` otherwise.
+  its duct is heated on one wall, and must be given otherwise.
 - `name`: system name (Symbol)
 
 # Throws
-- `ArgumentError`: for a side other than `:left` or `:right`, or one the channel has no face on
+- `ArgumentError`: for a side other than `:left` or `:right`, one the channel has no face on,
+  or no side for a channel with two faces
 
 # Returns
 Uncompiled `System` from [`assembly`](@ref).
@@ -169,7 +137,7 @@ one-face-insulated coupling, use [`one_sided`](@ref) instead.
 - `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `channel.n`).
 - `fuel_side`: `:left` or `:right`, the near (conjugate) face, of the channel and the fuel
   alike. The fuel's opposite face gets the convective sink. Defaults to the channel's only
-  face when its duct is heated on one wall, and to `:left` otherwise.
+  face when its duct is heated on one wall, and must be given otherwise.
 - `name`: system name (Symbol).
 
 # Returns

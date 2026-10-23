@@ -47,56 +47,6 @@ end
     @test all(isequal(Ts[i], port(cac, :thermal_left, i).T) for i in 1:4)
 end
 
-# check_gravity_mismatch
-@testset "check_gravity_mismatch — :ok when no gravity" begin
-    geom = Duct(0.6, Circular(0.01))
-    @named ch = ChannelAndContacts(; n=4, geometry=geom)  # default g=0.0
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    # CAC's per-cell thermal ports are Flow-based ThermalPort subsystems —
-    # pinning `port.T` directly over-determines via the dangling Flow rule
-    # (auto-zeros Q). Drive them via ConstantTemperature `connect()`s
-    # (the canonical CAC wall-T pattern; see the flow-reversal testset in test_channels.jl).
-    @named wall = ConstantTemperature(40.0; n=4)
-    connections = [
-        inseries(pump, bc, ch, pump),
-        pump.inlet.p ~ 1.0e5,
-        faces((wall, :thermal) => (ch, :thermal_outer)),
-    ]
-    @named sys = assembly(connections, pump, bc, ch, wall)
-    ssys = mtkcompile(sys)
-    @test check_gravity_mismatch(ssys) == :ok
-end
-
-@testset "check_gravity_mismatch — :mismatch when CAC has g but no Gravity component" begin
-    geom = Duct(0.6, Circular(0.01))
-    @named ch = ChannelAndContacts(; n=4, geometry=geom, g=G_EARTH)
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    @named wall = ConstantTemperature(40.0; n=4)
-    connections = [
-        inseries(pump, bc, ch, pump),
-        pump.inlet.p ~ 1.0e5,
-        faces((wall, :thermal) => (ch, :thermal_outer)),
-    ]
-    @named sys = assembly(connections, pump, bc, ch, wall)
-    ssys = mtkcompile(sys)
-    # The mismatch is also reported as a warning, which is part of what is checked.
-    result = @test_logs (:warn, r"no Gravity return component") check_gravity_mismatch(ssys)
-    @test result == :mismatch
-end
-
-@testset "check_gravity_mismatch — :ok with a Gravity return leg, compiled or not" begin
-    @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=G_EARTH)
-    @named pump = Pump(3.0e4)
-    @named ret = Gravity(0.6)
-    @named sys = assembly([inseries(pump, ch, ret, pump), pump.inlet.p ~ 1.0e5], pump, ch, ret)
-    @test check_gravity_mismatch(sys) == :ok
-    # The channel carries its g and the Gravity its H, so nothing needs compiling to check.
-    @named bare = assembly([inseries(pump, ch, pump), pump.inlet.p ~ 1.0e5], pump, ch)
-    @test (@test_logs (:warn, r"no Gravity") check_gravity_mismatch(bare)) == :mismatch
-end
-
 # var_length
 # Counts a ChannelAndContacts' thermal ports; a Channel or ChannelHeatFlux has none.
 @testset "var_length: counts thermal_left* on CAC (n=4)" begin
@@ -306,6 +256,12 @@ end
 @testset "one_sided — invalid side errors" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     @test_throws ArgumentError one_sided(cac, fuel; side=:bogus, name=:bad)
+end
+
+@testset "one_sided — a channel with two faces needs its side named" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    @test_throws ArgumentError one_sided(cac, fuel; name=:bad)
+    @test_throws ArgumentError single_channel(cac, fuel; name=:bad)
 end
 
 @testset "one_sided — a channel heated on one wall uses that face" begin

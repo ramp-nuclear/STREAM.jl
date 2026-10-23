@@ -290,40 +290,52 @@ end
 end
 
 @testset "HTC.fully_developed_laminar_nusselt" begin
-    # The two-sided heating polynomial, not Marco and Han's four-sided one.
-    @test HTC.fully_developed_laminar_nusselt(0.0) == 8.235
-    nu_02 = 8.235 * (1.0 - 1.4122*0.2 + 2.3473*0.2^2 - 2.8983*0.2^3 + 2.0629*0.2^4 - 0.6077*0.2^5)
-    @test isapprox(HTC.fully_developed_laminar_nusselt(0.2), nu_02; rtol=1e-10)
-    @test HTC.fully_developed_laminar_nusselt(0.2) != HTC.marco_han_nusselt(0.2)
+    @testset "the two-sided heating polynomial, not Marco and Han's four-sided one" begin
+        @test HTC.fully_developed_laminar_nusselt(0.0) == 8.235
+        nu_02 = 8.235 * (1.0 - 1.4122*0.2 + 2.3473*0.2^2 - 2.8983*0.2^3 + 2.0629*0.2^4 -
+                         0.6077*0.2^5)
+        @test isapprox(HTC.fully_developed_laminar_nusselt(0.2), nu_02; rtol=1e-10)
+        @test HTC.fully_developed_laminar_nusselt(0.2) != HTC.marco_han_nusselt(0.2)
+    end
 
-    # The duct form reads the aspect ratio and ignores everything else.
-    duct = Duct(1.0, Rectangular(1.0, 0.2))
-    @test HTC.fully_developed_laminar_nusselt(100.0, 3.0, 126.85, 26.85, duct) ==
-          HTC.fully_developed_laminar_nusselt(5000.0, 10.0, 106.85, 16.85, duct) ==
-          HTC.fully_developed_laminar_nusselt(aspect_ratio(duct))
-    # A circle has no aspect ratio, and the polynomial is not its answer.
-    @test_throws MethodError HTC.fully_developed_laminar_nusselt(100.0, 3.0, 60.0, 40.0,
-                                                                 Duct(1.0, Circular(0.01)))
+    @testset "the duct form reads the aspect ratio and ignores everything else" begin
+        duct = Duct(1.0, Rectangular(1.0, 0.2))
+        @test HTC.fully_developed_laminar_nusselt(100.0, 3.0, 126.85, 26.85, duct) ==
+              HTC.fully_developed_laminar_nusselt(5000.0, 10.0, 106.85, 16.85, duct) ==
+              HTC.fully_developed_laminar_nusselt(aspect_ratio(duct))
+    end
+
+    @testset "a circle has no aspect ratio, and the polynomial is not its answer" begin
+        @test_throws MethodError HTC.fully_developed_laminar_nusselt(
+            100.0, 3.0, 60.0, 40.0, Duct(1.0, Circular(0.01)))
+    end
 end
 
 @testset "HTC.developing_laminar_nusselt" begin
     ar, x_over_Dh = 0.2, 0.3 / 0.005
     Nu_fd = HTC.fully_developed_laminar_nusselt(ar)
 
-    # Near the entrance (high Re, so small x*), developing flow transfers more heat.
-    @test HTC.developing_laminar_nusselt(2000.0, 7.0, ar, x_over_Dh) > Nu_fd
-    # Far downstream (x* large) it settles to within 5% of the fully developed value.
-    @test isapprox(HTC.developing_laminar_nusselt(1.0, 7.0, ar, x_over_Dh), Nu_fd; rtol=0.05)
-    # The aspect ratio enters x* too, not only the final scaling.
-    @test HTC.developing_laminar_nusselt(1000.0, 7.0, ar, x_over_Dh) !=
-          HTC.developing_laminar_nusselt(1000.0, 7.0, 0.5, x_over_Dh)
+    @testset "near the entrance (high Re, so small x*) it transfers more heat" begin
+        @test HTC.developing_laminar_nusselt(2000.0, 7.0, ar, x_over_Dh) > Nu_fd
+    end
 
-    # The model reads x/Dh and the aspect ratio off the duct.
-    duct = Duct(1.0, Rectangular(0.07, 0.0014))
-    model = HTC.DevelopingLaminar(; develop_length=0.3)
-    Re_, Pr_ = Re(H2O, 40.0, 0.01, duct), Pr(H2O, 40.0)
-    @test model.nusselt(Re_, Pr_, 40.0, 40.0, duct) ≈ HTC.developing_laminar_nusselt(
-        Re_, Pr_, aspect_ratio(duct), 0.3 / hydraulic_diameter(duct))
+    @testset "far downstream (x* large) it settles to the fully developed value" begin
+        @test isapprox(HTC.developing_laminar_nusselt(1.0, 7.0, ar, x_over_Dh), Nu_fd;
+                       rtol=0.05)
+    end
+
+    @testset "the aspect ratio enters x* too, not only the final scaling" begin
+        @test HTC.developing_laminar_nusselt(1000.0, 7.0, ar, x_over_Dh) !=
+              HTC.developing_laminar_nusselt(1000.0, 7.0, 0.5, x_over_Dh)
+    end
+
+    @testset "the model reads x/Dh and the aspect ratio off the duct" begin
+        duct = Duct(1.0, Rectangular(0.07, 0.0014))
+        model = HTC.DevelopingLaminar(; develop_length=0.3)
+        Re_, Pr_ = Re(H2O, 40.0, 0.01, duct), Pr(H2O, 40.0)
+        @test model.nusselt(Re_, Pr_, 40.0, 40.0, duct) ≈ HTC.developing_laminar_nusselt(
+            Re_, Pr_, aspect_ratio(duct), 0.3 / hydraulic_diameter(duct))
+    end
 end
 
 @testset "laminar HTC factories in compiled Channel" begin

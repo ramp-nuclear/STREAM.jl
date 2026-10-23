@@ -368,8 +368,7 @@ hydraulic chains, [`face`](@ref) and [`faces`](@ref) for per-cell thermal contac
 [`one_sided`](@ref), [`single_channel`](@ref) and [`fuel_assembly`](@ref) return an uncompiled
 `System` already wired, leaving the caller to add boundary conditions and compile.
 [`assembly`](@ref) is the general form: it composes any components with any list of
-connections. [`check_gravity_mismatch`](@ref) reports whether a loop's channels agree about
-which way is up.
+connections.
 
 [`assembly`](@ref), [`port`](@ref) and [`var_length`](@ref) are defined at the top level,
 since components use them too, and re-exported here.
@@ -379,7 +378,6 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ..STREAM: Duct, duct
 using ..Components
-using ..Components: _GravityKey, _ElevationKey   # what the gravity check reads, private
 using ..STREAM: assembly, port, var_length
     """
         STREAM.Assemblies.Connect
@@ -401,7 +399,6 @@ using .Connect
 include("assemblies/concrete_assemblies.jl")
 export Connect
 export inseries, inparallel, weighted, face, faces, port, temperature_feedback
-export check_gravity_mismatch
 export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
 export assembly
 end
