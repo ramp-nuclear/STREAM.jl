@@ -44,17 +44,16 @@ source(0.0)
 z_edges = range(0.0, case.L; length=case.n + 1)
 core_parts = []
 paths = []
-channels = Dict{Symbol,Any}()
 power_eqs = []
 for (key, ty) in pairs(case.types)
-    geom = PipeGeometry_rectangular(case.L, ty.width, ty.gap, ty.heated_width)
+    geom = Duct(case.L, Rectangular(ty.width, ty.gap); heated=ty.heated_width)
     htc = HTC.SubcooledBoiling(
         HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(),
-                            natural=HTC.Elenbaas(geom), geom),
+                            natural=HTC.Elenbaas()),
         HTC.regime_dependent_q_scb(),
     )
     darcy = Friction.RegimeDependent(; turbulent=Friction.blasius,
-                                     k_R=Friction.rectangular_correction(geom.depth / geom.width))
+                                     k_R=Friction.rectangular_correction)
     @named ch = ChannelAndContacts(; n=case.n, geometry=geom, g=-G_EARTH, htc, darcy)
     plate = Slab(; x=range(0.0, ty.plate_thickness; length=case.nx + 1), z=z_edges,
                  y=ty.heated_width, material=Solid(case.rho_s, case.cp_s, case.k_s))
@@ -67,7 +66,6 @@ for (key, ty) in pairs(case.types)
     path = weighted(ty.N, pool, orifice, rods.ch; name=key)
     append!(core_parts, [first(path), pool, orifice, rods, last(path)])
     push!(paths, path)
-    channels[key] = (rods.ch, geom)
     push!(power_eqs, rods.fuel.power ~ pk.P * case.P_rated * ty.power_fraction / ty.N)
 end
 
@@ -75,7 +73,7 @@ end
 @named pump = Pump(case.dP_pump)
 @named flywheel = Inertia(case.flywheel_L_over_A)
 @named primary = ResistorFromKnownPoint(; dp=-case.primary_dp, ṁ=ṁ_design, T=case.T_pool)
-@named riser = Channel(; n=case.n, geometry=PipeGeometry_circular(case.riser_L, case.riser_D),
+@named riser = Channel(; n=case.n, geometry=Duct(case.riser_L, Circular(case.riser_D)),
                        g=G_EARTH)
 @named pool_flapper = HeatExchanger(case.T_pool);
 
@@ -178,9 +176,9 @@ fig = Figure(size=(760, 600))
 ax1 = Axis(fig[1, 1]; xscale=log10, ylabel=L"min $T_\mathrm{ONB} - T_w$ [K]")
 ax2 = Axis(fig[2, 1]; xscale=log10, yscale=log10, xlabel="time after the pump trip [s]",
            ylabel="min CHF ratio, Sudo-Kaminaga")
-for (key, (ch, geom)) in channels
+for key in keys(case.types)
     chsys = getproperty(sys, key).ch
-    m = threshold_analysis(sol, chsys; pipe=geom,
+    m = threshold_analysis(sol, chsys;
                            onb = s -> bergles_rohsenow_t_onb(s) .- s.T_wall,
                            chfr = chfr(q_CHF_sudo_kaminaga))
     lines!(ax1, sol.t[later], vec(minimum(m.onb; dims=1))[later]; label=string(key))

@@ -7,13 +7,13 @@ using ModelingToolkit: @named, mtkcompile, unknowns, equations
 
 @named hx = HeatExchanger(40.0);
 
-geometry = PipeGeometry_circular(0.6, 0.01)
-@named ch = Channel(; n=10, geometry, h_left=5000.0);
+geometry = Duct(0.6, Circular(0.01))
+@named ch = Channel(; n=10, geometry, h=5000.0);
 
 connections = [
     inseries(pump, hx, ch, pump),
     pump.inlet.p ~ 1.0e5,
-    ch.T_wall_left .~ 100.0,
+    ch.T_wall_outer .~ 100.0,
 ];
 
 @named loop = assembly(connections, pump, hx, ch)
