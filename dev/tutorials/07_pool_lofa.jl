@@ -98,10 +98,10 @@ connections = [
 sys = mtkcompile(plant)
 ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 
-guess = [sys.primary.inlet.ṁ => ṁ_design,
-         ch_high.inlet.ṁ => case.types.high.design_ṁ,
-         ch_low.inlet.ṁ => case.types.low.design_ṁ]
-sol_ss = solve_steady(sys, guess; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
+design = [sys.primary.inlet.ṁ => ṁ_design,
+          ch_high.inlet.ṁ => case.types.high.design_ṁ,
+          ch_low.inlet.ṁ => case.types.low.design_ṁ]
+sol_ss = solve_steady(sys, design; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
 sol_ss.retcode
 
 @assert isapprox(sol_ss[ch_high.inlet.ṁ], case.types.high.design_ṁ; rtol=0.02)

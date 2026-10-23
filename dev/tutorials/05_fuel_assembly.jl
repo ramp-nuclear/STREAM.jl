@@ -48,11 +48,7 @@ connections = [
 sys = mtkcompile(loop)
 length(unknowns(sys))
 
-flows = filter(u -> occursin("ṁ", string(u)), unknowns(sys))
-foreach(println, flows)
-
-guess = [ṁ => 1.0 for ṁ in flows]
-sol = solve_steady(sys, guess; solver=DynamicSS(Rodas5P()), abstol=1e-8, reltol=1e-8)
+sol = solve_steady(sys; solver=DynamicSS(Rodas5P()), abstol=1e-8, reltol=1e-8)
 sol.retcode
 
 C(i) = getproperty(sys.asm, Symbol(:c, i))
