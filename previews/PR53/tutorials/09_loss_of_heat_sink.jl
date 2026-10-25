@@ -15,9 +15,9 @@ nothing #hide
 
 N = 400
 P_rated = 2.0e6                           # [W]
-geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 @parameters P_core = P_rated
-q_wall = P_core / N / (2 * geometry.heated_parts[1] * geometry.L)   # each face [W/m²]
+q_wall = P_core / N / (2 * geometry.heated.left * geometry.L)   # each face [W/m²]
 @named ch = ChannelHeatFlux(; n=10, geometry, g=-G_EARTH)
 core = weighted(N, ch; name=:core)
 nothing #hide
@@ -55,9 +55,8 @@ end
 sys = build_plant(hx)
 nothing #hide
 
-op = [sys.ch.inlet.ṁ => ṁ_primary / N, sys.flywheel.inlet.ṁ => ṁ_secondary]
 steady = (solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
-sol_ss = solve_steady(sys, op; steady...)
+sol_ss = solve_steady(sys; steady...)
 sol_ss.retcode
 
 Q_ss = sol_ss[sys.hx.Q]
@@ -74,7 +73,7 @@ T_pool_hand = T_tower + P_rated / (ε * C_min) - P_rated / C_p
 
 @named hx = HeatExchanger(; UA, arrangement=HTC.ParallelFlow())
 sys_parallel = build_plant(hx)
-sol_parallel = solve_steady(sys_parallel, op; steady...)
+sol_parallel = solve_steady(sys_parallel; steady...)
 @assert sol_parallel[sys_parallel.pool.T] > sol_ss[sys.pool.T]
 (counterflow=sol_ss[sys.pool.T], parallel=sol_parallel[sys_parallel.pool.T])
 
@@ -110,7 +109,7 @@ residual = -sol[sys.hx.Q][end] / P_rated
 ua = HTC.flow_scaled_UA(UA, ṁp_0, ṁs_0)
 @named hx = HeatExchanger(; UA=ua)
 sys_scaled = build_plant(hx)
-sol_ss_scaled = solve_steady(sys_scaled, op; steady...)
+sol_ss_scaled = solve_steady(sys_scaled; steady...)
 sol_scaled = solve_transient(sys_scaled, sol_ss_scaled, times;
                              overrides=[sys_scaled.spump.dP_pump => 0.0,
                                         sys_scaled.pool.pinned => false])

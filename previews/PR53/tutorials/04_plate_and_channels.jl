@@ -16,7 +16,7 @@ P = 2.5e4                # plate power [W]
 ṁ = 0.4                  # channel flow [kg/s]
 T_in, p_in = 40.0, 1.7e5 # inlet temperature [°C] and pressure [Pa]
 
-geometry = PipeGeometry_rectangular(L, width, gap, heated_width)
+geometry = Duct(L, Rectangular(width, gap); heated=heated_width)
 
 z_edges = range(0.0, L; length=n + 1)
 aluminium = Solid(2700.0, 900.0, 180.0)      # density, specific heat, conductivity
@@ -62,7 +62,7 @@ hm = heatmap!(ax_map, range(0, 1000 * thickness; length=nx + 1), z_edges, T_plat
 Colorbar(fig_map[1, 2], hm; label="temperature [°C]")
 fig_map
 
-margins = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
+margins = threshold_analysis(sol, sys.cell.ch;
     onb = s -> bergles_rohsenow_t_onb(s) .- s.T_wall,
     osv = s -> q_OSV_saha_zuber(s) ./ s.q_flux,
     ofi = s -> q_OFI_whittle_forgan(s) / P,

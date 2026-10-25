@@ -15,7 +15,7 @@ sys = mtkcompile(loop);
 
 foreach(println, unknowns(sys))
 
-sol_ss = solve_steady(sys, [sys.loss.inlet.ṁ => 40.0])
+sol_ss = solve_steady(sys)
 sol_ss[sys.flywheel.inlet.ṁ]
 
 times = range(0.0, 60.0; length=301)

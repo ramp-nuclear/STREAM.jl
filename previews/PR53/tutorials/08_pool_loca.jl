@@ -27,10 +27,10 @@ nothing #hide
 
 N = 400
 P_rated = 2.0e6                           # [W]
-geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 n = 10
 @parameters P_core = P_rated
-q_wall = P_core / N / (2 * geometry.heated_parts[1] * geometry.L)   # each face [W/m²]
+q_wall = P_core / N / (2 * geometry.heated.left * geometry.L)   # each face [W/m²]
 @named ch = ChannelHeatFlux(; n, geometry, g=-G_EARTH)
 core = weighted(N, ch; name=:core)
 nothing #hide
@@ -71,9 +71,8 @@ connections = [
 sys = mtkcompile(plant)
 foreach(println, unknowns(sys))
 
-flows = filter(u -> occursin("ṁ", string(u)), unknowns(sys))
-op = [[f => ṁ_design for f in flows]; sys.dtank.pinned => false]
-sol_ss = solve_steady(sys, op; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
+sol_ss = solve_steady(sys, [sys.dtank.pinned => false]; solver=DynamicSS(Rodas5P()),
+                      abstol=1e-10, reltol=1e-10)
 sol_ss.retcode
 
 (level=sol_ss[sys.dtank.L], inflow=sol_ss[sys.tank_line.inlet.ṁ],
