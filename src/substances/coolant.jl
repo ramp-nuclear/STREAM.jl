@@ -62,7 +62,7 @@ out inside the block takes it:
 ```julia
 using STREAM.Components: Channel, Gravity
 
-geom = PipeGeometry_circular(0.6, 0.01)
+geom = Duct(0.6, Circular(0.01))
 ch, rise = with_coolant(D2O) do
     @named ch = Channel(; n=10, geometry=geom)
     @named rise = Gravity(2.0)

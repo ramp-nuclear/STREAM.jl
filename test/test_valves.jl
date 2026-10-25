@@ -128,7 +128,7 @@ end
     sys = assembly(conns, pump, ine, res, flapper, hx;
                    parameters=[ṁ_open_at], name=:flap_param)
     ssys = mtkcompile(sys)
-    sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => 1.0, ssys.res.inlet.ṁ => 1.0])
+    sol_ss = solve_steady(ssys)
     coast(threshold) = solve_transient(
         ssys, sol_ss, range(0.0, 30.0; length=301);
         overrides=[ssys.pump.dP_pump => 0.0, ṁ_open_at => threshold],
@@ -208,7 +208,7 @@ end
     @testset "a shut break holds back a pressure difference" begin
         @named sealed = Orifice(; area=A_HOLE, cd=CD_SHARP)
         ssys = _orifice_between_ambients(sealed; dp=2e4)
-        sol = solve_transient(ssys, range(0.0, 1.0; length=11))
+        sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 1.0; length=11))
         @test all(iszero, sol[ssys.sealed.inlet.ṁ])
     end
 
@@ -391,17 +391,15 @@ end
     # by a branch holding the pump, the heat exchanger and an inertia, with a flapper in
     # parallel. When the pump head falls the flapper opens and the two legs circulate alone.
     n, L, D, T_in, power, t_trip = 10, 1.0, 0.01, 40.0, 1.0e3, 10.0
-    geom = PipeGeometry_circular(L, D)
+    geom = Duct(L, Circular(D))
     # 200 kPa, falling to zero over 5 s from `t_trip` on a C1 cubic. A trip at Inf holds for
     # good and is the same closure type, so one callable parameter takes both.
     head(t_trip) = tt -> (ξ = clamp((tt - t_trip) / 5.0, 0.0, 1.0); 2.0e5 * (1 - (3ξ^2 - 2ξ^3)))
-    # The heated leg switches regime on its own, natural convection included, so the run
-    # stays physical once the pump stops.
+    # The heated leg switches regime on its own, so the run stays physical once the pump
+    # stops.
     htc = HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(; Nu=8.235),
-                              turbulent=HTC.DittusBoelter(),
-                              natural=HTC.Elenbaas(geom; g=G_EARTH), geom, g=G_EARTH)
-    darcy = Friction.RegimeDependent(; laminar=Friction.rectangular_laminar(geom),
-                                     turbulent=Friction.blasius)
+                              turbulent=HTC.DittusBoelter())
+    darcy = Friction.RegimeDependent(; turbulent=Friction.blasius)
     machine = StateMachine(; initial_state=:CLOSED)
 
     @named pump = Pump(head(t_trip))
@@ -415,25 +413,19 @@ end
     slab = Slab(; x=range(0, 0.005, 3), z=range(0, L, n + 1), y=0.07,
                 material=Solid(19300.0, 116.0, 174.0))
     @named fuel = HeatDiffusion(slab; power)
-    heated = one_sided(ch, fuel; side=:left, name=:heated)
+    @named heated = assembly(faces((ch, :thermal_outer) => (fuel, :thermal_right)), ch, fuel)
     connections = [
         inseries(ext_res, hx, pump, ine),
         inparallel(ine, ((heated.ch, ret), flapper), ext_res),
         pump.inlet.p ~ 1.0e5,
-        # A circular channel's right face has no heated perimeter, so it passes no heat
-        # whatever its wall temperature. Pinning that to the coolant determines it.
-        port(heated.ch, :thermal_right, :T) .~ heated.ch.T,
     ]
     @named sys = assembly(connections, heated, pump, ine, hx, ret, flapper, ext_res)
     ssys = mtkcompile(sys)
     C = ssys.heated.ch
 
-    # Pump on, flapper shut, integrated to steady. Started at zero, the flows mtkcompile keeps
-    # stay at ṁ = 0 and the solve fails, so they start at the flow the head drives through
-    # ext_res. The dummy derivative has no default and needs a value too.
-    ṁ0 = 2.0e5 / 1.0e6
-    ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => head(Inf), C.inlet.ṁ => ṁ0,
-                             ssys.ext_res.inlet.ṁ => ṁ0, Differential(t)(C.inlet.ṁ) => 0.0];
+    # Pump on, flapper shut, integrated to steady. The flows start from their guesses; the
+    # dummy derivative has no default and needs a value.
+    ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => head(Inf), Differential(t)(C.inlet.ṁ) => 0.0];
                       solver=DynamicSS(Rodas5P()))
     valve_at_steady = machine.state
     # Every unknown, not a subset: a `Dt(ṁ) => 0` guess does not reach the dummy-derivative
@@ -489,7 +481,7 @@ end
         T_ret = [mean(sol[ssys.ret.T[i], nc]) for i in 1:n]
         dP_buoy = sum(G_EARTH * dz * (ρ(H2O, T_ret[i]) - ρ(H2O, T_ch[i])) for i in 1:n)
         leg(T, f, md) = Friction.darcy_weisbach_dp(md, ρ(H2O, T), f(T, T, md, H2O, geom), dz,
-                                                   geom.Dh, geom.A)
+                                                   hydraulic_diameter(geom), flow_area(geom))
         dP_fric(md) = sum(leg(T_ch[i], darcy, md) + leg(T_ret[i], Friction.Blasius(), md)
                           for i in 1:n)
         lo, hi = 1.0e-6, 1.0   # bisect in log space
@@ -506,7 +498,7 @@ end
         @test mean(ṁ_nc) < 0.0
         @test 0.0 < mean(abs ∘ Q_wall, nc) <= power
         # Single phase only, with the sink bypassed, so the coolant creeps up past saturation.
-        # No thermal runaway: a regression value of 233.95 °C, the band the spread between
+        # No thermal runaway: a regression value of 233.6 °C, the band the spread between
         # package sets, and well below the critical 373.95 °C.
         T_max = mean(maximum(sol[C.T, idx]) for idx in nc)
         @test T_max > T_in

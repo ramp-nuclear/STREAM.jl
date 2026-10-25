@@ -83,12 +83,12 @@ flow, with 40 °C water entering at 1.7 bar. The corner is the switch at
 ```@example osv
 using STREAM, STREAM.Thresholds, CairoMakie
 
-pipe = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
+pipe = Duct(0.6, Rectangular(0.067, 0.0024))
 T_in, p, n = 40.0, 1.7e5, 20
 coolant = H2O(fill(T_in, n), fill(p, n))
 ṁ = range(0.05, 0.6; length=200)
 q_out = [last(q_OSV_saha_zuber(T_in, m, pipe, coolant)) for m in ṁ]
-Pe = [m / pipe.A * pipe.Dh * cₚ(H2O, T_in) / κ(H2O, T_in) for m in ṁ]
+Pe = [m / flow_area(pipe) * hydraulic_diameter(pipe) * cₚ(H2O, T_in) / κ(H2O, T_in) for m in ṁ]
 
 fig = Figure(size=(700, 420))
 ax = Axis(fig[1, 1]; xlabel=L"mass flow $\dot{m}$ [kg/s]",

@@ -159,21 +159,9 @@ latent_heat(l::Liquid, T, p) = l.hfg
 thermal_expansion(l::Liquid, T, p) = l.β
 sat_temperature(l::Liquid, T, p) = l.Tsat
 
-# A `Liquid` returns stored numbers, so a symbolic temperature folds away to a constant.
-
-(liquid::AbstractLiquid)(T, p=ATM) = Liquid(
-    density(liquid, T, p),
-    vapor_density(liquid, T, p),
-    specific_heat(liquid, T, p),
-    viscosity(liquid, T, p),
-    sat_temperature(liquid, T, p),
-    surface_tension(liquid, T, p),
-    latent_heat(liquid, T, p),
-    conductivity(liquid, T, p),
-    thermal_expansion(liquid, T, p),
-)
-
-function (liquid::AbstractLiquid)(T::AbstractArray, p=ATM)
+# Broadcast, so scalar T and p give scalar fields and arrays give arrays. A `Liquid` returns
+# stored numbers, so a symbolic temperature folds away to a constant.
+function (liquid::AbstractLiquid)(T, p=ATM)
     return Liquid(
         density.(liquid, T, p),
         vapor_density.(liquid, T, p),

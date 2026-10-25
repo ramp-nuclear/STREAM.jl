@@ -61,10 +61,10 @@ function Flapper(; name, f=1.0, area=1.0, open_rate=1.0,
                  liquid::AbstractLiquid=default_coolant())
     fraction = open_fraction === nothing ?
         _Opening(machine, open_state, open_rate) : open_fraction
-    fs = @parameters f = f
+    @parameters f = f
     # ΔP = f·ṁ|ṁ|/(2ρA²) is the orifice law with cd = 1/√f.
     return _Valve(; name, area, fraction, dp_linear, liquid, cc=nothing,
-                  cd_of_Re=_ -> 1 / sqrt(fs[1]), extra_pars=fs)
+                  cd_of_Re=_ -> 1 / sqrt(f))
 end
 
 @doc raw"""
@@ -145,13 +145,12 @@ function Orifice(; name, area, cd, machine::StateMachine=StateMachine(; initial_
                  liquid::AbstractLiquid=default_coolant())
     fraction = _Opening(machine, open_state, open_rate)
     cd isa Function && return _Valve(; name, area, fraction, dp_linear, cc, liquid, cd_of_Re=cd)
-    cds = @parameters cd = cd
-    return _Valve(; name, area, fraction, dp_linear, cc, liquid,
-                  cd_of_Re=_ -> cds[1], extra_pars=cds)
+    @parameters cd = cd
+    return _Valve(; name, area, fraction, dp_linear, cc, liquid, cd_of_Re=_ -> cd)
 end
 
 """
-    _Valve(; name, area, fraction, cd_of_Re, dp_linear, cc, liquid, extra_pars=[]) -> System
+    _Valve(; name, area, fraction, cd_of_Re, dp_linear, cc, liquid) -> System
 
 The component behind [`Flapper`](@ref) and [`Orifice`](@ref): a hole of area `area` whose open
 fraction `xi` follows `fraction(t)`, passing
@@ -164,46 +163,39 @@ constructors hand it a constant when the coefficient does not depend on the flow
 is taken on the side the flow enters. With `cc`, it also carries the vena contracta pressure
 `p_throat` and its `subcooling`.
 
-`extra_pars` are parameters `cd_of_Re` refers to, such as a flapper's `f`.
 """
-function _Valve(; name, area, fraction, cd_of_Re, dp_linear, cc, liquid, extra_pars=[])
+function _Valve(; name, area, fraction, cd_of_Re, dp_linear, cc, liquid)
+    two = HydraulicTwoPort(; name)
+    @unpack inlet, outlet, Δp, ṁ = two
     FType = typeof(fraction)
-    pars = @parameters begin
+    @parameters begin
         area = area
         dp_linear = dp_linear
         (xi_fn::FType)(..) = fraction
     end
-    append!(pars, extra_pars)
-    vars = @variables xi(t)
+    @variables xi(t)
 
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-
-    ṁ = inlet.ṁ
     T_up = ifelse(ṁ >= 0, instream(inlet.T), instream(outlet.T))
     rho = ρ(liquid, T_up)
     Re_throat = max(abs(ṁ) * sqrt(4 * area / π) / (area * μ(liquid, T_up)), 1.0)
-    ṁ_open = cd_of_Re(Re_throat) * area * sqrt(2 * rho) *
-        _smooth_signed_sqrt(inlet.p - outlet.p, dp_linear)
+    ṁ_open = cd_of_Re(Re_throat) * area * sqrt(2 * rho) * _smooth_signed_sqrt(-Δp, dp_linear)
     opened = xi_fn(t)
 
-    eqs = Equation[
+    eqs = [
         xi ~ opened,
         # Shut, the equation is just ṁ = 0, and the pressure across the valve is left to the
         # rest of the loop.
         ifelse(opened <= 0.0, ṁ, ṁ - opened * ṁ_open) ~ 0,
     ]
     if cc !== nothing
-        ccs = @parameters cc = cc
-        append!(pars, ccs)
-        throat = @variables p_throat(t) subcooling(t)
-        append!(vars, throat)
-        push!(eqs, p_throat ~ inlet.p - (ṁ / (ccs[1] * area))^2 / (2 * rho))
+        @parameters cc = cc
+        @variables p_throat(t) subcooling(t)
+        push!(eqs, p_throat ~ inlet.p - (ṁ / (cc * area))^2 / (2 * rho))
         # Below a few hundred pascals the saturation fits leave their range; Python floors
         # the pressure at the same value.
         push!(eqs, subcooling ~ Tsat(liquid, max(p_throat, _SATURATION_PRESSURE_FLOOR)) - T_up)
     end
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
+    return flow_relation(two, eqs)
 end
 
 """

@@ -180,8 +180,7 @@ inseries(pool.bottom, breach, ambient.port)
 Uncompiled `System`.
 """
 function Environment(; name, p=ATM, T=T_ROOM)
-    pars = @parameters p_env = p T_env = T
+    @parameters p_env = p T_env = T
     @named port = FlowPort()
-    eqs = Equation[port.p ~ p_env, port.T ~ T_env]
-    return compose(System(eqs, t, [], pars; name=name), port)
+    return assembly([port.p ~ p_env, port.T ~ T_env], port; name)
 end

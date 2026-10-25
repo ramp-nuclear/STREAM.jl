@@ -69,11 +69,11 @@ Q_\text{OFI} = \frac{|\dot m|\int_{T_\text{in}}^{T_\text{sat}} c_p\,dT}{1 + \eta
 ```@example ofi
 using STREAM, STREAM.Thresholds, CairoMakie
 
-pipe = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
+pipe = Duct(0.6, Rectangular(0.067, 0.0024))
 ṁ = range(0.02, 0.6; length=100)
-G_cgs = ṁ ./ pipe.A ./ 10                 # kg/(m²·s) to g/(cm²·s)
+G_cgs = ṁ ./ flow_area(pipe) ./ 10   # kg/(m²·s) to g/(cm²·s)
 η = 3.15 .* (1.08 .* G_cgs) .^ 0.29
-R = 1 ./ (1 .+ η .* pipe.Dh ./ pipe.L)
+R = 1 ./ (1 .+ η .* hydraulic_diameter(pipe) ./ pipe.L)
 
 fig = Figure(size=(700, 380))
 ax1 = Axis(fig[1, 1]; xlabel=L"mass flux $G$ [kg/(m²·s)]", ylabel=L"\eta")

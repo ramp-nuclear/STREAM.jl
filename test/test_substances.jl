@@ -13,7 +13,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
 Every component that reads a coolant, with `kw` forwarded to each constructor.
 """
 function _coolant_readers(; kw...)
-    geom = PipeGeometry_circular(0.6, 0.01)
+    geom = Duct(0.6, Circular(0.01))
     opened = StateMachine(; initial_state=:OPEN)
     return [
         Channel(; name=:ch, n=4, geometry=geom, kw...),
@@ -94,15 +94,15 @@ end
     @test isequal(equations(frozen), equations(Gravity(1.0; name=:rise, liquid=Liquid())))
 
     # The correlation and the initial guess read the same default.
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
-    @test with_coolant(() -> Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe), D2O) ==
-          Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe; liquid=D2O)
+    duct = Duct(0.6, Rectangular(0.0671, 0.0024))
+    @test with_coolant(() -> Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, duct), D2O) ==
+          Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, duct; liquid=D2O)
     guess(; kw...) = steady_state_guess(; T_inlet=40.0, Q_wall=1.0e4, ṁ_guess=0.1, n=5, kw...)
     @test with_coolant(guess, D2O) == guess(; liquid=D2O)
 end
 
 @testset "a channel records its coolant, and coolant(sys) returns it after compilation" begin
-    geom = PipeGeometry_circular(0.6, 0.01)
+    geom = Duct(0.6, Circular(0.01))
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     @named ch = Channel(; n=3, geometry=geom, liquid=D2O)

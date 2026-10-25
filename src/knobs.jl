@@ -29,8 +29,8 @@ caller supplying a value.
 # Example
 ```julia
 gap = @design_knob gap = 0.0024
-geometry = PipeGeometry_rectangular(0.6, 0.067, gap, 0.063)   # build with it, then:
-solve_steady(sys, [gap => 0.0027, ...])                       # a new gap, no rebuild
+geometry = Duct(0.6, Rectangular(0.067, gap); heated=0.063)   # build with it, then:
+solve_steady(sys, [gap => 0.0027, ...])                         # a new gap, no rebuild
 ```
 See [Scan a design parameter](@ref).
 

@@ -136,7 +136,7 @@ end
     # the coolant runs hotter for want of flow. Some cases, such as the cycle guard, only
     # need a solve and do not depend on the coasting.
     ssys = build_loop(; n=5)
-    sol_ss = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol_ss = solve_steady(ssys)
     setpoint = 0.5 * sol_ss[ssys.ch.inlet.ṁ]
     T_setpoint = sol_ss[ssys.ch.T[5]] + 1.0
     times = range(0.0, 0.5; length=11)

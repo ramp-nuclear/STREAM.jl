@@ -37,7 +37,7 @@ T_in = 35.0                    # inlet temperature [°C]
 p_out = 1.67e5                 # pressure at the channel outlets, under the pool [Pa]
 dp_pump = 1.0e5                # pump head [Pa]
 
-geometry = PipeGeometry_rectangular(L, 0.0666, gap, heated_width)
+geometry = Duct(L, Rectangular(0.0666, gap); heated=heated_width)
 
 # ## The plates
 #
@@ -102,16 +102,9 @@ length(unknowns(sys))
 #
 # Parallel channels sharing a pump are the case
 # [Get a steady solve to converge](../howto/steady_solve.md) is about: the steady solve
-# integrates to where the model settles, starting each flow the compiled system keeps away
-# from zero. These are the eight channel flows:
+# integrates to where the model settles.
 
-flows = filter(u -> occursin("ṁ", string(u)), unknowns(sys))
-foreach(println, flows)
-
-#-
-
-guess = [ṁ => 1.0 for ṁ in flows]
-sol = solve_steady(sys, guess; solver=DynamicSS(Rodas5P()), abstol=1e-8, reltol=1e-8)
+sol = solve_steady(sys; solver=DynamicSS(Rodas5P()), abstol=1e-8, reltol=1e-8)
 sol.retcode
 
 # All the plates' power reaches the coolant:

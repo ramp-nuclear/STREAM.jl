@@ -13,7 +13,7 @@ using STREAM
 using STREAM.Components: ChannelAndContacts, Gravity, ResistorFromKnownPoint
 using ModelingToolkit: @named
 
-geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+geom = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 @named ch = ChannelAndContacts(; n=10, geometry=geom, liquid=D2O)
 @named rise = Gravity(2.0; liquid=D2O)
 @named orifice = ResistorFromKnownPoint(; dp=-2.0e3, ṁ=0.4, T=40.0, liquid=D2O)

@@ -1,6 +1,3 @@
-# Acausal connector tests (FlowPort, ThermalPort).
-# Connector unit tests: FlowPort + ThermalPort — the v1.1 connector roster.
-
 using Test
 using ModelingToolkit
 using STREAM
@@ -16,6 +13,14 @@ const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
         nothing,
     )
     @test connect_type == ModelingToolkit.Flow
+end
+
+@testset "a port's flow starts in its usual direction" begin
+    @named fp = FlowPort()
+    @named out = FlowPort(; ṁ=-Components.FLOW_START)
+    flow(p) = only(filter(v -> ModelingToolkit.getname(v) == :ṁ, unknowns(p)))
+    @test ModelingToolkit.getdefault(flow(fp)) == Components.FLOW_START > 0
+    @test ModelingToolkit.getdefault(flow(out)) == -Components.FLOW_START
 end
 
 @testset "T is a Stream variable" begin

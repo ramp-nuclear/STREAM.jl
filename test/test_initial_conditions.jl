@@ -25,7 +25,7 @@ using STREAM.Components
         @test isequal(first(op[1]), ssys.ch.T) && last(op[1]) == fill(40.0, 10)
         @test isequal(first(op[2]), ssys.ch.dP) && last(op[2]) == 40.0
         @test isempty(uniform([ssys.ch], 40.0, :nope))
-        sol = solve_steady(ssys, [uniform([ssys.ch], 40.0, :T)...; ssys.ch.inlet.ṁ => 0.49])
+        sol = solve_steady(ssys, uniform([ssys.ch], 40.0, :T))
         @test sol.retcode == ReturnCode.Success
     end
 end

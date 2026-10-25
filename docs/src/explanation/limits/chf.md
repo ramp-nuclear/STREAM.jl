@@ -104,7 +104,7 @@ STREAM has them:
 - **Channel ends, not cells.** The subcoolings are those of the channel's inlet
   (``q^*_2``, ``q^*_3``) and outlet (``q^*_4``), because the correlation was fitted to whole
   test sections. Only the ``c_p/h_{fg}`` factor is evaluated per cell.
-- **The width is the channel width.** ``W`` in ``q^*_3`` is the full width, `pipe.width`,
+- **The width is the channel width.** ``W`` in ``q^*_3`` is the full width, `pipe.shape.width`,
   not the heated width. Mishima's rectangular test section was heated over 30 mm of its
   40 mm width, and the correlation was fitted with the channel width.
 - **``1 + \Delta T^*`` rather than ``1 + 3\Delta T^*``.** The 1998 revision gives the
@@ -126,12 +126,12 @@ used.
 ```@example chf
 using STREAM, STREAM.Thresholds, CairoMakie
 
-pipe = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
+pipe = Duct(0.6, Rectangular(0.067, 0.0024))
 T_b, p = 40.0, 1.7e5
 T_sat = Tsat(H2O, p)
 sat = H2O(T_sat, p)                        # coolant at saturation
 ṁ = range(-0.4, 0.6; length=401)
-v = ṁ ./ (ρ(H2O, T_b) * pipe.A)
+v = ṁ ./ (ρ(H2O, T_b) * flow_area(pipe))
 
 q_sk = [q_CHF_sudo_kaminaga(T_b, m, pipe, G_EARTH, sat) for m in ṁ]
 q_mirshak = [q_CHF_mirshak(T_b, T_sat, p, vi) for vi in v]

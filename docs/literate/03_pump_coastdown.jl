@@ -49,11 +49,12 @@ sys = mtkcompile(loop);
 
 foreach(println, unknowns(sys))
 
-# A guess has to name that variable. A guess for `flywheel.inlet.ṁ`, the same flow under
-# another name, would have nothing to act on, since `mtkcompile` eliminated it. At steady
+# A value in an operating point has to name that variable: one for `flywheel.inlet.ṁ`, the
+# same flow under another name, would have nothing to act on, since `mtkcompile` eliminated
+# it. The steady solve needs none, since every flow starts away from zero. At steady
 # state the pump head balances the loss, and the flow is the design flow:
 
-sol_ss = solve_steady(sys, [sys.loss.inlet.ṁ => 40.0])
+sol_ss = solve_steady(sys)
 sol_ss[sys.flywheel.inlet.ṁ]
 
 # ## The trip

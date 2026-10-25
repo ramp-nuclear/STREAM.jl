@@ -10,7 +10,7 @@ using STREAM
 using STREAM.Components: ChannelAndContacts
 using ModelingToolkit: @named
 
-geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+geom = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 nothing # hide
 ```
 
@@ -19,15 +19,16 @@ nothing # hide
 For a transient that reaches low flow, switch models by regime. This is the combination the
 [pool loss-of-flow tutorial](../tutorials/07_pool_lofa.md) uses: laminar, turbulent and natural
 convection, with subcooled boiling on top, and friction that blends from laminar to turbulent
-with the rectangular-duct correction.
+with the rectangular-duct correction. Neither model is told the geometry: the channel hands
+them its duct on every call, so the same two values serve any channel.
 
 ```@example models
 htc = HTC.SubcooledBoiling(
     HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(),
-                        natural=HTC.Elenbaas(geom), geom),
+                        natural=HTC.Elenbaas()),
     HTC.regime_dependent_q_scb(),
 )
-darcy = Friction.RegimeDependent(; k_R=Friction.rectangular_correction(geom.depth / geom.width))
+darcy = Friction.RegimeDependent(; k_R=Friction.rectangular_correction)
 @named ch = ChannelAndContacts(; n=10, geometry=geom, htc, darcy);
 htc
 ```
@@ -38,18 +39,11 @@ A model prints the branches it chooses between, and the friction model its own:
 darcy
 ```
 
-A model can be called directly, which is a quick way to see what it gives. A heat transfer
-model takes the wall and bulk temperatures, the flow, the hydraulic diameter, the flow area
-and the coolant:
+A model can be called directly, which is a quick way to see what it gives. Both kinds take
+the wall and bulk temperatures, the flow, the coolant and the duct:
 
 ```@example models
-htc(60.0, 40.0, 0.3, geom.Dh, geom.A, H2O)
-```
-
-A friction model takes the bulk and wall temperatures, the flow, the coolant and the geometry:
-
-```@example models
-darcy(40.0, 60.0, 0.3, H2O, geom)
+(h=htc(60.0, 40.0, 0.3, H2O, geom), f=darcy(60.0, 40.0, 0.3, H2O, geom))
 ```
 
 ## Read the properties at the film or the bulk
@@ -58,8 +52,8 @@ Each Nusselt-based model takes a `basis`: [`HTC.AtFilm`](@ref), the default, rea
 properties at ``(T_w + T_b)/2``, and [`HTC.AtBulk`](@ref) at the bulk temperature.
 
 ```@example models
-(film=HTC.DittusBoelter()(80.0, 40.0, 0.3, geom.Dh, geom.A, H2O),
- bulk=HTC.DittusBoelter(; basis=HTC.AtBulk())(80.0, 40.0, 0.3, geom.Dh, geom.A, H2O))
+(film=HTC.DittusBoelter()(80.0, 40.0, 0.3, H2O, geom),
+ bulk=HTC.DittusBoelter(; basis=HTC.AtBulk())(80.0, 40.0, 0.3, H2O, geom))
 ```
 
 `HTC.RegimeDependent` sets the basis of its branches itself: bulk for the laminar and natural
@@ -69,7 +63,7 @@ branches, film for the turbulent one.
 
 ```@example models
 darcy_hot = Friction.RegimeDependent(; viscosity=Friction.viscosity_correction)
-(plain=darcy(40.0, 90.0, 0.3, H2O, geom), corrected=darcy_hot(40.0, 90.0, 0.3, H2O, geom))
+(plain=darcy(90.0, 40.0, 0.3, H2O, geom), corrected=darcy_hot(90.0, 40.0, 0.3, H2O, geom))
 ```
 
 The wall's lower viscosity lowers the friction. A channel using this correction needs both
@@ -77,7 +71,8 @@ wall temperatures bound.
 
 ## Use your own correlation
 
-A Nusselt correlation is a function `(Re, Pr, T_wall, T_bulk) -> Nu`. Wrap it in
+A Nusselt correlation is a function `(Re, Pr, T_wall, T_bulk, duct) -> Nu`, and one that needs
+only the first two can absorb the rest as `args...`. Wrap it in
 [`HTC.FromNusselt`](@ref) and it becomes a model. Here is Gnielinski's correlation, which
 STREAM does not ship:
 
@@ -87,7 +82,7 @@ function gnielinski(Re, Pr, args...)
     return (f / 8) * (Re - 1000) * Pr / (1 + 12.7 * sqrt(f / 8) * (Pr^(2 / 3) - 1))
 end
 gn = HTC.FromNusselt(gnielinski)
-gn(60.0, 40.0, 0.3, geom.Dh, geom.A, H2O)
+gn(60.0, 40.0, 0.3, H2O, geom)
 ```
 
 A friction correlation of the Reynolds number alone goes into [`Friction.FromReynolds`](@ref):
@@ -107,5 +102,5 @@ built. Use `ifelse` for a branch, and keep both branches finite, since both are 
 ```@example models
 # Gnielinski is fitted above Re = 3000. Below that, fall back to the laminar constant.
 safe(Re, Pr, args...) = ifelse(Re > 3000, gnielinski(max(Re, 3000.0), Pr), 8.235)
-HTC.FromNusselt(safe)(60.0, 40.0, 0.01, geom.Dh, geom.A, H2O)
+HTC.FromNusselt(safe)(60.0, 40.0, 0.01, H2O, geom)
 ```

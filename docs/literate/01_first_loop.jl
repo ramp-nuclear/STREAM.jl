@@ -35,13 +35,13 @@ using ModelingToolkit: @named, mtkcompile, unknowns, equations
 # leaving it, here to 40 °C, and takes away whatever heat that needs. It stands in for the
 # secondary side of a real heat exchanger, so the loop reaches a steady state.
 
-geometry = PipeGeometry_circular(0.6, 0.01)
-@named ch = Channel(; n=10, geometry, h_left=5000.0);
+geometry = Duct(0.6, Circular(0.01))
+@named ch = Channel(; n=10, geometry, h=5000.0);
 
 # A [`Channel`](@ref STREAM.Components.Channel) is the heated pipe: 0.6 m long and 10 mm
-# across, cut into 10 cells along its length. It has a left and a right face. Only the left
-# is heated here, through a heat transfer coefficient of 5000 W/(m²·K) to a wall temperature
-# we will set in a moment. With the default `h_right=0` the right face is adiabatic.
+# across, cut into 10 cells along its length. It has one face for each heated wall of its
+# duct, and a circular pipe has one wall, `outer`. It is heated through a heat transfer
+# coefficient of 5000 W/(m²·K) to a wall temperature we will set in a moment.
 #
 # ## Connections
 #
@@ -51,7 +51,7 @@ geometry = PipeGeometry_circular(0.6, 0.01)
 connections = [
     inseries(pump, hx, ch, pump),
     pump.inlet.p ~ 1.0e5,
-    ch.T_wall_left .~ 100.0,
+    ch.T_wall_outer .~ 100.0,
 ];
 
 # The second line fixes the pressure at one point. A closed loop determines only pressure
@@ -78,10 +78,11 @@ foreach(println, unknowns(sys))
 #
 # ## Solving
 #
-# [`solve_steady`](@ref) finds the state where nothing changes in time. A loop has a trivial
-# solution with no flow at all, so the solver needs a guess of the flow to start from.
+# [`solve_steady`](@ref) finds the state where nothing changes in time. A loop also has a
+# trivial solution with no flow at all; every port's flow starts at 0.1 kg/s, which
+# keeps the solver away from it.
 
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5]);
+sol = solve_steady(sys);
 
 # Every variable of the model can be read by its name:
 
@@ -122,9 +123,9 @@ Q_flow = ṁ * cₚ(H2O, (T_in + T_out) / 2) * (T_out - T_in)
 # ## Changing the pump head
 #
 # The pump head is a parameter of the compiled model, so a different value needs no rebuild.
-# Pass it with the guess:
+# Pass it in the operating point:
 
-sol2 = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5, sys.pump.dP_pump => 4.0e4])
+sol2 = solve_steady(sys, [sys.pump.dP_pump => 4.0e4])
 ṁ2 = sol2[sys.ch.inlet.ṁ]
 
 # The pipe's friction follows Blasius, ``f \propto \text{Re}^{-1/4}``, so its pressure drop

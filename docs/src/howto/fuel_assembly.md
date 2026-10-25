@@ -69,7 +69,7 @@ using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
 
 n, P_plate = 8, 1.0e4
-geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 slab = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
             material=Solid(2700.0, 900.0, 180.0))
 fuel_plate(name) = HeatDiffusion(slab; name, power=P_plate)
@@ -87,14 +87,12 @@ connections = [
 ]
 @named loop = assembly(connections, pump, hx, asm)
 sys = mtkcompile(loop)
-guess = [sys.asm.c2.inlet.ṁ => 0.4, sys.asm.c3.inlet.ṁ => 0.4]
-sol = solve_steady(sys, guess; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
+sol = solve_steady(sys; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
 [round(sol[getproperty(sys.asm, c).T_out]; digits=2) for c in (:c1, :c2, :c3)]
 ```
 
 Parallel channels sharing a flow are the case [Get a steady solve to converge](steady_solve.md)
-recommends integrating to steady state for, with a guess for each flow the compiled system
-keeps (here those of `c2` and `c3`).
+recommends integrating to steady state for.
 
 The middle channel is heated by both plates and runs hotter than the outer two, each heated
 by one. Each plate sends more of its heat to its outer, cooler channel than to the middle one:

@@ -20,7 +20,7 @@ using STREAM.Components
     )
     @named sys = assembly([corner.(0:7); pump.inlet.p ~ 1.0e5], pump, values(r)...)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.r01.inlet.ṁ => 0.1])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
     ṁ = dP / (5 / 6 * R)
@@ -41,7 +41,7 @@ end
     ]
     @named sys = assembly(conns, pump, hx, vfr)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.vfr.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     ṁ = sol[ssys.vfr.inlet.ṁ]
     @test isapprox(ṁ, sqrt(dP / k); rtol=1e-6)         # k*Q^2 = dP, Q = ṁ (rho=1)
@@ -64,7 +64,7 @@ end
     ]
     @named sys = assembly(conns, pump, hx, vfr)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.vfr.inlet.ṁ => 0.4])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     q = sol[ssys.vfr.inlet.ṁ]                         # rho=1 ⇒ Q = ṁ
     @test isapprox(
@@ -108,17 +108,12 @@ end
     ssys = mtkcompile(sys)
 
     # The loop is purely algebraic in flow (no inertia), so the flow tracks the instantaneous
-    # k(t): at each t, k(t)*Q*|Q| = dP_head. Seed and solve the steady balance at t=0, then
-    # integrate the transient with k_fn active. Q(t=0) = sqrt(dP/k0).
-    q0 = sqrt(dP_head / k0)
+    # k(t): at each t, k(t)*Q*|Q| = dP_head. Solve the steady balance at t=0, then integrate
+    # the transient with k_fn active.
     # DynamicSS(Rodas5P()): this loop is purely algebraic in the flow (no inertia), and the
     # default steady solver goes unstable relaxing it; the stiff explicit relaxation settles
     # cleanly (same choice as the callable-pump ramp test).
-    sol_ss = solve_steady(
-        ssys,
-        [ssys.vfr.inlet.ṁ => q0, ssys.vfr.k_fn => k_hold];
-        solver=DynamicSS(Rodas5P()),
-    )
+    sol_ss = solve_steady(ssys, [ssys.vfr.k_fn => k_hold]; solver=DynamicSS(Rodas5P()))
     @test sol_ss.retcode == ReturnCode.Success
 
     t_arr = range(0.0, 3.0; length=4)
@@ -159,7 +154,7 @@ end
     ]
     @named sys = assembly(conns, pump, hx, lpd)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.lpd.inlet.ṁ => ṁ])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     A = min(A1, A2)
     f = STREAM.LocalLoss.factor(ṁ, A1, A2, μ(H2O, Tin))
@@ -178,7 +173,7 @@ end
         conns = [inseries(pump, hx, r, pump), pump.inlet.p ~ 1.0e5]
         @named sys = assembly(conns, pump, hx, r)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.r.inlet.ṁ => guess])
+        sol = solve_steady(ssys)
         @test sol.retcode == ReturnCode.Success
         return sol[ssys.r.inlet.ṁ]
     end
