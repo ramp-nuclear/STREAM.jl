@@ -24,7 +24,7 @@ using STREAM.Components
         ssys = build_loop(T_inlet=T_inlet)
 
 
-        sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => ṁ_guess])
+        sol = solve_steady(ssys)
         @test sol.retcode == ReturnCode.Success
         @test sol[ssys.ch.T_out] > T_inlet      # outlet > inlet (fluid heated)
         @test sol[ssys.ch.T_out] < 126.85       # physically reasonable
@@ -34,7 +34,6 @@ using STREAM.Components
     @testset "solve_transient returns time-series (callable T_wall step)" begin
         # Step-change: T_wall jumps from 100.0 to 120.0 at t=10s via callable.
         T_inlet = 40.0
-        ṁ_guess = 0.490
         T_wall_0 = 100.0
         T_wall_final = 120.0
         t_step = 10.0
@@ -45,9 +44,7 @@ using STREAM.Components
         # both steady states and the transient.
         wall(T_before, T_after, t_switch) = t -> t < t_switch ? T_before : T_after
         ssys = build_loop(T_inlet=T_inlet, T_wall=wall(T_wall_0, T_wall_final, t_step))
-        steady_at(T_wall) = solve_steady(
-            ssys, [ssys.ch.inlet.ṁ => ṁ_guess, ssys.T_wall_callable => wall(T_wall, T_wall, Inf)]
-        )
+        steady_at(T_wall) = solve_steady(ssys, [ssys.T_wall_callable => wall(T_wall, T_wall, Inf)])
         sol_ss = steady_at(T_wall_0)
         sol_final = steady_at(T_wall_final)
         @test sol_ss.retcode == ReturnCode.Success
@@ -107,7 +104,7 @@ using STREAM.Components
         ]
         @named sys = assembly(conns, pump, ine, res, hx)
         ssys = mtkcompile(sys)
-        sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0])
+        sol_ss = solve_steady(ssys)
         @test sol_ss.retcode == ReturnCode.Success
 
         t_arr = range(0.0, 1.0; length=5)
@@ -125,7 +122,7 @@ using STREAM.Components
         # every state starts at the steady value and keeps it. MTK's initialization once
         # moved a plate temperature here by 0.46 K when the problem was built.
         n = 5
-        geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+        geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
         slab = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1),
                     y=0.063, material=Solid(2700.0, 900.0, 180.0))
         @named fuel = HeatDiffusion(slab; power=2.5e4)

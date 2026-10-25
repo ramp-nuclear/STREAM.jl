@@ -1,50 +1,31 @@
-function _real_defaults(params)
-    vals = Float64[]
-    for p in params
-        ModelingToolkit.hasdefault(p) || continue
-        d = ModelingToolkit.getdefault(p)
-        d isa Real && push!(vals, Float64(d))
-    end
-    return vals
+"""
+    _sole_face(channel) -> Symbol
+
+The face of a channel whose duct is heated on one wall.
+
+# Throws
+- `ArgumentError`: for a channel with more than one face, which needs its side named
+"""
+function _sole_face(channel)
+    faces = keys(duct(channel).heated)
+    length(faces) == 1 || throw(ArgumentError(
+        "$(nameof(channel)) has faces $(join(repr.(faces), ", ")); name the one to wire"))
+    return only(faces)
 end
 
 """
-    check_gravity_mismatch(sys) -> Symbol
+    _check_side(channel, side)
 
-Check whether gravity pressure contributions in a hydraulic loop are balanced.
-
-# Arguments
-- `sys`: compiled `AbstractSystem` to inspect
-
-# Returns
-`:ok` if balanced (or gravity disabled), `:mismatch` if channels have gravity but no
-return-leg `Gravity` component.
+Check that `side` names a wall of a rectangular channel. Throw an `ArgumentError` unless
+`side` is `:left` or `:right` and the channel has a face there.
 """
-function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
-    all_pars = ModelingToolkit.parameters(sys)
-
-    local_name = p -> begin
-        s = string(p)
-        idx = findlast('₊', s)
-        idx === nothing ? s : s[nextind(s, idx):end]
-    end
-
-    g_vals = _real_defaults(filter(p -> local_name(p) == "g_acc", all_pars))
-    h_vals = _real_defaults(filter(p -> local_name(p) == "H", all_pars))
-
-    if isempty(g_vals) || all(iszero, g_vals)
-        return :ok
-    end
-
-    active_g = any(v -> v > 0.0, g_vals)
-    has_return = !isempty(h_vals) && any(v -> v > 0.0, h_vals)
-
-    if active_g && !has_return
-        @warn "check_gravity_mismatch: channels have g_acc > 0 but no Gravity return component found; loop gravity terms may be unbalanced"
-        return :mismatch
-    end
-
-    return :ok
+function _check_side(channel, side)
+    side in (:left, :right) || throw(ArgumentError(
+        "side must be :left or :right for a rectangular channel, got :$side"))
+    faces = keys(duct(channel).heated)
+    side in faces || throw(ArgumentError(
+        "$(nameof(channel)) has no :$side face, which a rectangular channel should have; " *
+        "its faces are $(join(repr.(faces), ", "))"))
 end
 
 """
@@ -99,15 +80,25 @@ function plate(ch_left, ch_right, fuel; name::Symbol)
 end
 
 """
-    one_sided(channel, fuel; side=:left, name) -> System
+    one_sided(channel, fuel; side, name) -> System
 
-Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channel.
+Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channel. The
+channel's face `side` meets the plate's opposite face, so `side=:left` joins the channel's
+`thermal_left` to the plate's `thermal_right`, and the plate's other face is adiabatic.
+
+A channel built on a duct heated on one wall, such as `heated=(left=0.063,)`, has that one
+face and nothing left dangling.
 
 # Arguments
 - `channel`: uncompiled `ChannelAndContacts` instance
 - `fuel`: uncompiled `HeatDiffusion` instance
-- `side`: `:left` or `:right`, which face of the fuel plate connects to the channel (default `:left`)
+- `side`: the channel's face, `:left` or `:right`. Defaults to the channel's only face when
+  its duct is heated on one wall, and must be given otherwise.
 - `name`: system name (Symbol)
+
+# Throws
+- `ArgumentError`: for a side other than `:left` or `:right`, one the channel has no face on,
+  or no side for a channel with two faces
 
 # Returns
 Uncompiled `System` from [`assembly`](@ref).
@@ -116,9 +107,8 @@ After calling this function, refer to sub-components exclusively via the returne
 (e.g. `osc.channel`, `osc.fuel`). The original component variables hold unscoped symbolic
 names and should not be used in equations or connection dicts after composition.
 """
-function one_sided(channel, fuel; side::Symbol=:left, name::Symbol)
-    side in (:left, :right) ||
-        throw(ArgumentError("side must be :left or :right, got :$side"))
+function one_sided(channel, fuel; side::Symbol=_sole_face(channel), name::Symbol)
+    _check_side(channel, side)
     connections = if side == :left
         faces((channel, :thermal_left) => (fuel, :thermal_right))
     else
@@ -128,13 +118,13 @@ function one_sided(channel, fuel; side::Symbol=:left, name::Symbol)
 end
 
 """
-    single_channel(channel, fuel, geometry; fuel_side=:left, name) -> System
+    single_channel(channel, fuel; fuel_side, name) -> System
 
 Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*.
 
 The channel is heated on one face only, but the fuel plate is cooled on **both** faces: the
 near face by conjugate coupling to the channel, the far face by a one-way convective sink
-(`ConvectiveBoundary`) fed from the channel's far-side `h_tc` and coolant `T`.
+(`ConvectiveBoundary`) fed from the channel's near-face `h_tc` and coolant `T`.
 
 This reproduces the half-symmetric reduced unit used for the last plate in an array: the
 plate sits between two channels, so it loses heat on both faces, but only one channel is
@@ -145,10 +135,9 @@ one-face-insulated coupling, use [`one_sided`](@ref) instead.
 # Arguments
 - `channel`: uncompiled `ChannelAndContacts` instance.
 - `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `channel.n`).
-- `geometry`: the `PipeGeometry` the channel was built with (supplies `L` and
-  `heated_parts` for the far-face areas).
-- `fuel_side`: `:left` or `:right`, which fuel face is the near (conjugate) face
-  (default `:left`). The opposite face gets the convective sink.
+- `fuel_side`: `:left` or `:right`, the near (conjugate) face, of the channel and the fuel
+  alike. The fuel's opposite face gets the convective sink. Defaults to the channel's only
+  face when its duct is heated on one wall, and must be given otherwise.
 - `name`: system name (Symbol).
 
 # Returns
@@ -158,33 +147,30 @@ Uncompiled `System` from [`assembly`](@ref) holding `channel`, `fuel`, and `n` p
 After composition, refer to sub-components through the returned system (e.g.
 `scc.channel`, `scc.fuel`).
 """
-function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol=:left, name::Symbol)
-    fuel_side in (:left, :right) ||
-        throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
-    n = var_length(channel, :thermal_left)
-    dz = geometry.L / n
-
+function single_channel(channel, fuel; fuel_side::Symbol=_sole_face(channel), name::Symbol)
+    _check_side(channel, fuel_side)
     near = fuel_side
     far = fuel_side == :left ? :right : :left
-    far_idx = far == :left ? 1 : 2
-
     near_port = Symbol(:thermal_, near)
     far_port = Symbol(:thermal_, far)
-    # The channel's far face is never connected, so its conductance is undefined; Python's
-    # `_other_if_none` copies the connected (near) face's h to it. Cool the fuel's far face
-    # with that same near-side h_tc and the channel's coolant T: the equivalent-twin proxy.
-    h_near = near == :left ? :h_tc_left : :h_tc_right
+    geometry = duct(channel)
+    n = var_length(channel, near_port)
+    dz = geometry.L / n
 
+    # The channel's far face, if it has one, is never connected, so its conductance is
+    # undefined; Python's `_other_if_none` copies the connected (near) face's h to it. Cool
+    # the fuel's far face with that same near-side h_tc and the channel's coolant T, over the
+    # near face's area: the face of the equivalent twin.
     far_bcs = [
-        ConvectiveBoundary(; name=Symbol(name, :_far, i), area=geometry.heated_parts[far_idx] * dz)
+        ConvectiveBoundary(; name=Symbol(name, :_far, i), area=geometry.heated[near] * dz)
         for i in 1:n
     ]
 
     connections = [
         faces((channel, near_port) => (fuel, near_port)),
         face(far_bcs, fuel, far_port),
-        [bc.h for bc in far_bcs] .~ collect(getproperty(channel, h_near)),
-        [bc.T_fluid for bc in far_bcs] .~ collect(channel.T),
+        getproperty.(far_bcs, :h) .~ scalarize(getproperty(channel, Symbol(:h_tc_, near))),
+        getproperty.(far_bcs, :T_fluid) .~ scalarize(channel.T),
     ]
     return assembly(connections, channel, fuel, far_bcs...; name=name)
 end
@@ -200,8 +186,8 @@ as `(kind, sys)` tuples with `kind` either `:c` for a channel or `:p` for a plat
 `:plate` for `np = nc + 1`. With equal counts `start` picks which kind leads.
 """
 function _walk_alternation(channels, plates, effective_bookend::Symbol, start)
-    C = [(:c, ch) for ch in channels]
-    P = [(:p, pl) for pl in plates]
+    C = tuple.(:c, channels)
+    P = tuple.(:p, plates)
     if effective_bookend == :channel        # nc = np + 1  ->  c p c p ... c
         return [collect(Iterators.flatten(zip(C, P))); C[end]]
     elseif effective_bookend == :plate       # np = nc + 1  ->  p c p c ... p

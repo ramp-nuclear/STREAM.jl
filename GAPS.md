@@ -139,6 +139,7 @@ small and independent.
 | `analysis/report.py` | Tables of every calculation's variables, flagging unset and externally-set ones | No |
 | `analysis/debugging.py` | Inspecting a bad initial guess | No |
 | `Aggregator.draw` | Draws the calculation graph | No |
+| `check_gravity_mismatch` | Checks that elevations close around every loop, with the coolant at rest | No, [#56](https://github.com/ramp-nuclear/STREAM.jl/issues/56); a working version is on the `gravity-check` branch |
 
 MTK covers some of it: `unknowns`, `observed` and `equations` show what is being solved, and
 `mtkcompile` refuses a model whose equations and unknowns do not balance. What remains is making a failed

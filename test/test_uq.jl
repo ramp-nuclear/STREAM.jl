@@ -187,10 +187,10 @@ end
     end
 end
 
-@testset "SteadyUQ through a ChannelState and a pipe built from two knobs" begin
+@testset "SteadyUQ through a ChannelState and a duct built from two knobs" begin
     gap = @design_knob gap = 0.0024
     width = @design_knob width = 0.067
-    geometry = PipeGeometry_rectangular(0.6, width, gap, 0.063)
+    geometry = Duct(0.6, Rectangular(width, gap); heated=0.063)
     n = 10
     slab = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
                 material=Solid(2700.0, 900.0, 180.0))
@@ -205,8 +205,7 @@ end
     op = [knob_defaults([gap, width]); ssys.cell.ch.inlet.ṁ => 0.4]
 
     function margins(sol)
-        pipe = PipeGeometry_rectangular(0.6, sol.ps[width], sol.ps[gap], 0.063)
-        state = ChannelState(sol, ssys.cell.ch; pipe)
+        state = ChannelState(sol, ssys.cell.ch)
         return [minimum(chfr(q_CHF_sudo_kaminaga)(state));
                 minimum(bergles_rohsenow_t_onb(state) .- state.T_wall);
                 q_OFI_whittle_forgan(state)]
@@ -215,19 +214,22 @@ end
     s = local_sensitivities(SteadyUQ(ssys, op, parameters; output=margins))
     J = jacobian(s)
 
-    @testset "the nominal margins are those of the numeric pipe" begin
+    @testset "the state holds the duct at the solved knob values" begin
         sol = solve_steady(ssys, op; abstol=1e-10, reltol=1e-10)
-        numeric_pipe = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
-        plain = threshold_analysis(sol, ssys.cell.ch; pipe=numeric_pipe,
-                                   chfr=chfr(q_CHF_sudo_kaminaga), onb=bergles_rohsenow_t_onb,
-                                   ofi=q_OFI_whittle_forgan)
-        state = ChannelState(sol, ssys.cell.ch; pipe=numeric_pipe)
+        state = ChannelState(sol, ssys.cell.ch)
+        numeric = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
+        @test state.duct isa Duct{Rectangular{Float64},Float64}
+        @test flow_area(state.duct) ≈ flow_area(numeric)
+        @test hydraulic_diameter(state.duct) ≈ hydraulic_diameter(numeric)
+        @test state.duct.heated == numeric.heated
+        plain = threshold_analysis(sol, ssys.cell.ch; chfr=chfr(q_CHF_sudo_kaminaga),
+                                   onb=bergles_rohsenow_t_onb, ofi=q_OFI_whittle_forgan)
         @test s.nominal ≈ [minimum(plain.chfr); minimum(plain.onb .- state.T_wall); plain.ofi]
     end
 
-    @testset "a pipe that still holds the knobs is refused" begin
-        sol = solve_steady(ssys, op)
-        @test_throws ArgumentError ChannelState(sol, ssys.cell.ch; pipe=geometry)
+    @testset "a wider gap in the operating point widens the state's duct" begin
+        sol = solve_steady(ssys, with(op, gap => 0.003))
+        @test ChannelState(sol, ssys.cell.ch).duct.shape.depth ≈ 0.003
     end
 
     @testset "more power, less margin to CHF and to ONB" begin
@@ -250,17 +252,17 @@ end
 @testset "CHF less its uncertainty rises with the flow" begin
     T_low = @design_knob T_low = 70.0
     n = 20
-    geometry = PipeGeometry_rectangular(0.5, 0.06, 0.0025, 0.06)
+    geometry = Duct(0.5, Rectangular(0.06, 0.0025))
     @named pump = Pump(; ṁ0=0.1)
     @named hx = HeatExchanger(20.0)
-    @named ch = Channel(; n, geometry, h_left=1.0e4, h_right=1.0e4)
+    @named ch = Channel(; n, geometry, h=1.0e4)
     walls = [T_low + offset for offset in range(0.0, 15.0; length=n)]
     connections = [inseries(pump, hx, ch, pump), pump.inlet.p ~ 2ATM,
                    ch.T_wall_left .~ walls, ch.T_wall_right .~ walls]
     @named loop = assembly(connections, pump, hx, ch)
     ssys = mtkcompile(loop)
 
-    chf(sol) = q_CHF_sudo_kaminaga(ChannelState(sol, ssys.ch; pipe=geometry))
+    chf(sol) = q_CHF_sudo_kaminaga(ChannelState(sol, ssys.ch))
     worst = map(range(0.04, 0.2; length=10)) do ṁ
         prob = SteadyUQ(ssys, [knob_defaults([T_low]); ssys.pump.ṁ0 => ṁ],
                         [ssys.pump.ṁ0, T_low]; output=chf)
@@ -357,7 +359,7 @@ end
     # head at the start moves them at once, so the start is solved again. Its derivatives
     # have to come through that, at t = 0 as well as after.
     n = 5
-    geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+    geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
     slab = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
                 material=Solid(2700.0, 900.0, 180.0))
     @named fuel = HeatDiffusion(slab; power=2.5e4)

@@ -37,9 +37,8 @@ function inseries(systems...)
     for sys in systems[2:(end - 1)]
         _check_not_port(sys, "inside an inseries chain")
     end
-    return Equation[
-        connect(_outlet(systems[i]), _inlet(systems[i + 1])) for i in 1:(length(systems) - 1)
-    ]
+    chain = collect(systems)
+    return connect.(_outlet.(chain[1:(end - 1)]), _inlet.(chain[2:end]))
 end
 
 """
@@ -65,8 +64,13 @@ function _check_not_port(x, place)
     ))
 end
 
-_branch_systems(branch::Tuple) = collect(branch)
-_branch_systems(branch::AbstractVector) = collect(branch)
+"""
+    _branch_systems(branch) -> Vector
+
+The components along one branch of [`inparallel`](@ref): a tuple or vector of them in series,
+or a single component.
+"""
+_branch_systems(branch::Union{Tuple,AbstractVector}) = collect(branch)
 _branch_systems(branch) = Any[branch]
 
 """
@@ -225,10 +229,7 @@ Connect one per-cell source array to one thermal face of a target system.
 `Vector{Equation}` with one `connect(...)` equation per cell.
 """
 function face(sources, target, face::Symbol; source_port::Symbol=:thermal)
-    return Equation[
-        connect(getproperty(sources[i], source_port), port(target, face, i)) for
-        i in eachindex(sources)
-    ]
+    return connect.(getproperty.(sources, source_port), port(target, face))
 end
 
 """
@@ -252,49 +253,32 @@ eqs = faces(
 )
 ```
 """
-function faces(mappings::Pair...)
-    eqs = Equation[]
-    for mapping in mappings
-        append!(eqs, faces(mapping))
-    end
-    return eqs
-end
+faces(mappings::Pair...) = _flat(map(faces, mappings))
 
 function faces(mapping::Pair)
-    (left_sys, left_face) = mapping.first
-    (right_sys, right_face) = mapping.second
-    n_left = var_length(left_sys, left_face)
-    n_right = var_length(right_sys, right_face)
-    n_left == n_right ||
-        throw(ArgumentError("face sizes do not match: $n_left != $n_right"))
-    return Equation[
-        connect(port(left_sys, left_face, i), port(right_sys, right_face, i)) for i in 1:n_left
-    ]
+    left, right = port(mapping.first...), port(mapping.second...)
+    length(left) == length(right) ||
+        throw(ArgumentError("face sizes do not match: $(length(left)) != $(length(right))"))
+    return connect.(left, right)
 end
 
 """
     temperature_feedback(pk, components) -> Vector{Equation}
 
-Generate binding equations that wire each component's existing `T` symbolic to the
-corresponding `pk.T_source_<name>` unknowns inside `PointKinetics`. Used together
-with [`assembly`](@ref STREAM.Assemblies.assembly) to close the neutronics<->thermal-hydraulics loop.
+Bind each component's temperatures to the `pk.T_source_<name>` unknowns a
+[`PointKinetics`](@ref) built with `temp_worth` reads its feedback from, closing the loop
+between the neutronics and the thermal hydraulics.
 
 # Arguments
-- `pk`: uncompiled `PointKinetics` system built with `temp_worth=...`
-- `components`: list of scoped component references whose temperatures feed into `pk`
-  (e.g. `[rods.cac]`, `[inter.ch_left, inter.ch_right]`). Pass scoped references
-  (post-composition), not original component variables. Alpha coefficients belong in
-  the `PointKinetics` constructor `temp_worth` dict; they are not needed here.
+- `pk`: uncompiled `PointKinetics` system built with `temp_worth`
+- `components`: the components whose temperatures feed `pk`, as reached through the system
+  that composes them, such as `[rods.cac]`, not the variables they were built in. Their
+  feedback coefficients are in `temp_worth`, not here.
 
 # Returns
-`Vector{Equation}` -- one equation per cell, per component. Length equals the total
-number of cells across all components. For 1D channel T: `pk.T_source_<name>[j] ~ comp.T[j]`.
-For 2D HeatDiffusion T: `pk.T_source_<name>[(jz-1)*nx+jx] ~ comp.T[jz, jx]` (row-major).
-
-# Note
-Pass scoped references (post-composition), not original component variables. The
-original component variables hold unscoped symbolic names and should not be used in
-equations or connection dicts after composition.
+`Vector{Equation}`, one equation per cell of every component: `pk.T_source_<name>[j] ~
+comp.T[j]` for a channel, and the cells of a `HeatDiffusion` a row at a time,
+`pk.T_source_<name>[(jz-1)*nx + jx] ~ comp.T[jz, jx]`.
 
 # Example: a component wrapped inside `symmetric_plate`
 ```julia
@@ -305,19 +289,6 @@ eqs = temperature_feedback(pk, [rods.cac])
 ```
 """
 function temperature_feedback(pk, components)
-    eqs = Equation[]
-    for comp in components
-        cname = nameof(comp)
-        pk_T_source = getproperty(pk, Symbol(:T_source_, cname))
-        T_sym = getproperty(comp, :T)
-        comp_eqs = if ndims(T_sym) == 1
-            n = length(T_sym)
-            [pk_T_source[j] ~ T_sym[j] for j in 1:n]
-        else
-            nz, nx = size(T_sym)
-            [pk_T_source[(jz - 1) * nx + jx] ~ T_sym[jz, jx] for jz in 1:nz for jx in 1:nx]
-        end
-        append!(eqs, comp_eqs)
-    end
-    return eqs
+    bind(comp) = getproperty(pk, Symbol(:T_source_, nameof(comp))) .~ _row_major(comp.T)
+    return _flat(map(bind, components))
 end

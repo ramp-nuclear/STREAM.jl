@@ -1,5 +1,3 @@
-# test/runtests.jl — thin orchestrator
-
 include("preamble.jl")
 
 include("test_doctests.jl")

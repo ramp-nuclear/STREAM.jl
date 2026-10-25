@@ -102,7 +102,7 @@ using Random: Xoshiro
 using Statistics: quantile
 
 n = 10
-geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
              material=Solid(2700.0, 900.0, 180.0))
 @named fuel = HeatDiffusion(plate; power=3.0e4)

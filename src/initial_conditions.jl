@@ -29,7 +29,7 @@ function uniform(systems, value, variables::Symbol...)
 end
 
 """
-    steady_state_guess(; T_inlet, Q_wall, ṁ_guess, n) -> Vector{Float64}
+    steady_state_guess(; T_inlet, Q_wall, ṁ_guess, n, liquid=H2O) -> Vector{Float64}
 
 Generate a linear temperature guess for steady-state initialization.
 
@@ -38,18 +38,19 @@ Generate a linear temperature guess for steady-state initialization.
 - `Q_wall`: total wall heat input [W]
 - `ṁ_guess`: estimated mass flow rate [kg/s]
 - `n`: number of axial cells (Int)
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), whose `cₚ` at `T_inlet` is used
 
 # Returns
 Vector of length `n` with linearly interpolated temperatures from `T_inlet` to estimated
 `T_outlet` as `Float64`.
 """
 function steady_state_guess(;
-    T_inlet::Float64,
-    Q_wall::Float64,
-    ṁ_guess::Float64,
+    T_inlet::Real,
+    Q_wall::Real,
+    ṁ_guess::Real,
     n::Int,
     liquid::AbstractLiquid=H2O,
 )
     cp = cₚ(liquid, T_inlet)
-    return [T_inlet + i * Q_wall / (n * ṁ_guess * cp) for i in 1:n]
+    return collect(T_inlet .+ (1:n) .* Q_wall ./ (n * ṁ_guess * cp))
 end

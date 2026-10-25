@@ -28,35 +28,32 @@ They sum to β = 0.006502, reported by the `beta_total` observable.
 """
 const U235_BETA_K = [0.000215, 0.001424, 0.001274, 0.002568, 0.000748, 0.000273]
 
+"""
+    _row_major(x) -> Vector
+
+The cells of `x` in one vector, a row at a time: `x[jz, jx]` lands at `(jz-1)*nx + jx`. A
+vector is unchanged. This is the order a [`PointKinetics`](@ref) feedback group holds a
+component's cells in.
+"""
+_row_major(x::AbstractVector) = scalarize(x)
+_row_major(x::AbstractMatrix) = vec(permutedims(scalarize(x)))
+
+"""
+    _flatten_weights(raw, comp) -> Vector{Float64}
+
+A feedback weight or reference temperature for every cell of `comp`, in [`_row_major`](@ref)
+order: a number for every cell, or an array shaped like `comp.T`.
+
+# Throws
+- `ArgumentError`: for an array of another shape
+"""
 function _flatten_weights(raw, comp)
     T_sym = getproperty(comp, :T)
-    if ndims(T_sym) == 2
-        nz, nx = size(T_sym)
-        if raw isa Real
-            return (fill(Float64(raw), nz * nx), nz * nx)
-        elseif raw isa AbstractMatrix && size(raw) == (nz, nx)
-            return ([Float64(raw[i, j]) for i in 1:nz for j in 1:nx], nz * nx)
-        else
-            throw(
-                ArgumentError(
-                    "weight for $(nameof(comp)) must be scalar or $(nz)x$(nx) matrix, got $(summary(raw))",
-                ),
-            )
-        end
-    else
-        n = length(T_sym)
-        if raw isa Real
-            return (fill(Float64(raw), n), n)
-        elseif raw isa AbstractVector && length(raw) == n
-            return (Float64.(raw), n)
-        else
-            throw(
-                ArgumentError(
-                    "weight for $(nameof(comp)) must be scalar or length-$n vector, got $(summary(raw))",
-                ),
-            )
-        end
-    end
+    raw isa Real && return fill(Float64(raw), length(T_sym))
+    size(raw) == size(T_sym) || throw(ArgumentError(
+        "weight for $(nameof(comp)) must be a number or an array of size " *
+        "$(join(size(T_sym), "×")), got $(summary(raw))"))
+    return Float64.(_row_major(raw))
 end
 
 """
@@ -70,23 +67,17 @@ the component temperatures they stand for.
 """
 function _temperature_feedback(temp_worth, ref_temp)
     temp_worth === nothing && return (0, Num[])
-    ref_dict = ref_temp === nothing ? Dict() : ref_temp
-    unknown_vars = Num[]
-    expr = 0
+    refs = something(ref_temp, Dict())
+    expr, unknowns = 0, Num[]
     for (comp, alpha_raw) in temp_worth
-        alpha, n_flat = _flatten_weights(alpha_raw, comp)
-        Tref, _ = _flatten_weights(get(ref_dict, comp, 0.0), comp)
-        length(Tref) == n_flat || throw(
-            DimensionMismatch(
-                "ref_temp for $(nameof(comp)) has length $(length(Tref)), expected $n_flat",
-            ),
-        )
-        var_sym = Symbol(:T_source_, nameof(comp))
-        T_source = only(@variables $(var_sym)(t)[1:n_flat])
-        append!(unknown_vars, collect(T_source))
-        expr = expr + sum(alpha[j] * (T_source[j] - Tref[j]) for j in 1:n_flat)
+        alpha = _flatten_weights(alpha_raw, comp)
+        Tref = _flatten_weights(get(refs, comp, 0.0), comp)
+        name = Symbol(:T_source_, nameof(comp))
+        T_source = scalarize(only(@variables $name(t)[1:length(alpha)]))
+        expr += sum(alpha .* (T_source .- Tref))
+        append!(unknowns, T_source)
     end
-    return (expr, unknown_vars)
+    return (expr, unknowns)
 end
 
 """
@@ -234,7 +225,7 @@ function PointKinetics(
         reactivity(t)
     end
 
-    β_k, λ_k, C_k = collect(β), collect(λ), collect(C)
+    β_k, λ_k, C_k = scalarize(β), scalarize(λ), scalarize(C)
     control_reactivity, control_pars, control_unknowns = control()
     ρ = control_reactivity
     β_sum = sum(β_k)
@@ -288,7 +279,7 @@ function point_kinetics_steady_state(
     P0; Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K, power_input=0.0
 )
     Pn = P0 - power_input
-    C_k = [beta_k[i] / (lambda_k[i] * Lambda) * Pn for i in eachindex(beta_k)]
+    C_k = beta_k ./ (lambda_k .* Lambda) .* Pn
     return (P_neutron=Pn, C_k=C_k)
 end
 

@@ -15,7 +15,7 @@ component.
 
 # Arguments
 - `name`: system name (Symbol; supplied by `@named`).
-- `area`: heat-transfer area for the cell [m^2], e.g. `heated_parts[side] * dz`.
+- `area`: heat-transfer area for the cell [m^2], e.g. `geometry.heated[side] * dz`.
 
 # Ports
 - `thermal` -- `ThermalPort`; connect to the fuel cell's far-face port.
@@ -25,9 +25,8 @@ component.
 - `T_fluid(t)`: bulk fluid temperature [°C].
 """
 function ConvectiveBoundary(; name, area)
-    pars = @parameters area = area
+    @parameters area = area
     @named thermal = ThermalPort()
-    vars = @variables h(t) T_fluid(t)
-    eqs = Equation[thermal.Q ~ h * area * (thermal.T - T_fluid)]
-    return compose(System(eqs, t, collect(vars), pars; name=name), thermal)
+    @variables h(t) T_fluid(t)
+    return assembly(thermal.Q ~ h * area * (thermal.T - T_fluid), thermal; name)
 end

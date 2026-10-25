@@ -17,7 +17,7 @@ using STREAM.Assemblies: inseries, symmetric_plate
 using ModelingToolkit: @named, mtkcompile
 
 gap = @design_knob gap = 0.0024
-geometry = PipeGeometry_rectangular(0.6, 0.067, gap, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, gap); heated=0.063)
 n = 10
 plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
              material=Solid(2700.0, 900.0, 180.0))
@@ -43,8 +43,7 @@ the steady state once and differentiating the outputs there:
 
 ```@example uq
 function margins(sol)
-    pipe = PipeGeometry_rectangular(0.6, 0.067, sol.ps[gap], 0.063)
-    state = ChannelState(sol, sys.cell.ch; pipe)
+    state = ChannelState(sol, sys.cell.ch)
     return [minimum(chfr(q_CHF_sudo_kaminaga)(state)),            # smallest CHF ratio
             minimum(bergles_rohsenow_t_onb(state) .- state.T_wall)] # K to the onset of boiling
 end
@@ -55,9 +54,9 @@ s = local_sensitivities(prob)
 s.nominal
 ```
 
-`ChannelState` wants the pipe in numbers, so `margins` builds it again from the gap the
-solution was solved at. Under `local_sensitivities` that value carries its derivative, and the
-geometry passes it on to the correlations.
+`ChannelState` reads the channel's duct at the gap the solution was solved at, as it reads
+the temperatures. Under `local_sensitivities` that gap carries its derivative, and the duct
+passes it on to the correlations.
 
 ## Give each input its uncertainty
 
@@ -274,7 +273,7 @@ For a correlation on its own, or any calculation that is not one steady solve, a
 dual numbers, so keep it free of `Float64` conversions:
 
 ```@example uq
-pipe = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+pipe = Duct(0.6, Rectangular(0.067, 0.0024))
 ofi = FunctionUQ(x -> q_OFI_whittle_forgan(x.ṁ, x.T_sat, x.T_in, pipe),
                  (ṁ=0.4, T_sat=115.0, T_in=40.0))
 s_ofi = local_sensitivities(ofi)

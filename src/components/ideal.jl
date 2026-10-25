@@ -28,22 +28,17 @@ network topology -- correct physics (distributed + concentrated).
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Inertia(L_over_A::Real; name)
-    pars = @parameters L_over_A = L_over_A
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    eqs = Equation[inlet.p - outlet.p ~ L_over_A * D(inlet.ṁ)]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    two = HydraulicTwoPort(; name)
+    @unpack Δp, ṁ = two
+    @parameters L_over_A = L_over_A
+    return flow_relation(two, [Δp ~ -L_over_A * D(ṁ)])
 end
 
 function Inertia(L_over_A::Function; name)
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    vars = @variables L_eff(t)
-    eqs = Equation[
-        L_eff ~ L_over_A(inlet.ṁ),
-        inlet.p - outlet.p ~ L_eff * D(inlet.ṁ),
-    ]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars=vars)
+    two = HydraulicTwoPort(; name)
+    @unpack Δp, ṁ = two
+    @variables L_eff(t)
+    return flow_relation(two, [L_eff ~ L_over_A(ṁ), Δp ~ -L_eff * D(ṁ)])
 end
 
 @doc raw"""
@@ -109,10 +104,8 @@ function ConstantTemperature(T; n::Int=(T isa AbstractVector ? length(T) : 1), n
         length(T) == n ||
             throw(DimensionMismatch("T has length $(length(T)), expected n=$n"))
         @parameters T_bc[1:n] = T
-        eqs = [thermal[i].T ~ T_bc[i] for i in 1:n]
     else
         @parameters T_bc = T
-        eqs = [thermal[i].T ~ T_bc for i in 1:n]
     end
-    return compose(System(eqs, t, [], [T_bc]; name=name), thermal...)
+    return assembly(port(thermal, :T) .~ T_bc, thermal...; name)
 end

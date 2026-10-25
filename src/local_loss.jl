@@ -1,8 +1,18 @@
-# Analytic high-Re factors (Borda-Carnot expansion; Idelchik contraction closed form).
+"""
+    _expansion_asymptote(aratio), _contraction_asymptote(aratio) -> K
+
+The loss coefficients above the tabulated Reynolds numbers: Borda-Carnot `(1 - aratio)²` for
+an expansion, and Idelchik's closed form `0.5 (1 - aratio)^0.75` for a contraction.
+"""
 _expansion_asymptote(aratio) = (1 - aratio)^2
 _contraction_asymptote(aratio) = 0.5 * (1 - aratio)^0.75
 
-# Linear interpolation through (x1,y1)-(x2,y2), matching Python's lin_interp.
+"""
+    _lin_interp(x1, x2, y1, y2, x)
+
+The line through `(x1, y1)` and `(x2, y2)` at `x`, extrapolating outside them. Python's
+`lin_interp`.
+"""
 _lin_interp(x1, x2, y1, y2, x) = (y2 - y1) / (x2 - x1) * (x - x2) + y2
 
 # Idelchik tables. Rows index the area ratio, columns the Reynolds number.
@@ -29,27 +39,36 @@ const _IDELCHIK_410_F = let
         5.00 2.70 1.80 1.46 1.30 0.90 0.65 0.42 0.30 0.20 0.40 0.42 0.25
         5.00 2.60 1.70 1.35 1.20 0.80 0.56 0.35 0.24 0.15 0.35 0.35 0.20
     ]
-    for (i, ar) in enumerate(_IDELCHIK_ARATIOS)
-        f[i, end] = _contraction_asymptote(ar)
-    end
+    f[:, end] .= _contraction_asymptote.(_IDELCHIK_ARATIOS)
     f
 end
 
-# Bilinear interpolation of f over (Re, area ratio). f[i,j]: i over ar_grid, j over re_grid.
-# The caller only reaches here with re and aratio inside the grid bounds.
+"""
+    _table_interp(re_grid, ar_grid, f, aratio, re)
+
+Bilinear interpolation of an Idelchik table `f`, rows over `ar_grid` and columns over
+`re_grid`: in the Reynolds number at the two bracketing area ratios, then in area ratio. Only
+reached with `re` and `aratio` inside the grid.
+"""
 function _table_interp(re_grid, ar_grid, f, aratio, re)
     jr = clamp(searchsortedlast(re_grid, re), 1, length(re_grid) - 1)
     ia = clamp(searchsortedlast(ar_grid, aratio), 1, length(ar_grid) - 1)
     re1, re2 = re_grid[jr], re_grid[jr + 1]
     ar1, ar2 = ar_grid[ia], ar_grid[ia + 1]
-    # Interpolate in Re at the two bracketing area ratios, then in area ratio.
     f_ar1 = _lin_interp(re1, re2, f[ia, jr], f[ia, jr + 1], re)
     f_ar2 = _lin_interp(re1, re2, f[ia + 1, jr], f[ia + 1, jr + 1], re)
     return _lin_interp(ar1, ar2, f_ar1, f_ar2, aratio)
 end
 
-# Re-regime dispatch for a sudden area change (Idelchik): analytic above the table,
-# table interpolation within, and a velocity-decay extrapolation below.
+"""
+    _sudden_area_factor(max_re, min_re, min_re_val, max_ar, min_ar, infval, analytic,
+                        table_interp, aratio, re) -> K
+
+The loss coefficient of a sudden area change across the Reynolds regimes: `analytic` at and
+above `max_re`, `table_interp` within the table, and below it, or outside the tabulated area
+ratios, an extrapolation that decays as `1/Re` from `min_re_val` at `min_re`. No flow gives
+no loss.
+"""
 function _sudden_area_factor(
     max_re, min_re, min_re_val, max_ar, min_ar, infval, analytic, table_interp, aratio, re,
 )

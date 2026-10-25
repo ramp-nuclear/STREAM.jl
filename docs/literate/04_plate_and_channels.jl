@@ -43,7 +43,7 @@ P = 2.5e4                # plate power [W]
 ṁ = 0.4                  # channel flow [kg/s]
 T_in, p_in = 40.0, 1.7e5 # inlet temperature [°C] and pressure [Pa]
 
-geometry = PipeGeometry_rectangular(L, width, gap, heated_width)
+geometry = Duct(L, Rectangular(width, gap); heated=heated_width)
 
 # ## The plate
 #
@@ -145,7 +145,7 @@ fig_map
 # reads the channel's solved state and applies the correlations we name. Each margin is
 # arranged so that larger is safer, a ratio above 1 or a temperature difference above 0:
 
-margins = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
+margins = threshold_analysis(sol, sys.cell.ch;
     onb = s -> bergles_rohsenow_t_onb(s) .- s.T_wall,
     osv = s -> q_OSV_saha_zuber(s) ./ s.q_flux,
     ofi = s -> q_OFI_whittle_forgan(s) / P,

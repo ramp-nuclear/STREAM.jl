@@ -14,7 +14,7 @@ using OrdinaryDiffEq: ReturnCode
 
     # Shared test pipe: 0.6m long, 67.1mm x 2.4mm rectangular channel
     # Matches typical MTR fuel assembly geometry used in Python STREAM tests
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    pipe = Duct(0.6, Rectangular(0.0671, 0.0024))
 
     # Anchors below come from Python STREAM run under conda env stream-env
     # (the project at ~/projects/STREAM, imported as `stream`). Each expected number
@@ -84,8 +84,8 @@ using OrdinaryDiffEq: ReturnCode
         Nu_c = 455.0
         St_c = 0.0065
         function pe_at(ṁ)
-            G = abs(ṁ) / pipe.A
-            return G * pipe.Dh * cₚ(H2O, 26.85) / κ(H2O, 26.85)
+            G = abs(ṁ) / flow_area(pipe)
+            return G * hydraulic_diameter(pipe) * cₚ(H2O, 26.85) / κ(H2O, 26.85)
         end
 
         coolant = H2O(fill(26.85, 10), fill(1e5, 10))
@@ -197,25 +197,23 @@ using OrdinaryDiffEq: ReturnCode
 end
 
 @testset "ChannelState and wrappers" begin
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    pipe = Duct(0.6, Rectangular(0.0671, 0.0024))
     n = 5
 
     state = ChannelState(;
         n=n,
         T_bulk=fill(46.85, n),
         T_wall=fill(66.85, n),
-        T_wall_left=fill(66.85, n),
-        T_wall_right=fill(61.85, n),
+        T_walls=(left=fill(66.85, n), right=fill(61.85, n)),
         T_sat=fill(100.0, n),
         T_ONB=fill(106.85, n),
         T_inlet=26.85,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
-        q_flux_left=fill(5e5, n),
-        q_flux_right=fill(4e5, n),
+        q_fluxes=(left=fill(5e5, n), right=fill(4e5, n)),
         ṁ=0.5,
         velocity=fill(3.0, n),
-        pipe=pipe,
+        duct=pipe,
         gravity=9.81,
     )
 
@@ -225,7 +223,7 @@ end
         @test state.T_inlet == 26.85
         @test state.ṁ == 0.5
         @test state.gravity == 9.81
-        @test state.pipe === pipe
+        @test state.duct === pipe
     end
 
     @testset "bergles_rohsenow_t_onb on a ChannelState" begin
@@ -251,7 +249,7 @@ end
         result = q_CHF_fabrega(state)
         @test length(result) == n
         @test all(result .> 0)
-        expected_val = 1e7 * pipe.Dh * (0.023 * (100.0 - 26.85) + 4.56)
+        expected_val = 1e7 * hydraulic_diameter(pipe) * (0.023 * (100.0 - 26.85) + 4.56)
         @test result[1] ≈ expected_val rtol = 1e-10
     end
 
@@ -267,10 +265,10 @@ end
         # is uniform in T_bulk, so build a sloped one to tell them apart.
         warming = collect(range(40.0, 70.0; length=n))
         sloped = ChannelState(; n=n, T_bulk=warming, T_wall=fill(90.0, n),
-            T_wall_left=fill(90.0, n), T_wall_right=fill(85.0, n),
+            T_walls=(left=fill(90.0, n), right=fill(85.0, n)),
             T_sat=fill(100.0, n), T_ONB=fill(106.85, n), T_inlet=40.0, P=fill(1e5, n),
-            q_flux=fill(5e5, n), q_flux_left=fill(5e5, n), q_flux_right=fill(4e5, n),
-            ṁ=0.5, velocity=fill(3.0, n), pipe=pipe, gravity=9.81)
+            q_flux=fill(5e5, n), q_fluxes=(left=fill(5e5, n), right=fill(4e5, n)),
+            ṁ=0.5, velocity=fill(3.0, n), duct=pipe, gravity=9.81)
 
         # The state method takes its saturated properties from the coolant at the channel's
         # own saturation state, so the explicit call needs the same snapshot to agree.
@@ -323,15 +321,15 @@ end
         # outlet. Reading the wrong end silently overstates the margin.
         sloped = collect(range(110.0, 90.0; length=n))   # hot inlet, cooler outlet
         fwd = ChannelState(; n=n, T_bulk=fill(46.85, n), T_wall=fill(66.85, n),
-            T_wall_left=fill(66.85, n), T_wall_right=fill(61.85, n),
+            T_walls=(left=fill(66.85, n), right=fill(61.85, n)),
             T_sat=sloped, T_ONB=fill(106.85, n), T_inlet=26.85, P=fill(1e5, n),
-            q_flux=fill(5e5, n), q_flux_left=fill(5e5, n), q_flux_right=fill(4e5, n),
-            ṁ=0.5, velocity=fill(3.0, n), pipe=pipe, gravity=9.81)
+            q_flux=fill(5e5, n), q_fluxes=(left=fill(5e5, n), right=fill(4e5, n)),
+            ṁ=0.5, velocity=fill(3.0, n), duct=pipe, gravity=9.81)
         rev = ChannelState(; n=n, T_bulk=fwd.T_bulk, T_wall=fwd.T_wall,
-            T_wall_left=fwd.T_wall_left, T_wall_right=fwd.T_wall_right,
+            T_walls=fwd.T_walls,
             T_sat=sloped, T_ONB=fwd.T_ONB, T_inlet=fwd.T_inlet, P=fwd.P,
-            q_flux=fwd.q_flux, q_flux_left=fwd.q_flux_left, q_flux_right=fwd.q_flux_right,
-            ṁ=-0.5, velocity=fwd.velocity, pipe=pipe, gravity=9.81)
+            q_flux=fwd.q_flux, q_fluxes=fwd.q_fluxes,
+            ṁ=-0.5, velocity=fwd.velocity, duct=pipe, gravity=9.81)
 
         @test q_OFI_whittle_forgan(fwd) ≈
               q_OFI_whittle_forgan(0.5, last(sloped), 26.85, pipe) rtol = 1e-12
@@ -342,8 +340,8 @@ end
     end
 
     @testset "twall_limit on a ChannelState" begin
-        # Fixture: T_bulk 46.85, T_wall_left 66.85, T_wall_right 61.85. The left face is
-        # hotter, so it sets the limit: 46.85 + 1.2*20 = 70.85.
+        # Fixture: T_bulk 46.85, left wall 66.85, right wall 61.85. The left face is hotter,
+        # so it sets the limit: 46.85 + 1.2*20 = 70.85.
         result = twall_limit(state; inhomogeneity_factor=1.2)
         @test length(result) == n
         @test all(result .≈ 70.85)
@@ -358,7 +356,7 @@ end
         superheat = bergles_rohsenow_t_onb(state) .- state.T_sat
         @test bergles_rohsenow_t_onb(state; onb_factor=1.2) .- state.T_sat ≈ 1.2 .* superheat
         @test bergles_rohsenow_t_onb(state; inhomogeneity_factor=1.3) ≈
-              bergles_rohsenow_t_onb.(state.P, 1.3 .* state.q_flux_left, state.T_sat)
+              bergles_rohsenow_t_onb.(state.P, 1.3 .* state.q_fluxes.left, state.T_sat)
 
         # The factor divides the ∫q dz / q term, so 1/q_OSV is linear in 1/f, and the very
         # large f stands in for f → ∞.
@@ -373,13 +371,16 @@ end
 
 @testset "ChannelState from a solved channel" begin
     # Built from a solution rather than by hand, which is what exercises the extraction.
-    geo = PipeGeometry_circular(0.6, 0.01)
+    geo = Duct(0.6, Circular(0.01))
     ssys = build_loop(; n=5)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys)
 
     # A plain Channel has no `velocity` variable (only ChannelAndContacts declares it), so
     # the extraction has to fall back to the signed `v` and take its magnitude.
-    state = ChannelState(sol, ssys.ch; pipe=geo)
+    state = ChannelState(sol, ssys.ch)
+    # The duct comes off the compiled channel itself, not from the caller.
+    @test duct(ssys.ch) == geo
+    @test state.duct == geo
     @test state.n == 5
     @test length(state.T_bulk) == 5
     @test all(state.velocity .>= 0)
@@ -390,24 +391,18 @@ end
     @test state.gravity == G_EARTH
     @test state.ṁ > 0
 
-    # A circular pipe puts the whole heated perimeter on one face, so the other has zero
-    # area. That face carries no flux; dividing by its area would give NaN and poison
-    # q_flux, and through it every CHF ratio.
-    @test all(iszero, state.q_flux_right)
+    # A circular pipe has one face, and the state has one flux and one wall temperature.
+    @test keys(state.q_fluxes) == keys(state.T_walls) == (:outer,)
+    @test state.q_flux == state.q_fluxes.outer
     @test all(isfinite, state.q_flux)
     @test all(state.q_flux .> 0)
     @test all(isfinite, chfr(q_CHF_mirshak)(state))
-
-    # Without a geometry there is no area at all, so both faces read zero.
-    bare = ChannelState(sol, ssys.ch)
-    @test all(iszero, bare.q_flux)
 
     # Run the loop backwards and the coolant enters at the last cell. The heat exchanger
     # sets both of its ports, so what reaches the channel is still its 40 °C, while the
     # first cell is now the hot end.
     back = build_loop(; n=5, dP_pump=-3.0e4)
-    op_back = [back.ch.inlet.ṁ => -0.5]
-    reversed = ChannelState(solve_steady(back, op_back), back.ch; pipe=geo)
+    reversed = ChannelState(solve_steady(back), back.ch)
     @test reversed.ṁ < 0
     @test reversed.T_inlet ≈ 40.0
     @test reversed.T_inlet < last(reversed.T_bulk) < first(reversed.T_bulk)
@@ -418,9 +413,9 @@ end
     # carries the flow down, so every flow-dependent limit has to move with it. The reader
     # this replaces froze ṁ and T_inlet at the first saved time.
     n = 5
-    geo = PipeGeometry_circular(0.6, 0.01)
+    geo = Duct(0.6, Circular(0.01))
     ssys = build_loop(; n=n)
-    sol_ss = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol_ss = solve_steady(ssys)
     sol = solve_transient(
         ssys, sol_ss, range(0.0, 0.5; length=6); overrides=[ssys.pump.dP_pump => 0.0]
     )
@@ -430,19 +425,18 @@ end
     @test ṁ[end] < 0.5 * ṁ[1]
 
     @testset "at saved time $k" for k in (1, 3, length(sol.t))
-        s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
+        s = ChannelState(sol, ssys.ch; index=k)
         @test s.ṁ == ṁ[k]
         @test s.T_inlet == sol[ssys.ch.T_in, k]
         @test s.T_bulk == sol[ssys.ch.T, k]
     end
     # A transient has many instants, so asking for the state without saying which is an
     # error rather than a guess.
-    @test_throws ArgumentError ChannelState(sol, ssys.ch; pipe=geo)
+    @test_throws ArgumentError ChannelState(sol, ssys.ch)
 
     # Channel-level results stack into a vector over time, per-cell ones into [cell, time].
     result = threshold_analysis(
-        sol, ssys.ch; pipe=geo,
-        osv=q_OSV_saha_zuber, ofi=q_OFI_whittle_forgan, sk=q_CHF_sudo_kaminaga,
+        sol, ssys.ch; osv=q_OSV_saha_zuber, ofi=q_OFI_whittle_forgan, sk=q_CHF_sudo_kaminaga,
         onb=bergles_rohsenow_t_onb,
     )
     nt = length(sol.t)
@@ -453,7 +447,7 @@ end
     # Stacking loses nothing: column k of each result is exactly what the correlation gives
     # for the state at saved time k on its own.
     @testset "column $k is the state at saved time $k" for k in (1, nt)
-        s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
+        s = ChannelState(sol, ssys.ch; index=k)
         @test result.osv[:, k] == q_OSV_saha_zuber(s)
         @test result.ofi[k] == q_OFI_whittle_forgan(s)
         @test result.sk[:, k] == q_CHF_sudo_kaminaga(s)
@@ -464,8 +458,8 @@ end
     @test result.sk[:, end] != result.sk[:, 1]
 
     # A steady solution still gives one value per cell.
-    steady = threshold_analysis(sol_ss, ssys.ch; pipe=geo, sk=q_CHF_sudo_kaminaga)
-    @test steady.sk == q_CHF_sudo_kaminaga(ChannelState(sol_ss, ssys.ch; pipe=geo))
+    steady = threshold_analysis(sol_ss, ssys.ch; sk=q_CHF_sudo_kaminaga)
+    @test steady.sk == q_CHF_sudo_kaminaga(ChannelState(sol_ss, ssys.ch))
 end
 
 @testset "worst_case finds the smallest margin and where it is" begin
@@ -480,30 +474,26 @@ end
 end
 
 @testset "ChannelState says so when the channel has no wall temperature" begin
-    # ChannelHeatFlux prescribes its flux, so nothing closes T_wall_left/T_wall_right and
+    # ChannelHeatFlux prescribes its flux, so nothing closes its wall temperatures and
     # mtkcompile drops them. MTK's own complaint is "Symbol ... is not present in the
     # system", which does not tell you that the channel variant is the problem.
     n = 4
-    geo = PipeGeometry_circular(0.6, 0.01)
+    geo = Duct(0.6, Circular(0.01))
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(20.0)
     @named chf = ChannelHeatFlux(; n=n, geometry=geo)
     conns = [
         inseries(pump, bc, chf, pump),
         pump.inlet.p ~ 1.0e5,
-        chf.q_left .~ 1.0e4,
-        chf.q_right .~ 0.0,
+        chf.q_outer .~ 1.0e4,
     ]
     @named sys = assembly(conns, pump, bc, chf)
     ssys = mtkcompile(sys)
-    ic = [
-        ssys.chf.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
     err = try
-        ChannelState(sol, ssys.chf; pipe=geo)
+        ChannelState(sol, ssys.chf)
         nothing
     catch e
         e
@@ -514,82 +504,77 @@ end
 end
 
 @testset "chfr helper" begin
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    pipe = Duct(0.6, Rectangular(0.0671, 0.0024))
     n = 3
     state = ChannelState(;
         n=n,
         T_bulk=fill(46.85, n),
         T_wall=fill(66.85, n),
-        T_wall_left=fill(66.85, n),
-        T_wall_right=fill(61.85, n),
+        T_walls=(left=fill(66.85, n), right=fill(61.85, n)),
         T_sat=fill(100.0, n),
         T_ONB=fill(106.85, n),
         T_inlet=26.85,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
-        q_flux_left=fill(5e5, n),
-        q_flux_right=fill(4e5, n),
+        q_fluxes=(left=fill(5e5, n), right=fill(4e5, n)),
         ṁ=0.5,
         velocity=fill(3.0, n),
-        pipe=pipe,
+        duct=pipe,
         gravity=9.81,
     )
 
-    ratio_fn = chfr(q_CHF_mirshak; direction=:max)
+    ratio_fn = chfr(q_CHF_mirshak; face=:max)
     ratios = ratio_fn(state)
     @test length(ratios) == n
     @test all(ratios .> 0)
 
-    ratio_left = chfr(q_CHF_mirshak; direction=:left)(state)
-    ratio_right = chfr(q_CHF_mirshak; direction=:right)(state)
-    ratio_total = chfr(q_CHF_mirshak; direction=:total)(state)
+    ratio_left = chfr(q_CHF_mirshak; face=:left)(state)
+    ratio_right = chfr(q_CHF_mirshak; face=:right)(state)
     @test length(ratio_left) == n
     @test length(ratio_right) == n
-    @test length(ratio_total) == n
     @test all(ratio_right .>= ratio_left)
+    # :max divides by the larger face flux, the left one here.
+    @test ratio_fn(state) == ratio_left
 
     state_zero = ChannelState(;
         n=n,
         T_bulk=fill(46.85, n),
         T_wall=fill(66.85, n),
-        T_wall_left=fill(66.85, n),
-        T_wall_right=fill(61.85, n),
+        T_walls=(left=fill(66.85, n), right=fill(61.85, n)),
         T_sat=fill(100.0, n),
         T_ONB=fill(106.85, n),
         T_inlet=26.85,
         P=fill(1e5, n),
         q_flux=fill(0.0, n),
-        q_flux_left=fill(0.0, n),
-        q_flux_right=fill(0.0, n),
+        q_fluxes=(left=fill(0.0, n), right=fill(0.0, n)),
         ṁ=0.5,
         velocity=fill(3.0, n),
-        pipe=pipe,
+        duct=pipe,
         gravity=9.81,
     )
     ratios_zero = ratio_fn(state_zero)
     @test all(ratios_zero .== Inf)
-    @test_throws ArgumentError chfr(q_CHF_mirshak; direction=:bad)(state)
+    @test_throws ArgumentError chfr(q_CHF_mirshak; face=:bad)(state)
+    @test_throws ArgumentError chfr(q_CHF_mirshak; face=:outer)(state)   # not this channel's
 end
 
 @testset "threshold_analysis dispatch" begin
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    pipe = Duct(0.6, Rectangular(0.0671, 0.0024))
     n = 3
     state = ChannelState(;
         n=n,
         T_bulk=fill(46.85, n),
         T_wall=fill(66.85, n),
-        T_wall_left=fill(66.85, n),
-        T_wall_right=fill(61.85, n),
+        T_walls=(left=fill(66.85, n), right=fill(61.85, n)),
         T_sat=fill(100.0, n),
         T_ONB=fill(106.85, n),
         T_inlet=26.85,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
-        q_flux_left=fill(5e5, n),
-        q_flux_right=fill(4e5, n),
+        q_fluxes=(left=fill(5e5, n), right=fill(4e5, n)),
         ṁ=0.5,
         velocity=fill(3.0, n),
-        pipe=pipe,
+        duct=pipe,
         gravity=9.81,
     )
 
@@ -599,7 +584,7 @@ end
     @test length(manual_result.mirshak) == n
     @test length(manual_result.onb) == n
 
-    mirshak_chfr = chfr(q_CHF_mirshak; direction=:max)
+    mirshak_chfr = chfr(q_CHF_mirshak; face=:max)
     chfr_result = mirshak_chfr(state)
     @test length(chfr_result) == n
     @test all(chfr_result .> 0)
@@ -612,10 +597,9 @@ end
     n = 3
     q = [5.0e4, 0.0, -3.0e3]
     s = ChannelState(;
-        n=n, T_bulk=fill(60.0, n), T_wall=fill(62.0, n), T_wall_left=fill(62.0, n),
-        T_wall_right=fill(62.0, n), T_sat=fill(115.0, n), T_ONB=fill(120.0, n),
-        T_inlet=35.0, P=fill(1.7e5, n), q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=0.01,
-        velocity=fill(0.05, n), pipe=nothing, gravity=9.81,
+        n=n, T_bulk=fill(60.0, n), T_wall=fill(62.0, n), T_walls=(left=fill(62.0, n), right=fill(62.0, n)), T_sat=fill(115.0, n), T_ONB=fill(120.0, n),
+        T_inlet=35.0, P=fill(1.7e5, n), q_flux=q, q_fluxes=(left=q, right=q), ṁ=0.01,
+        velocity=fill(0.05, n), duct=nothing, gravity=9.81,
     )
     onb = bergles_rohsenow_t_onb(s)
     @test onb[1] ≈ bergles_rohsenow_t_onb(1.7e5, 5.0e4, 115.0)
@@ -630,7 +614,7 @@ end
     # are Python's values in the first and last cell (OFI is one number for the channel).
     # Python's numba `directed` was swapped for its plain-numpy equivalent so it would run.
     n = 10
-    pipe = PipeGeometry_rectangular(0.6, 0.066, 0.0027, 0.063)
+    pipe = Duct(0.6, Rectangular(0.066, 0.0027); heated=0.063)
     dz = pipe.L / n
     q = 6e5 .* (0.6 .+ 0.8 .* sin.(π .* ((1:n) .- 0.5) ./ n))
     P = collect(range(1.75e5, 1.70e5; length=n))
@@ -639,10 +623,9 @@ end
         rise = cumsum(mdot >= 0 ? Q : reverse(Q)) ./ (abs(mdot) * 4180.0)
         T = 35.0 .+ (mdot >= 0 ? rise : reverse(rise))
         T_wall = T .+ q ./ 2e4
-        return ChannelState(; n=n, T_bulk=T, T_wall=T_wall, T_wall_left=T_wall,
-            T_wall_right=T_wall, T_sat=Tsat.(H2O, P), T_ONB=zeros(n), T_inlet=35.0, P=P,
-            q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=mdot,
-            velocity=abs.(mdot ./ (ρ.(H2O, T) .* pipe.A)), pipe=pipe, gravity=G_EARTH)
+        return ChannelState(; n=n, T_bulk=T, T_wall=T_wall, T_walls=(left=T_wall, right=T_wall), T_sat=Tsat.(H2O, P), T_ONB=zeros(n), T_inlet=35.0, P=P,
+            q_flux=q, q_fluxes=(left=q, right=q), ṁ=mdot,
+            velocity=abs.(mdot ./ (ρ.(H2O, T) .* flow_area(pipe))), duct=pipe, gravity=G_EARTH)
     end
 
     python = (
@@ -658,10 +641,10 @@ end
             mirshak=q_CHF_mirshak(s),
             fabrega=q_CHF_fabrega(s),
             ofi=[q_OFI_whittle_forgan(s)],
-            osv=q_OSV_saha_zuber(s; direction=:left),
+            osv=q_OSV_saha_zuber(s; face=:left),
             bp=q_boiling_onset(s),
             # Python reports the margin T_wall - T_ONB.
-            onb_margin=s.T_wall_left .- bergles_rohsenow_t_onb(s; direction=:left),
+            onb_margin=s.T_walls.left .- bergles_rohsenow_t_onb(s; face=:left),
             twall=twall_limit(s; inhomogeneity_factor=1.2),
         )
         @testset "$label $k" for k in keys(python[label])

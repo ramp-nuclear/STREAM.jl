@@ -1,6 +1,5 @@
 # Runs the jldoctest examples in the docstrings, so a wrong one fails the suite even when the
-# docs are not built. They cover the correlation, property and decay heat values that used to
-# be unit tests here.
+# docs are not built. They cover the correlation, property and decay heat values.
 #
 # Documenter is a test-only dependency: `Pkg.test()` (and CI) installs it, but
 # `julia --project=. test/runtests.jl` does not see it unless it is in your global environment.
