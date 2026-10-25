@@ -218,7 +218,7 @@ _all_variables(vars) =
 Build the composed `System` for a channel variant. Every variant states the heat flow into
 each face and whatever extra variables, equations, observables, and ports it adds, then hands
 them here; the shared core equations and the `compose` call live in one place. The system
-carries `geometry`, for [`duct`](@ref) to read back.
+carries `geometry` and `liquid`, for [`duct`](@ref) and [`coolant`](@ref) to read back.
 """
 function _channel_system(;
     name, n::Int, geometry::Duct, g, darcy, liquid,
@@ -229,15 +229,14 @@ function _channel_system(;
         n, inlet, outlet, geometry, g, darcy, q_face, vars, liquid, T_wall,
     )
     all_vars = vcat(_all_variables(vars), extra_vars...)
-    sys = compose(
+    return compose(
         System(_flat(core.eqs, extra_eqs), t, all_vars, pars;
                observed=_flat(core.obs, extra_obs), name,
-               metadata=(_CoolantKey => liquid,)),
+               metadata=(_DuctKey => geometry, _CoolantKey => liquid)),
         inlet,
         outlet,
         extra_ports...,
     )
-    return _with_duct(sys, geometry)
 end
 
 """

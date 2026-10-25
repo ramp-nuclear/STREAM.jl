@@ -276,7 +276,7 @@ using ModelingToolkit: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
 using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM, default_coolant
-using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter, _with_duct
+using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter, _DuctKey
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..STREAM: assembly, port, _flat

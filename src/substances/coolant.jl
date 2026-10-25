@@ -42,12 +42,12 @@ The coolant the channel `sys` was built with.
 The coolant recorded when the channel was built.
 
 # Throws
-- `ArgumentError`: when `sys` records no coolant, which only a channel does
+- `ArgumentError`: for a system that is not a STREAM channel
 """
 function coolant(sys::ModelingToolkit.AbstractSystem)
     liquid = ModelingToolkit.getmetadata(sys, _CoolantKey, nothing)
     liquid === nothing && throw(ArgumentError(
-        "$(nameof(sys)) was built without a coolant; only a channel records one",
+        "$(nameof(sys)) carries no coolant: only a channel built by STREAM does",
     ))
     return liquid
 end
