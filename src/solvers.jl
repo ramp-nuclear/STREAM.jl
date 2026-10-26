@@ -1,5 +1,5 @@
 """
-    solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, reltol=1e-6) -> NonlinearSolution
+    solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, reltol=1e-6) -> SciMLSolution
 
 Solve a compiled system to steady state, with every callable forcing evaluated at the time `t`.
 
@@ -9,10 +9,12 @@ parameter, held at `t`: ModelingToolkit's `NonlinearSystem(ssys; bind_iv=false)`
 starting at `t` starts from. It keeps the unknowns and observed quantities of `ssys`, with
 observed ones evaluated at `t`.
 
-With `solver=nothing`, NonlinearSolve chooses the root finder. A `DynamicSS` solver first
-integrates `ssys` from `op`, with time held at `t`, to where it settles, and the root solve
-starts from there. That suits a loop whose root finder does not converge from the declared
-values, or a free tank level that settles where its inflow and outflow balance.
+With `solver=nothing`, NonlinearSolve chooses the root finder. A `DynamicSS` solver integrates
+from `op` in a pseudo-time, with the model's time held at `t`, until the state stops changing.
+That suits a loop whose root finder does not converge from the declared values, or a free
+tank level that settles where its inflow and outflow balance. Its integration starts from
+`BrownFullBasicInit`, so a guess off the algebraic equations is made consistent rather than
+rejected.
 
 An operating point is ModelingToolkit's single map over both unknowns and parameters, such as
 `[ssys.pump.dP_pump => 6.0e4, ssys.ch.inlet.ṁ => 0.5]`. The full rules are in
@@ -23,64 +25,35 @@ An operating point is ModelingToolkit's single map over both unknowns and parame
 - `op`: operating point, a `Vector{Pair}`. A parameter in it takes that value. An unknown in it
   is where the solve starts. An unknown left out starts from the value the model declares.
 - `t`: the time the forcings are evaluated at (default 0.0)
-- `solver`: `nothing`, a NonlinearSolve algorithm, `SSRootfind(alg)`, or `DynamicSS(alg)`
+- `solver`: `nothing` for NonlinearSolve's default, a NonlinearSolve algorithm, or
+  `DynamicSS(alg)`
 - `abstol`: absolute tolerance (default 1e-8)
 - `reltol`: relative tolerance (default 1e-6)
 
 # Returns
-`NonlinearSolution`. Index it with the variables of `ssys`, `sol[ssys.component.variable]`,
+A steady-state solution. Index it with the variables of `ssys`, `sol[ssys.component.variable]`,
 and start a transient from it with `solve_transient(ssys, sol, times)`.
 """
 function solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, reltol=1e-6)
-    op = [op; _unset_arrays(ssys)]
     steady = ModelingToolkit.NonlinearSystem(ssys; bind_iv=false)
     # Without initialization: for a system whose unknowns are all observed, MTK's
     # initialization refers to variables it does not define.
-    prob = NonlinearProblem(
-        steady, Dict{Any,Any}([op; ModelingToolkit.get_iv(ssys) => t]);
-        build_initializeprob=false,
+    op = Dict{Any,Any}([op; _unset_arrays(ssys); ModelingToolkit.get_iv(ssys) => t])
+    residual = NonlinearProblem(steady, op; build_initializeprob=false)
+    # The steady residual as an ODE in a pseudo-time, with the mass matrix of `ssys`: a root
+    # finder solves it and `DynamicSS` integrates it, and either solution is indexed through
+    # `steady`, where `t` is the parameter set above.
+    f = ODEFunction{true}(
+        (du, u, p, _) -> residual.f(du, u, p);
+        mass_matrix=ModelingToolkit.calculate_massmatrix(ssys), sys=steady,
     )
-    if solver isa DynamicSS
-        prob = remake(prob; u0=_settle(ssys, op, t, solver; abstol, reltol))
-    end
-    alg = _root_finder(solver)
-    return alg === nothing ? solve(prob; abstol, reltol) : solve(prob, alg; abstol, reltol)
-end
-
-"""
-    _settle(ssys, op, t, solver; abstol, reltol) -> Vector{Pair}
-
-Where `solver`, a `DynamicSS`, takes `ssys` from `op` with its right-hand side evaluated at `t`
-at every pseudo-time, so the integration settles with each forcing at its value at `t`. One
-`unknown => value` per unknown of `ssys`.
-
-The integration starts from `BrownFullBasicInit`, so a guess off the algebraic equations is
-made consistent rather than rejected.
-"""
-function _settle(ssys, op, t, solver; abstol, reltol)
-    prob = ODEProblem(
-        ssys, op, (t, t); warn_initialize_determined=false, build_initializeprob=false,
-    )
-    f = prob.f
-    held = ODEFunction{true}((du, u, p, _) -> f(du, u, p, t); mass_matrix=f.mass_matrix)
+    prob = SteadyStateProblem(f, residual.u0, residual.p)
     # Dense output would only feed interpolation, which DynamicSS never reads, and with it on
     # OrdinaryDiffEq warns about interpolation on a loop with no differential states.
-    sol = solve(
-        SteadyStateProblem(held, prob.u0, prob.p), solver; abstol, reltol,
-        odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol)),
-    )
-    return unknowns(ssys) .=> sol.u
+    inner = solver isa DynamicSS ?
+        (; odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol))) : (;)
+    return solve(prob, solver; abstol, reltol, inner...)
 end
-
-"""
-    _root_finder(solver)
-
-The NonlinearSolve algorithm `solve_steady` finishes with: `nothing` for NonlinearSolve's
-default, after a `DynamicSS` too.
-"""
-_root_finder(solver) = solver
-_root_finder(::DynamicSS) = nothing
-_root_finder(solver::SSRootfind) = solver.alg
 
 """
     solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...) -> SciMLSolution
