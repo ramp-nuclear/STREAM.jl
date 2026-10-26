@@ -8,6 +8,7 @@ Latexify = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+OrdinaryDiffEqNonlinearSolve = "127b3ac7-2247-4354-8eb6-78cf4e7c58e8"
 STREAM = "49562357-9609-405b-b96f-716d2939d241"
 SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 

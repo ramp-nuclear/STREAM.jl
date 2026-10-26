@@ -37,7 +37,9 @@ module STREAM
 
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
+using ModelingToolkit: SymbolicUtils
 using OrdinaryDiffEq
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using QuadGK
 using SteadyStateDiffEq
 
@@ -268,7 +270,7 @@ module Components
 using ModelingToolkit
 using OrdinaryDiffEq
 using ModelingToolkit: t_nounits as t, D_nounits as D
-using ModelingToolkit: ⋅
+using LinearAlgebra: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
 using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM

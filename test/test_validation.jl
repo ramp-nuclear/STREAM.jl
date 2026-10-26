@@ -696,7 +696,7 @@ end  # @testset "parity harness"
     # (thermal-port Q) are explicit in those ICs. MTK's auto-generated OverrideInit
     # nonlinear solve is fragile for this all-differential structure, so verify IC
     # consistency (CheckInit) instead of re-solving it.
-    sol_v01 = solve(prob_v01, Rodas5P(); initializealg=CheckInit(),
+    sol_v01 = solve(prob_v01, Rodas5P(); initializealg=SciMLBase.CheckInit(),
                     reltol=1e-8, abstol=1e-10, saveat=t_checkpoints)
     @test sol_v01.retcode == ReturnCode.Success
 

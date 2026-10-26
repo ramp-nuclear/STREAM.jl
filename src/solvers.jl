@@ -24,8 +24,11 @@ solve, so each solver here says what it does with one. The full rules are in
 - `reltol`: relative tolerance (default 1e-6)
 - `build_initializeprob`: passed to `SteadyStateProblem` (default `false`)
 
-A `DynamicSS` solver integrates to steady state and keeps only where it ends, so its inner
-integration runs without dense output.
+The residual solved is the compiled system's own, at the steady-state time `t = Inf`, so a
+component that reads `t` sees its value at the end of its history. A `DynamicSS` solver
+integrates to steady state and keeps only where it ends, so its inner integration runs
+without dense output. It starts from `BrownFullBasicInit`, so a guess off the algebraic
+equations is made consistent rather than rejected.
 
 # Returns
 `SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
@@ -33,10 +36,16 @@ integration runs without dense output.
 function solve_steady(
     ssys, op=Pair[]; solver=nothing, abstol=1e-8, reltol=1e-6, build_initializeprob=false
 )
+    op = [op; _unset_arrays(ssys)]
     prob = SteadyStateProblem(ssys, op; warn_initialize_determined=false, build_initializeprob)
+    # MTK lowers a steady problem by recompiling the model as a time-free NonlinearSystem,
+    # where a callable of `t` is left unbound. Solving the compiled residual instead keeps
+    # the steady-state time every solve here was checked at.
+    prob = remake(prob; lowered_problem=nothing)
     # Dense output would only feed interpolation, which DynamicSS never reads, and with it
     # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
-    inner = solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
+    inner = solver isa DynamicSS ?
+        (; odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit())) : (;)
     return solve(prob, solver; abstol, reltol, inner...)
 end
 
@@ -56,11 +65,12 @@ Solve a transient simulation over a time array, starting from the operating poin
 - `callbacks`: optional `CallbackSet` for user-supplied events (passed to DifferentialEquations
   `solve`); pre-wired for Flapper support
 - `initializealg`: DAE initialization algorithm (default `SciMLBase.NoInit()`, which trusts the
-  supplied `op` as a fully consistent initial condition). Pass `SciMLBase.BrownFullBasicInit()`
-  to have the solver solve the algebraic constraints for consistency at `t[1]` (holding the
-  differential states fixed) before stepping. It is needed when `op` is an approximate or transplanted
-  IC that does not exactly satisfy the algebraic equations, where `NoInit` + a stiff solver can
-  abort at `t=0` (`dt` driven below floating-point epsilon, `NaN` error estimate).
+  supplied `op` as a fully consistent initial condition). Pass `BrownFullBasicInit()`, from
+  OrdinaryDiffEqNonlinearSolve, to have the solver solve the algebraic constraints for
+  consistency at `t[1]` (holding the differential states fixed) before stepping. It is
+  needed when `op` is an approximate or transplanted IC that does not exactly satisfy the
+  algebraic equations, where `NoInit` + a stiff solver can abort at `t=0` (`dt` driven below
+  floating-point epsilon, `NaN` error estimate).
 - `build_initializeprob`: leave at the default `nothing` for almost everything (MTK chooses). Pass
   `false` only for a loop that `mtkcompile` reduces to no differential states (a purely algebraic
   system, such as a flapper and pump with no inertia), where MTK would otherwise build an
@@ -82,9 +92,25 @@ function solve_transient(
 )
     tspan = (Float64(t[1]), Float64(t[end]))
     init = build_initializeprob === nothing ? (;) : (; build_initializeprob)
+    op = [op; _unset_arrays(ssys)]
     prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false, init...)
     return solve(prob, solver; saveat=t, callback=callbacks, initializealg,
                  merge(values(kwargs), _saved_steps(prob, t, kwargs))...)
+end
+
+"""
+    _unset_arrays(ssys) -> Vector{Pair}
+
+`v => nothing` for each array variable whose initial condition in `ssys` holds `nothing` in
+every element.
+
+`mtkcompile` records such an entry for an array variable it removed, such as the wall of a
+channel face no equation reads, and the problem constructors then look for an `Initial`
+parameter that does not exist. An explicit `nothing` in the operating point drops the entry.
+"""
+function _unset_arrays(ssys)
+    unset(v) = (u = SymbolicUtils.unwrap_const(v); u isa AbstractArray && all(isnothing, u))
+    return [k => nothing for (k, v) in initial_conditions(ssys) if unset(v)]
 end
 
 """
@@ -104,10 +130,7 @@ function _saved_steps(prob, t, kwargs)
     M = prob.f.mass_matrix
     stateless = M isa AbstractMatrix && all(iszero, M)
     (stateless && !haskey(kwargs, :verbose)) || return (; tstops)
-    # DEVerbosity and SciMLLogging are reached through OrdinaryDiffEqCore, which already
-    # loads them, rather than taken on as dependencies of their own.
-    core = OrdinaryDiffEq.OrdinaryDiffEqCore
-    quiet = core.DEVerbosity(; rosenbrock_no_differential_states=core.SciMLLogging.Silent())
+    quiet = DEVerbosity(; rosenbrock_no_differential_states=SciMLLogging.Silent())
     return (; tstops, verbose=quiet)
 end
 
@@ -177,7 +200,7 @@ symbol means the result does not depend on which variables MTK chose as states.
 """
 function solve_transient(
     ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
-    overrides=Pair[], initializealg=OrdinaryDiffEq.BrownFullBasicInit(), kwargs...,
+    overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...,
 )
     op = Pair{Any,Any}[_state_snapshot(ssys, sol_ss); overrides]
     return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)

@@ -111,7 +111,7 @@ and the solve stops the first time the bob reaches the bottom, a quarter of a pe
 p = sys_plain
 prob_plain = ODEProblem(p, [p.x => sin(θ0), p.u => 0.0], (0.0, 10.0);
                         guesses=[p.y => -0.5, p.v => 0.0, p.λ => -1.0])
-stopped = solve(prob_plain, Rodas5P(); verbose=false)
+stopped = solve(prob_plain, Rodas5P(); verbose=DEVerbosity(SciMLLogging.None()))
 (stopped.retcode, stopped.t[end])
 ```
 
