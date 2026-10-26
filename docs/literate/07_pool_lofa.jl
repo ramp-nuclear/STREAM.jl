@@ -200,9 +200,12 @@ ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 # The solve integrates to where the model settles, the robust way to find a loop's operating
 # point (see [Get a steady solve to converge](../howto/steady_solve.md)). The core is at full
 # power, so it starts from the design flows: from the flow every port defaults to, the
-# coolant would heat far past what the correlations cover before the flow built up.
+# coolant would heat far past what the correlations cover before the flow built up. Each
+# path gets its flow, the riser included, so the start is consistent whichever of them the
+# compiled system keeps.
 
 design = [sys.primary.inlet.ṁ => ṁ_design,
+          sys.riser.inlet.ṁ => ṁ_design,
           ch_high.inlet.ṁ => case.types.high.design_ṁ,
           ch_low.inlet.ṁ => case.types.low.design_ṁ]
 sol_ss = solve_steady(sys, design; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)

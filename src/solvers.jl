@@ -27,8 +27,8 @@ solve, so each solver here says what it does with one. The full rules are in
 The residual solved is the compiled system's own, at the steady-state time `t = Inf`, so a
 component that reads `t` sees its value at the end of its history. A `DynamicSS` solver
 integrates to steady state and keeps only where it ends, so its inner integration runs
-without dense output. It starts from `BrownFullBasicInit`, so a guess off the algebraic
-equations is made consistent rather than rejected.
+without dense output. It starts from `BrownFullBasicInit` at `abstol`, so a guess off the
+algebraic equations is made consistent rather than rejected.
 
 # Returns
 `SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
@@ -45,7 +45,7 @@ function solve_steady(
     # Dense output would only feed interpolation, which DynamicSS never reads, and with it
     # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
     inner = solver isa DynamicSS ?
-        (; odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit())) : (;)
+        (; odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol))) : (;)
     return solve(prob, solver; abstol, reltol, inner...)
 end
 
@@ -168,7 +168,8 @@ Private, and used only by the [`solve_transient`](@ref) method below.
 _state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
 
 """
-    solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...)
+    solve_transient(ssys, sol_ss, t; overrides=Pair[],
+                    initializealg=BrownFullBasicInit(; abstol=1e-8), kwargs...)
 
 Start a transient from an already-solved state.
 
@@ -192,7 +193,9 @@ symbol means the result does not depend on which variables MTK chose as states.
 - `sol_ss`: a solved state to start from (e.g. the result of `solve_steady`)
 - `t`: time array; `tspan` derived as `(t[1], t[end])`
 - `overrides`: `Vector{Pair}` of parameter/forcing changes applied at `t[1]`
-- `initializealg`: DAE initialization (default `BrownFullBasicInit()`)
+- `initializealg`: DAE initialization, at the start and after every callback event (default
+  `BrownFullBasicInit(; abstol=1e-8)`; the residuals are in SI units, pascals among them, so
+  the algorithm's own 1e-10 default can be finer than the arithmetic resolves)
 - `kwargs...`: forwarded to the lower-level `solve_transient`
 
 # Returns
@@ -200,7 +203,7 @@ symbol means the result does not depend on which variables MTK chose as states.
 """
 function solve_transient(
     ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
-    overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...,
+    overrides=Pair[], initializealg=BrownFullBasicInit(; abstol=1e-8), kwargs...,
 )
     op = Pair{Any,Any}[_state_snapshot(ssys, sol_ss); overrides]
     return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)
