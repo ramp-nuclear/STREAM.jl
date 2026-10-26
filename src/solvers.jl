@@ -194,8 +194,8 @@ symbol means the result does not depend on which variables MTK chose as states.
 - `t`: time array; `tspan` derived as `(t[1], t[end])`
 - `overrides`: `Vector{Pair}` of parameter/forcing changes applied at `t[1]`
 - `initializealg`: DAE initialization, at the start and after every callback event (default
-  `BrownFullBasicInit(; abstol=1e-8)`; the residuals are in SI units, pascals among them, so
-  the algorithm's own 1e-10 default can be finer than the arithmetic resolves)
+  `BrownFullBasicInit(; abstol=1e-8)`; the residuals are in SI units, so the algorithm's own
+  1e-10 default can be finer than a heat balance in watts resolves)
 - `kwargs...`: forwarded to the lower-level `solve_transient`
 
 # Returns
