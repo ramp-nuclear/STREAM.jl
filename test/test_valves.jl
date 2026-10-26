@@ -299,14 +299,13 @@ end
 
 """
 A pump head that holds at `dp0` and, from `t = 0`, decays with time constant `τ`. With
-`τ = Inf` it holds for good, which is what a steady solve needs: it reads the head at
-`t = Inf`, where `exp(-t/τ)` is not a number.
+`τ = Inf` it holds for good.
 """
 struct _Coastdown
     dp0::Float64
     τ::Float64
 end
-(c::_Coastdown)(t) = isinf(c.τ) ? c.dp0 : c.dp0 * exp(-t / c.τ)
+(c::_Coastdown)(t) = c.dp0 * exp(-t / c.τ)
 
 """
     _drain_pool(; break_at=:bottom, t_break=0.0, coast=Inf) -> (ssys, sol, watch)
@@ -342,13 +341,13 @@ function _drain_pool(; break_at=:bottom, t_break=0.0, coast=Inf)
     push!(watch, (:INTACT => :UNCOVERED, pool.L < 1.0, "core uncovered"))
     ssys = mtkcompile(sys)
 
-    sol_ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => _Coastdown(dp0, Inf)])
+    head = ssys.pump.dP_pump_fn => _Coastdown(dp0, coast)
+    sol_ss = solve_steady(ssys, [head])
     # Fine over the break's opening ramp, then spread to the end.
     times = unique!(vcat(0.0, range(t_break, t_break + 4.0; length=21),
                          range(t_break + 4.0, 4000.0; length=400)[2:end]))
     sol = solve_transient(ssys, sol_ss, times;
-                          overrides=[ssys.pool.pinned => false,
-                                     ssys.pump.dP_pump_fn => _Coastdown(dp0, coast)],
+                          overrides=[ssys.pool.pinned => false, head],
                           callbacks=machine_callbacks(ssys, watch))
     return ssys, sol, watch
 end
@@ -392,8 +391,7 @@ end
     # parallel. When the pump head falls the flapper opens and the two legs circulate alone.
     n, L, D, T_in, power, t_trip = 10, 1.0, 0.01, 40.0, 1.0e3, 10.0
     geom = Duct(L, Circular(D))
-    # 200 kPa, falling to zero over 5 s from `t_trip` on a C1 cubic. A trip at Inf holds for
-    # good and is the same closure type, so one callable parameter takes both.
+    # 200 kPa, falling to zero over 5 s from `t_trip` on a C1 cubic.
     head(t_trip) = tt -> (ξ = clamp((tt - t_trip) / 5.0, 0.0, 1.0); 2.0e5 * (1 - (3ξ^2 - 2ξ^3)))
     # The heated leg switches regime on its own, so the run stays physical once the pump
     # stops.
@@ -423,17 +421,13 @@ end
     ssys = mtkcompile(sys)
     C = ssys.heated.ch
 
-    # Pump on, flapper shut, integrated to steady. The flows start from their guesses; the
-    # dummy derivative has no default and needs a value.
-    ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => head(Inf), Differential(t)(C.inlet.ṁ) => 0.0];
-                      solver=DynamicSS(Rodas5P()))
+    # Pump on, flapper shut, integrated to steady. The flows start from their guesses.
+    pump_head = ssys.pump.dP_pump_fn => head(t_trip)
+    ss = solve_steady(ssys, [pump_head]; solver=DynamicSS(Rodas5P()))
     valve_at_steady = machine.state
-    # Every unknown, not a subset: a `Dt(ṁ) => 0` guess does not reach the dummy-derivative
-    # state, which the latest packages would otherwise start at NaN.
-    op = Pair{Any,Any}[u => ss[u] for u in unknowns(ssys)]
-    push!(op, ssys.pump.dP_pump_fn => head(t_trip))
     t_arr = range(0.0, 300.0; length=3001)
-    sol = solve_transient(ssys, op, t_arr; callbacks=machine_callbacks(ssys, machine))
+    sol = solve_transient(ssys, ss, t_arr; overrides=[pump_head],
+                          callbacks=machine_callbacks(ssys, machine))
     Q_wall(idx) = sum(sol[C.q_wall[i], idx] for i in 1:n)
 
     @testset "the forced-flow steady state is physical, with the flapper shut" begin

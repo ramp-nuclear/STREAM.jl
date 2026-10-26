@@ -89,13 +89,7 @@ end
     # time-varying behavior the name evokes is exercised, not just compiled.
     dP_head = 3.0e4   # Pa, fixed pump head
     k0 = 1.0e5        # Pa*s^2/kg^2 at t=0 (density=1 -> Q = ṁ)
-    # Build the ramp and the constant seed from one factory so they share a closure type.
-    # The resistor stores k as an MTK callable parameter typed to the function it was built
-    # with, so the steady-solve seed and the transient override must be the same type to be
-    # interchangeable in the operating point (same gotcha as the callable-pump ramp test).
-    make_k = rate -> (tt -> k0 * (1.0 + rate * tt))
-    kfn = make_k(1.0)     # the ramp k0*(1+t)
-    k_hold = make_k(0.0)  # constant k0, for the steady seed
+    kfn = tt -> k0 * (1.0 + tt)
 
     @named pump = Pump(dP_head)
     @named hx = HeatExchanger(26.85)
@@ -109,11 +103,11 @@ end
 
     # The loop is purely algebraic in flow (no inertia), so the flow tracks the instantaneous
     # k(t): at each t, k(t)*Q*|Q| = dP_head. Solve the steady balance at t=0, then integrate
-    # the transient with k_fn active.
+    # the transient.
     # DynamicSS(Rodas5P()): this loop is purely algebraic in the flow (no inertia), and the
-    # default steady solver goes unstable relaxing it; the stiff explicit relaxation settles
-    # cleanly (same choice as the callable-pump ramp test).
-    sol_ss = solve_steady(ssys, [ssys.vfr.k_fn => k_hold]; solver=DynamicSS(Rodas5P()))
+    # default root finder goes unstable on it; the stiff relaxation settles cleanly (same
+    # choice as the callable-pump ramp test).
+    sol_ss = solve_steady(ssys, [ssys.vfr.k_fn => kfn]; solver=DynamicSS(Rodas5P()))
     @test sol_ss.retcode == ReturnCode.Success
 
     t_arr = range(0.0, 3.0; length=4)
