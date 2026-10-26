@@ -107,11 +107,11 @@ end
     # DynamicSS(Rodas5P()): this loop is purely algebraic in the flow (no inertia), and the
     # default root finder goes unstable on it; the stiff relaxation settles cleanly (same
     # choice as the callable-pump ramp test).
-    sol_ss = solve_steady(ssys, [ssys.vfr.k_fn => kfn]; solver=DynamicSS(Rodas5P()))
+    sol_ss = solve_steady(ssys; solver=DynamicSS(Rodas5P()))
     @test sol_ss.retcode == ReturnCode.Success
 
     t_arr = range(0.0, 3.0; length=4)
-    sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.vfr.k_fn => kfn])
+    sol = solve_transient(ssys, sol_ss, t_arr)
     @test sol.retcode == ReturnCode.Success
 
     # Defining relation at two distinct times: the measured drop equals k_fn(t)*q*|q|.

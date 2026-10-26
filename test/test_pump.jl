@@ -134,12 +134,12 @@ end
     #
     # Solver choice: the default root finder goes unstable on this loop, so the steady solve
     # integrates with DynamicSS(Rodas5P) first.
-    sol_ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => dP_fn]; solver=DynamicSS(Rodas5P()))
+    sol_ss = solve_steady(ssys; solver=DynamicSS(Rodas5P()))
     @test sol_ss.retcode == ReturnCode.Success
     @test isapprox(sol_ss[ssys.ine.inlet.ṁ], ṁ_0; rtol=1e-3)   # relaxation endpoint, loose
 
     t_arr = range(0.0, T_ramp, length=1000)
-    sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump_fn => dP_fn])
+    sol = solve_transient(ssys, sol_ss, t_arr)
 
     @test sol.retcode == ReturnCode.Success
 

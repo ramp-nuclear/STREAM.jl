@@ -341,13 +341,12 @@ function _drain_pool(; break_at=:bottom, t_break=0.0, coast=Inf)
     push!(watch, (:INTACT => :UNCOVERED, pool.L < 1.0, "core uncovered"))
     ssys = mtkcompile(sys)
 
-    head = ssys.pump.dP_pump_fn => _Coastdown(dp0, coast)
-    sol_ss = solve_steady(ssys, [head])
+    sol_ss = solve_steady(ssys)
     # Fine over the break's opening ramp, then spread to the end.
     times = unique!(vcat(0.0, range(t_break, t_break + 4.0; length=21),
                          range(t_break + 4.0, 4000.0; length=400)[2:end]))
     sol = solve_transient(ssys, sol_ss, times;
-                          overrides=[ssys.pool.pinned => false, head],
+                          overrides=[ssys.pool.pinned => false],
                           callbacks=machine_callbacks(ssys, watch))
     return ssys, sol, watch
 end
@@ -422,12 +421,10 @@ end
     C = ssys.heated.ch
 
     # Pump on, flapper shut, integrated to steady. The flows start from their guesses.
-    pump_head = ssys.pump.dP_pump_fn => head(t_trip)
-    ss = solve_steady(ssys, [pump_head]; solver=DynamicSS(Rodas5P()))
+    ss = solve_steady(ssys; solver=DynamicSS(Rodas5P()))
     valve_at_steady = machine.state
     t_arr = range(0.0, 300.0; length=3001)
-    sol = solve_transient(ssys, ss, t_arr; overrides=[pump_head],
-                          callbacks=machine_callbacks(ssys, machine))
+    sol = solve_transient(ssys, ss, t_arr; callbacks=machine_callbacks(ssys, machine))
     Q_wall(idx) = sum(sol[C.q_wall[i], idx] for i in 1:n)
 
     @testset "the forced-flow steady state is physical, with the flapper shut" begin

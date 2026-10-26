@@ -23,14 +23,14 @@ a parameter of the model, a *callable parameter*:
 
 | Component | Argument | Parameter | Needs it in the operating point |
 |:---|:---|:---|:---|
-| [`Pump`](@ref STREAM.Components.Pump) | the head, `Pump(f)` | `dP_pump_fn` | yes |
+| [`Pump`](@ref STREAM.Components.Pump) | the head, `Pump(f)` | `dP_pump_fn` | no, it stores its default |
 | [`Channel`](@ref STREAM.Components.Channel) | `h`, or one face's entry in it | `h_fn`, or `h_<face>_fn` such as `h_left_fn` | yes |
-| [`VolumetricFlowResistor`](@ref STREAM.Components.VolumetricFlowResistor) | `k` | `k_fn` | yes |
+| [`VolumetricFlowResistor`](@ref STREAM.Components.VolumetricFlowResistor) | `k` | `k_fn` | no, it stores its default |
 | [`PointKinetics`](@ref STREAM.Components.PointKinetics) | the control reactivity | `rho_c_fn` | no, it stores its default |
 | [`PointKinetics`](@ref STREAM.Components.PointKinetics) | `power_input` | `power_input_fn` | no, it stores its default |
 
 Where the table says yes, pass the function again in the operating point of the solve, under
-the parameter's name:
+the parameter's name. Where it says no, the function given to the component is used:
 
 ```@example ti
 using STREAM
@@ -46,8 +46,7 @@ head(t) = 3.0e4 * exp(-t / 5)               # coasting down with a 5 s time cons
 @named loop = assembly([inseries(pump, flywheel, loss, hx, pump), pump.inlet.p ~ 1.5e5],
                        pump, flywheel, loss, hx)
 sys = mtkcompile(loop)
-sol = solve_transient(sys, [sys.loss.inlet.ṁ => 50.0, sys.pump.dP_pump_fn => head],
-                      0.0:1.0:30.0)
+sol = solve_transient(sys, [sys.loss.inlet.ṁ => 50.0], 0.0:1.0:30.0)
 sol[sys.loss.inlet.ṁ, end]
 ```
 

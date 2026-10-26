@@ -32,10 +32,12 @@ An operating point is ModelingToolkit's single map over both unknowns and parame
 """
 function solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, reltol=1e-6)
     nsys = _steady_system(ssys)
-    start = solver isa DynamicSS ? _settle(ssys, nsys, op, t, solver; abstol, reltol) : Pair[]
-    # Later entries win: the settled state replaces the guesses it started from.
+    start = _start(ssys, nsys, op, t, solver; abstol, reltol)
+    # Later entries win: the start replaces the values in `op` it was computed from.
     op = Dict{Any,Any}([op; start; _unset_arrays(nsys); ModelingToolkit.get_iv(ssys) => t])
-    prob = NonlinearProblem(nsys, op)
+    # Without initialization: a steady system whose unknowns are all observed has none left,
+    # and MTK's initialization of such a problem refers to variables it does not define.
+    prob = NonlinearProblem(nsys, op; build_initializeprob=false)
     alg = _root_finder(solver)
     return alg === nothing ? solve(prob; abstol, reltol) : solve(prob, alg; abstol, reltol)
 end
@@ -55,35 +57,40 @@ function _steady_system(ssys)
 end
 
 """
-    _settle(ssys, nsys, op, t, solver; abstol, reltol) -> Vector{Pair}
+    _start(ssys, nsys, op, t, solver; abstol, reltol) -> Vector{Pair}
 
-Where `solver`, a `DynamicSS`, takes the compiled system from `op` with time held at `t`, as
-one value per unknown of the steady system `nsys`.
+Where the root solve of the steady system `nsys` starts, one value per unknown of `nsys`: the
+compiled system's state from `op`, or, for a `DynamicSS` `solver`, where that state settles
+with time held at `t`.
 
-The compiled system's right-hand side is evaluated at `t` at every pseudo-time, so the
-integration settles with each forcing at its value at `t`. A derivative the compiled system
-keeps as an unknown, such as a dummy derivative, starts at zero, its steady value, unless `op`
-sets it. The integration starts from `BrownFullBasicInit`, so a guess off the algebraic
-equations is made consistent rather than rejected.
+Values come from the compiled system because the steady system can keep as unknowns variables
+the model gives no values, ones the compiled system computes. A derivative the compiled
+system keeps as an unknown, such as a dummy derivative, starts at zero, its steady value,
+unless `op` sets it. A `DynamicSS` integration evaluates the right-hand side at `t` at every
+pseudo-time, so it settles with each forcing at its value at `t`, and starts from
+`BrownFullBasicInit`, so a guess off the algebraic equations is made consistent rather than
+rejected.
 """
-function _settle(ssys, nsys, op, t, solver; abstol, reltol)
+function _start(ssys, nsys, op, t, solver; abstol, reltol)
     derivatives = [u => 0.0 for u in unknowns(ssys) if !_holds(nsys, u)]
-    prob = SteadyStateProblem(
-        ssys, [derivatives; op; _unset_arrays(ssys)]; warn_initialize_determined=false,
+    # An ODE problem starting at `t`, so the values read from it, observed ones included, are
+    # the ones at `t`.
+    prob = ODEProblem(
+        ssys, [derivatives; op; _unset_arrays(ssys)], (t, t); warn_initialize_determined=false,
         build_initializeprob=false,
     )
-    f = prob.f
-    held = ODEFunction{true}(
-        (du, u, p, _) -> f(du, u, p, t); mass_matrix=f.mass_matrix, sys=f.sys,
-        observed=f.observed,
-    )
-    # Dense output would only feed interpolation, which DynamicSS never reads, and with it
-    # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
-    sol = solve(
-        SteadyStateProblem(held, prob.u0, prob.p), solver; abstol, reltol,
-        odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol)),
-    )
-    return [u => sol[u] for u in unknowns(nsys)]
+    if solver isa DynamicSS
+        f = prob.f
+        held = ODEFunction{true}((du, u, p, _) -> f(du, u, p, t); mass_matrix=f.mass_matrix)
+        # Dense output would only feed interpolation, which DynamicSS never reads, and with
+        # it on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
+        settled = solve(
+            SteadyStateProblem(held, prob.u0, prob.p), solver; abstol, reltol,
+            odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol)),
+        )
+        prob = remake(prob; u0=settled.u)
+    end
+    return [u => prob[u] for u in unknowns(nsys)]
 end
 
 """
