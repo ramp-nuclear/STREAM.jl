@@ -3,14 +3,16 @@
 
 Solve a compiled system to steady state, with every callable forcing evaluated at the time `t`.
 
-The steady state is the root of the model with each derivative set to zero and the time a
-parameter, held at `t`: a pump head `f(t)` or a valve opening reads its value at `t`, so the
-steady state is the one a transient starting at `t` starts from.
+The steady state is the root of `ssys` with each derivative set to zero and the time a
+parameter, held at `t`: ModelingToolkit's `NonlinearSystem(ssys; bind_iv=false)`. A pump head
+`f(t)` or a valve opening reads its value at `t`, so the steady state is the one a transient
+starting at `t` starts from. It keeps the unknowns and observed quantities of `ssys`, with
+observed ones evaluated at `t`.
 
 With `solver=nothing`, NonlinearSolve chooses the root finder. A `DynamicSS` solver first
-integrates the compiled system from `op`, with time held at `t`, to where it settles, and
-the root solve starts from there. That suits a loop whose root finder does not converge from
-the declared values, or a free tank level that settles where its inflow and outflow balance.
+integrates `ssys` from `op`, with time held at `t`, to where it settles, and the root solve
+starts from there. That suits a loop whose root finder does not converge from the declared
+values, or a free tank level that settles where its inflow and outflow balance.
 
 An operating point is ModelingToolkit's single map over both unknowns and parameters, such as
 `[ssys.pump.dP_pump => 6.0e4, ssys.ch.inlet.ṁ => 0.5]`. The full rules are in
@@ -26,71 +28,48 @@ An operating point is ModelingToolkit's single map over both unknowns and parame
 - `reltol`: relative tolerance (default 1e-6)
 
 # Returns
-`NonlinearSolution` of the steady system. Index it with the compiled system's variables,
-`sol[ssys.component.variable]`, and start a transient from it with
-`solve_transient(ssys, sol, times)`.
+`NonlinearSolution`. Index it with the variables of `ssys`, `sol[ssys.component.variable]`,
+and start a transient from it with `solve_transient(ssys, sol, times)`.
 """
 function solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, reltol=1e-6)
-    nsys = _steady_system(ssys)
-    start = _start(ssys, nsys, op, t, solver; abstol, reltol)
-    # Later entries win: the start replaces the values in `op` it was computed from.
-    op = Dict{Any,Any}([op; start; _unset_arrays(nsys); ModelingToolkit.get_iv(ssys) => t])
-    # Without initialization: a steady system whose unknowns are all observed has none left,
-    # and MTK's initialization of such a problem refers to variables it does not define.
-    prob = NonlinearProblem(nsys, op; build_initializeprob=false)
+    op = [op; _unset_arrays(ssys)]
+    steady = ModelingToolkit.NonlinearSystem(ssys; bind_iv=false)
+    # Without initialization: for a system whose unknowns are all observed, MTK's
+    # initialization refers to variables it does not define.
+    prob = NonlinearProblem(
+        steady, Dict{Any,Any}([op; ModelingToolkit.get_iv(ssys) => t]);
+        build_initializeprob=false,
+    )
+    if solver isa DynamicSS
+        prob = remake(prob; u0=_settle(ssys, op, t, solver; abstol, reltol))
+    end
     alg = _root_finder(solver)
     return alg === nothing ? solve(prob; abstol, reltol) : solve(prob, alg; abstol, reltol)
 end
 
 """
-    _steady_system(ssys) -> System
+    _settle(ssys, op, t, solver; abstol, reltol) -> Vector{Pair}
 
-The model `ssys` was compiled from, as ModelingToolkit's steady-state system: every derivative
-set to zero and the time a free parameter. Compiled.
+Where `solver`, a `DynamicSS`, takes `ssys` from `op` with its right-hand side evaluated at `t`
+at every pseudo-time, so the integration settles with each forcing at its value at `t`. One
+`unknown => value` per unknown of `ssys`.
+
+The integration starts from `BrownFullBasicInit`, so a guess off the algebraic equations is
+made consistent rather than rejected.
 """
-function _steady_system(ssys)
-    model = ssys
-    while (parent = ModelingToolkit.get_parent(model)) !== nothing && parent !== model
-        model = parent
-    end
-    return mtkcompile(ModelingToolkit.NonlinearSystem(model; bind_iv=false))
-end
-
-"""
-    _start(ssys, nsys, op, t, solver; abstol, reltol) -> Vector{Pair}
-
-Where the root solve of the steady system `nsys` starts, one value per unknown of `nsys`: the
-compiled system's state from `op`, or, for a `DynamicSS` `solver`, where that state settles
-with time held at `t`.
-
-Values come from the compiled system because the steady system can keep as unknowns variables
-the model gives no values, ones the compiled system computes. A derivative the compiled
-system keeps as an unknown, such as a dummy derivative, starts at zero, its steady value,
-unless `op` sets it. A `DynamicSS` integration evaluates the right-hand side at `t` at every
-pseudo-time, so it settles with each forcing at its value at `t`, and starts from
-`BrownFullBasicInit`, so a guess off the algebraic equations is made consistent rather than
-rejected.
-"""
-function _start(ssys, nsys, op, t, solver; abstol, reltol)
-    derivatives = [u => 0.0 for u in unknowns(ssys) if !_holds(nsys, u)]
-    # An ODE problem starting at `t`, so the values read from it, observed ones included, are
-    # the ones at `t`.
+function _settle(ssys, op, t, solver; abstol, reltol)
     prob = ODEProblem(
-        ssys, [derivatives; op; _unset_arrays(ssys)], (t, t); warn_initialize_determined=false,
-        build_initializeprob=false,
+        ssys, op, (t, t); warn_initialize_determined=false, build_initializeprob=false,
     )
-    if solver isa DynamicSS
-        f = prob.f
-        held = ODEFunction{true}((du, u, p, _) -> f(du, u, p, t); mass_matrix=f.mass_matrix)
-        # Dense output would only feed interpolation, which DynamicSS never reads, and with
-        # it on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
-        settled = solve(
-            SteadyStateProblem(held, prob.u0, prob.p), solver; abstol, reltol,
-            odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol)),
-        )
-        prob = remake(prob; u0=settled.u)
-    end
-    return [u => prob[u] for u in unknowns(nsys)]
+    f = prob.f
+    held = ODEFunction{true}((du, u, p, _) -> f(du, u, p, t); mass_matrix=f.mass_matrix)
+    # Dense output would only feed interpolation, which DynamicSS never reads, and with it on
+    # OrdinaryDiffEq warns about interpolation on a loop with no differential states.
+    sol = solve(
+        SteadyStateProblem(held, prob.u0, prob.p), solver; abstol, reltol,
+        odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol)),
+    )
+    return unknowns(ssys) .=> sol.u
 end
 
 """
@@ -215,22 +194,11 @@ one `unknown => value` per entry of `unknowns(ssys)`.
 
 MTK's problem constructors take a symbolic map rather than a raw state vector. `unknowns(ssys)`
 is the complete, non-redundant state, so this seeds a transient from a solved one without
-depending on which variables `mtkcompile` kept. A state `sol` does not hold is a derivative
-the steady system set to zero, such as the dummy derivative `ṁˍt`, and is taken as zero.
+depending on which variables `mtkcompile` kept.
 
 Private, and used only by the [`solve_transient`](@ref) method below.
 """
-function _state_snapshot(ssys, sol)
-    sys = sol.prob.f.sys
-    return [u => (_holds(sys, u) ? sol[u] : 0.0) for u in unknowns(ssys)]
-end
-
-"""
-    _holds(sys, u) -> Bool
-
-Whether the compiled system `sys` has `u`, as an unknown or an observed variable.
-"""
-_holds(sys, u) = any(isequal(u), unknowns(sys)) || any(eq -> isequal(eq.lhs, u), observed(sys))
+_state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
 
 """
     solve_transient(ssys, sol_ss, t; overrides=Pair[],
