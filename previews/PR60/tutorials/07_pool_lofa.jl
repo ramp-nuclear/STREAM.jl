@@ -8,6 +8,7 @@ using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
 using OrdinaryDiffEq: Rodas5P
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using SteadyStateDiffEq: DynamicSS
 
 case = (
@@ -113,7 +114,8 @@ sol_ss.retcode
 
 times = range(0.0, 1200.0; length=601)
 sol = solve_transient(sys, sol_ss, times; overrides=[sys.pump.dP_pump => 0.0],
-                      callbacks=machine_callbacks(sys, ctrl.machine, valve), tstops=times)
+                      callbacks=machine_callbacks(sys, ctrl.machine, valve), tstops=times,
+                      initializealg=BrownFullBasicInit(; abstol=1e-8))
 sol.retcode
 
 ctrl.machine.log
