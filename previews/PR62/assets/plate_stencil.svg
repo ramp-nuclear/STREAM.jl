@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 260" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+    <marker id="q" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d9480f"/>
+    </marker>
+  </defs>
+  <rect width="720" height="260" fill="white"/>
+  <!-- coolant on both sides -->
+  <rect x="20" y="40" width="120" height="140" fill="#e8f1fb"/>
+  <text x="80" y="110" text-anchor="middle" fill="#1f6fb4">coolant</text>
+  <text x="80" y="128" text-anchor="middle" fill="#1f6fb4" font-size="12">T<tspan baseline-shift="sub" font-size="9">b</tspan>, h</text>
+  <rect x="580" y="40" width="120" height="140" fill="#e8f1fb"/>
+  <text x="640" y="110" text-anchor="middle" fill="#1f6fb4">coolant</text>
+  <!-- plate cells nx = 4 -->
+  <g stroke="#333" stroke-width="1.5" fill="#fbe3cf">
+    <rect x="140" y="40" width="110" height="140"/>
+    <rect x="250" y="40" width="110" height="140"/>
+    <rect x="360" y="40" width="110" height="140"/>
+    <rect x="470" y="40" width="110" height="140"/>
+  </g>
+  <g fill="#333">
+    <circle cx="195" cy="110" r="4"/><circle cx="305" cy="110" r="4"/>
+    <circle cx="415" cy="110" r="4"/><circle cx="525" cy="110" r="4"/>
+  </g>
+  <text x="195" y="96" text-anchor="middle">T<tspan baseline-shift="sub" font-size="10">1</tspan></text>
+  <text x="305" y="96" text-anchor="middle">T<tspan baseline-shift="sub" font-size="10">2</tspan></text>
+  <text x="415" y="96" text-anchor="middle">T<tspan baseline-shift="sub" font-size="10">3</tspan></text>
+  <text x="525" y="96" text-anchor="middle">T<tspan baseline-shift="sub" font-size="10">4</tspan></text>
+  <text x="360" y="160" text-anchor="middle" font-size="12" fill="#555">q''' heats every cell</text>
+  <!-- surface ports -->
+  <circle cx="140" cy="110" r="6" fill="white" stroke="#d9480f" stroke-width="2"/>
+  <circle cx="580" cy="110" r="6" fill="white" stroke="#d9480f" stroke-width="2"/>
+  <text x="140" y="30" text-anchor="middle" font-size="12" fill="#d9480f">surface port, T<tspan baseline-shift="sub" font-size="9">s</tspan></text>
+  <text x="580" y="30" text-anchor="middle" font-size="12" fill="#d9480f">surface port</text>
+  <!-- heat flows -->
+  <line x1="130" y1="140" x2="96" y2="140" stroke="#d9480f" stroke-width="2.5" marker-end="url(#q)"/>
+  <text x="70" y="160" text-anchor="middle" font-size="11" fill="#d9480f">h P Δz (T<tspan baseline-shift="sub" font-size="8">s</tspan> − T<tspan baseline-shift="sub" font-size="8">b</tspan>)</text>
+  <line x1="190" y1="140" x2="152" y2="140" stroke="#d9480f" stroke-width="2.5" marker-end="url(#q)"/>
+  <!-- dimensions -->
+  <line x1="140" y1="205" x2="195" y2="205" stroke="#333" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="168" y="225" text-anchor="middle" font-size="12">Δx/2</text>
+  <line x1="250" y1="205" x2="360" y2="205" stroke="#333" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="305" y="225" text-anchor="middle" font-size="12">Δx</text>
+  <line x1="140" y1="242" x2="580" y2="242" stroke="#333" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="360" y="258" text-anchor="middle" font-size="12">plate thickness L<tspan baseline-shift="sub" font-size="9">x</tspan>, one axial slice</text>
+</svg>
