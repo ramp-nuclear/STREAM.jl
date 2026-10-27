@@ -255,7 +255,7 @@ end
 
 function _h_cells(h, n, name)
     FType = typeof(h)
-    p = only(@parameters ($name::FType)(..))
+    p = only(@parameters ($name::FType)(..) = h)
     return (fill(p(t), n), [p])
 end
 
@@ -276,9 +276,10 @@ into a cell, `heated` being the face's heated width.
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
 - `h`: convective coefficient [W/(m^2·K)], for every face or per face as a named tuple such
   as `(left=5000.0,)`, where a face left out gets 0, adiabatic. Each value is a number, a
-  length-`n` profile, or a function of time. A function becomes a callable parameter that
-  the operating point must give: `ch.h_fn => fn` for one function on every face, or
-  `ch.h_left_fn => fn` for one given by face. Default 0.0, adiabatic.
+  length-`n` profile, or a function of time. A function becomes a callable parameter, which
+  an operating point or `overrides` can replace with another function of the same type:
+  `ch.h_fn => fn` for one function on every face, or `ch.h_left_fn => fn` for one given by
+  face. Default 0.0, adiabatic.
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_wall, T_bulk, ṁ, liquid, geometry)` per cell, with the mean of the faces' wall
   temperatures. Regime switching and the heated-wall viscosity correction are

@@ -38,7 +38,7 @@ function solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, relto
     steady = ModelingToolkit.NonlinearSystem(ssys; bind_iv=false)
     # Without initialization: for a system whose unknowns are all observed, MTK's
     # initialization refers to variables it does not define.
-    op = Dict{Any,Any}([op; _unset_arrays(ssys); ModelingToolkit.get_iv(ssys) => t])
+    op = Dict{Any,Any}([op; ModelingToolkit.get_iv(ssys) => t])
     residual = NonlinearProblem(steady, op; build_initializeprob=false)
     # The steady residual as an ODE in a pseudo-time, with the mass matrix of `ssys`: a root
     # finder solves it and `DynamicSS` integrates it, and either solution is indexed through
@@ -111,8 +111,9 @@ end
 every element.
 
 `mtkcompile` records such an entry for an array variable it removed, such as the wall of a
-channel face no equation reads, and the problem constructors then look for an `Initial`
-parameter that does not exist. An explicit `nothing` in the operating point drops the entry.
+channel face no equation reads, and building an initialization system for the problem then
+looks for an `Initial` parameter that does not exist. An explicit `nothing` in the operating
+point drops the entry.
 """
 function _unset_arrays(ssys)
     unset(v) = (u = SymbolicUtils.unwrap_const(v); u isa AbstractArray && all(isnothing, u))

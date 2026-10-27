@@ -19,18 +19,20 @@ connections = [..., ch.T_wall_left .~ 60.0 + 40.0 * (1 - exp(-t / 10))]
 ## A function given to a component
 
 Several components take a Julia function of time in place of a number. The function becomes
-a parameter of the model, a *callable parameter*:
+a parameter of the model, a *callable parameter*, whose value is the function the component
+was given:
 
-| Component | Argument | Parameter | Needs it in the operating point |
-|:---|:---|:---|:---|
-| [`Pump`](@ref STREAM.Components.Pump) | the head, `Pump(f)` | `dP_pump_fn` | no, it stores its default |
-| [`Channel`](@ref STREAM.Components.Channel) | `h`, or one face's entry in it | `h_fn`, or `h_<face>_fn` such as `h_left_fn` | yes |
-| [`VolumetricFlowResistor`](@ref STREAM.Components.VolumetricFlowResistor) | `k` | `k_fn` | no, it stores its default |
-| [`PointKinetics`](@ref STREAM.Components.PointKinetics) | the control reactivity | `rho_c_fn` | no, it stores its default |
-| [`PointKinetics`](@ref STREAM.Components.PointKinetics) | `power_input` | `power_input_fn` | no, it stores its default |
+| Component | Argument | Parameter |
+|:---|:---|:---|
+| [`Pump`](@ref STREAM.Components.Pump) | the head, `Pump(f)` | `dP_pump_fn` |
+| [`Channel`](@ref STREAM.Components.Channel) | `h`, or one face's entry in it | `h_fn`, or `h_<face>_fn` such as `h_left_fn` |
+| [`VolumetricFlowResistor`](@ref STREAM.Components.VolumetricFlowResistor) | `k` | `k_fn` |
+| [`PointKinetics`](@ref STREAM.Components.PointKinetics) | the control reactivity | `rho_c_fn` |
+| [`PointKinetics`](@ref STREAM.Components.PointKinetics) | `power_input` | `power_input_fn` |
 
-Where the table says yes, pass the function again in the operating point of the solve, under
-the parameter's name. Where it says no, the function given to the component is used:
+An operating point or `overrides` can replace it under the parameter's name, with another
+function of the same type, as [Changing the function between runs](@ref) shows. A pump
+coasting down:
 
 ```@example ti
 using STREAM
