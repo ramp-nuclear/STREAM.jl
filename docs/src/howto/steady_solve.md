@@ -78,6 +78,14 @@ uses it. That tutorial also gives its design flows, since a core at full power s
 the default flow would heat its coolant past what the correlations cover before the flow
 built up. Give flows wherever the default is that far from the operating point.
 
+## Forcings are read at one time
+
+A callable forcing, such as a pump head `f(t)` or a valve opening, is evaluated at the time
+`t` given to `solve_steady`, 0 by default. The steady state is then the one a transient
+starting at that time starts from, with the same callables the transient uses:
+`solve_steady(sys; t=0.0)` and then `solve_transient(sys, sol, times)`. `DynamicSS`
+integrates with time held at `t` too, so a forcing does not change while it settles.
+
 ## Do not constrain the sign of the flow
 
 When a loop lands on zero or reversed flow, it is tempting to forbid negative flow. Do not.

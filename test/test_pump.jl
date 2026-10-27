@@ -108,12 +108,7 @@ end
     L_over_A = 5e5       # m^{-1} — tau = L_over_A/R = 5.0 s; T_ramp/tau = 20
     tau = L_over_A / R_val   # 5.0 s
 
-    # Build both heads from one factory so they share a closure type. The pump stores its head as
-    # an MTK callable parameter typed to the function it was constructed with, so the steady-state
-    # head and the ramp head must be the same type to be interchangeable in the operating point.
-    make_head = rate -> (tt -> dP0 * (1 - rate * tt / T_ramp))
-    dP_fn = make_head(1.0)        # the ramp: dP0·(1 - t/T_ramp)
-    dP_hold = make_head(0.0)      # constant dP0, for the steady solve
+    dP_fn = tt -> dP0 * (1 - tt / T_ramp)
 
     @named pump = Pump(dP_fn)
     @named ine = Inertia(L_over_A)
@@ -132,20 +127,19 @@ end
 
     ṁ_0 = dP0 / R_val
 
-    # Initial condition: solve for steady flow under a held head dP0 first, then start the ramp
-    # transient from that full solved state. Carrying every state from the solved point (not just a
+    # Initial condition: the steady flow at t = 0, under the head dP0, then the ramp transient
+    # from that full solved state. Carrying every state from the solved point (not just a
     # hand-picked ṁ) keeps the start consistent no matter which variables MTK keeps as states; a
     # partial guess landed off the real state on newer MTK and the flow froze at ṁ=0.
     #
-    # Solver choice: this loop has a time-varying head, so the steady solve needs the stiff
-    # DynamicSS(Rodas5P) solver. The default steady solver goes unstable here.
-    sol_ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => dP_hold];
-                          solver=DynamicSS(Rodas5P()))
+    # Solver choice: the default root finder goes unstable on this loop, so the steady solve
+    # integrates with DynamicSS(Rodas5P) first.
+    sol_ss = solve_steady(ssys; solver=DynamicSS(Rodas5P()))
     @test sol_ss.retcode == ReturnCode.Success
     @test isapprox(sol_ss[ssys.ine.inlet.ṁ], ṁ_0; rtol=1e-3)   # relaxation endpoint, loose
 
     t_arr = range(0.0, T_ramp, length=1000)
-    sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump_fn => dP_fn])
+    sol = solve_transient(ssys, sol_ss, t_arr)
 
     @test sol.retcode == ReturnCode.Success
 

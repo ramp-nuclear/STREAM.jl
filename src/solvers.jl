@@ -1,49 +1,55 @@
 """
-    solve_steady(ssys, op; solver=nothing, kwargs...) -> SciMLSolution
+    solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, reltol=1e-6) -> SciMLSolution
 
-Solve a compiled system to steady state.
+Solve a compiled system to steady state, with every callable forcing evaluated at the time `t`.
 
-With `solver=nothing` the SciML stack selects an algorithm. That is the right default across the
-loops here, because no single fixed solver suits all of them (a stiff integrator that holds a
-near-reversal channel loop will not converge the purely algebraic resistor cube, and the reverse).
-If a particular solve does not converge, pass an explicit solver; the coastdown reversal test in
-`test_integration.jl` passes `SSRootfind()`.
+The steady state is the root of `ssys` with each derivative set to zero and the time a
+parameter, held at `t`: ModelingToolkit's `NonlinearSystem(ssys; bind_iv=false)`. A pump head
+`f(t)` or a valve opening reads its value at `t`, so the steady state is the one a transient
+starting at `t` starts from. It keeps the unknowns and observed quantities of `ssys`, with
+observed ones evaluated at `t`.
+
+With `solver=nothing`, NonlinearSolve chooses the root finder. A `DynamicSS` solver integrates
+from `op` in a pseudo-time, with the model's time held at `t`, until the state stops changing.
+That suits a loop whose root finder does not converge from the declared values, or a free
+tank level that settles where its inflow and outflow balance. Its integration starts from
+`BrownFullBasicInit`, so a guess off the algebraic equations is made consistent rather than
+rejected.
 
 An operating point is ModelingToolkit's single map over both unknowns and parameters, such as
-`[ssys.pump.dP_pump => 6.0e4, ssys.ch.inlet.ṁ => 0.5]`. What an entry means depends on the
-solve, so each solver here says what it does with one. The full rules are in
+`[ssys.pump.dP_pump => 6.0e4, ssys.ch.inlet.ṁ => 0.5]`. The full rules are in
 [ModelingToolkit's initialization tutorial](https://docs.sciml.ai/ModelingToolkit/stable/tutorials/initialization/).
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
 - `op`: operating point, a `Vector{Pair}`. A parameter in it takes that value. An unknown in it
-  is where the solver starts: the first guess of a root finder, or the state `DynamicSS`
-  integrates from. An unknown left out starts from the value the model declares.
-- `solver`: steady-state solver to use, or `nothing` to let the stack choose (default `nothing`)
+  is where the solve starts. An unknown left out starts from the value the model declares.
+- `t`: the time the forcings are evaluated at (default 0.0)
+- `solver`: `nothing` for NonlinearSolve's default, a NonlinearSolve algorithm, or
+  `DynamicSS(alg)`
 - `abstol`: absolute tolerance (default 1e-8)
 - `reltol`: relative tolerance (default 1e-6)
-- `build_initializeprob`: passed to `SteadyStateProblem` (default `false`)
-
-The residual solved is the compiled system's own, at the steady-state time `t = Inf`, so a
-component that reads `t` sees its value at the end of its history. A `DynamicSS` solver
-integrates to steady state and keeps only where it ends, so its inner integration runs
-without dense output. It starts from `BrownFullBasicInit` at `abstol`, so a guess off the
-algebraic equations is made consistent rather than rejected.
 
 # Returns
-`SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
+A steady-state solution. Index it with the variables of `ssys`, `sol[ssys.component.variable]`,
+and start a transient from it with `solve_transient(ssys, sol, times)`.
 """
-function solve_steady(
-    ssys, op=Pair[]; solver=nothing, abstol=1e-8, reltol=1e-6, build_initializeprob=false
-)
-    op = [op; _unset_arrays(ssys)]
-    prob = SteadyStateProblem(ssys, op; warn_initialize_determined=false, build_initializeprob)
-    # MTK lowers a steady problem by recompiling the model as a time-free NonlinearSystem,
-    # where a callable of `t` is left unbound. Solving the compiled residual instead keeps
-    # the steady-state time every solve here was checked at.
-    prob = remake(prob; lowered_problem=nothing)
-    # Dense output would only feed interpolation, which DynamicSS never reads, and with it
-    # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
+function solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, reltol=1e-6)
+    steady = ModelingToolkit.NonlinearSystem(ssys; bind_iv=false)
+    # Without initialization: for a system whose unknowns are all observed, MTK's
+    # initialization refers to variables it does not define.
+    op = Dict{Any,Any}([op; ModelingToolkit.get_iv(ssys) => t])
+    residual = NonlinearProblem(steady, op; build_initializeprob=false)
+    # The steady residual as an ODE in a pseudo-time, with the mass matrix of `ssys`: a root
+    # finder solves it and `DynamicSS` integrates it, and either solution is indexed through
+    # `steady`, where `t` is the parameter set above.
+    f = ODEFunction{true}(
+        (du, u, p, _) -> residual.f(du, u, p);
+        mass_matrix=ModelingToolkit.calculate_massmatrix(ssys), sys=steady,
+    )
+    prob = SteadyStateProblem(f, residual.u0, residual.p)
+    # Dense output would only feed interpolation, which DynamicSS never reads, and with it on
+    # OrdinaryDiffEq warns about interpolation on a loop with no differential states.
     inner = solver isa DynamicSS ?
         (; odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol))) : (;)
     return solve(prob, solver; abstol, reltol, inner...)
@@ -105,8 +111,9 @@ end
 every element.
 
 `mtkcompile` records such an entry for an array variable it removed, such as the wall of a
-channel face no equation reads, and the problem constructors then look for an `Initial`
-parameter that does not exist. An explicit `nothing` in the operating point drops the entry.
+channel face no equation reads, and building an initialization system for the problem then
+looks for an `Initial` parameter that does not exist. An explicit `nothing` in the operating
+point drops the entry.
 """
 function _unset_arrays(ssys)
     unset(v) = (u = SymbolicUtils.unwrap_const(v); u isa AbstractArray && all(isnothing, u))
@@ -168,8 +175,8 @@ Private, and used only by the [`solve_transient`](@ref) method below.
 _state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
 
 """
-    solve_transient(ssys, sol_ss, t; overrides=Pair[],
-                    initializealg=BrownFullBasicInit(; abstol=1e-8), kwargs...)
+    solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(),
+                    kwargs...)
 
 Start a transient from an already-solved state.
 
@@ -194,8 +201,9 @@ symbol means the result does not depend on which variables MTK chose as states.
 - `t`: time array; `tspan` derived as `(t[1], t[end])`
 - `overrides`: `Vector{Pair}` of parameter/forcing changes applied at `t[1]`
 - `initializealg`: DAE initialization, at the start and after every callback event (default
-  `BrownFullBasicInit(; abstol=1e-8)`; the residuals are in SI units, so the algorithm's own
-  1e-10 default can be finer than a heat balance in watts resolves)
+  `BrownFullBasicInit()`, with its `abstol` of 1e-10). A model whose algebraic residuals cannot
+  get that small, such as a large heat balance in watts, needs a looser one, as
+  `BrownFullBasicInit(; abstol=1e-8)`.
 - `kwargs...`: forwarded to the lower-level `solve_transient`
 
 # Returns
@@ -203,7 +211,7 @@ symbol means the result does not depend on which variables MTK chose as states.
 """
 function solve_transient(
     ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
-    overrides=Pair[], initializealg=BrownFullBasicInit(; abstol=1e-8), kwargs...,
+    overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...,
 )
     op = Pair{Any,Any}[_state_snapshot(ssys, sol_ss); overrides]
     return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)
