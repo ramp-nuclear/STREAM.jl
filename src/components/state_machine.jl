@@ -532,8 +532,8 @@ function _callbacks(ssys, machine::StateMachine)
     end
     # The machine settles once at the start; the other callbacks only keep the default.
     settle(cb, u, t, integrator) =
-        (_settle!(machine, edges, integrator); u_modified!(integrator, false))
-    keep(cb, u, t, integrator) = u_modified!(integrator, false)
+        (_settle!(machine, edges, integrator); derivative_discontinuity!(integrator, false))
+    keep(cb, u, t, integrator) = derivative_discontinuity!(integrator, false)
     return map(eachindex(edges)) do i
         affect!(integrator) = fire!(integrator, i)
         ContinuousCallback(

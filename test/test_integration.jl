@@ -11,6 +11,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
