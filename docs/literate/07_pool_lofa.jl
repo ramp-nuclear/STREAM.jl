@@ -45,6 +45,7 @@ using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
 using OrdinaryDiffEq: Rodas5P
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using SteadyStateDiffEq: DynamicSS
 
 case = (
@@ -226,10 +227,15 @@ sol_ss.retcode
 # [`machine_callbacks`](@ref STREAM.Components.machine_callbacks), so each fires at the instant
 # its condition is met. Saving onto every output time with `tstops` keeps saved values off
 # the solver's interpolation, which strays for this model between widely spaced steps.
+#
+# After each event the algebraic equations are solved again. The plates' heat balances, in
+# watts, resolve no finer than about 5e-9 W, so that solve takes a tolerance of 1e-8 instead of
+# the default 1e-10.
 
 times = range(0.0, 1200.0; length=601)
 sol = solve_transient(sys, sol_ss, times; overrides=[sys.pump.dP_pump => 0.0],
-                      callbacks=machine_callbacks(sys, ctrl.machine, valve), tstops=times)
+                      callbacks=machine_callbacks(sys, ctrl.machine, valve), tstops=times,
+                      initializealg=BrownFullBasicInit(; abstol=1e-8))
 sol.retcode
 
 # The machines' logs say what happened and when:

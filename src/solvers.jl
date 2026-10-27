@@ -175,8 +175,8 @@ Private, and used only by the [`solve_transient`](@ref) method below.
 _state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
 
 """
-    solve_transient(ssys, sol_ss, t; overrides=Pair[],
-                    initializealg=BrownFullBasicInit(; abstol=1e-8), kwargs...)
+    solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(),
+                    kwargs...)
 
 Start a transient from an already-solved state.
 
@@ -201,8 +201,9 @@ symbol means the result does not depend on which variables MTK chose as states.
 - `t`: time array; `tspan` derived as `(t[1], t[end])`
 - `overrides`: `Vector{Pair}` of parameter/forcing changes applied at `t[1]`
 - `initializealg`: DAE initialization, at the start and after every callback event (default
-  `BrownFullBasicInit(; abstol=1e-8)`; the residuals are in SI units, so the algorithm's own
-  1e-10 default can be finer than a heat balance in watts resolves)
+  `BrownFullBasicInit()`, with its `abstol` of 1e-10). A model whose algebraic residuals cannot
+  get that small, such as a large heat balance in watts, needs a looser one, as
+  `BrownFullBasicInit(; abstol=1e-8)`.
 - `kwargs...`: forwarded to the lower-level `solve_transient`
 
 # Returns
@@ -210,7 +211,7 @@ symbol means the result does not depend on which variables MTK chose as states.
 """
 function solve_transient(
     ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
-    overrides=Pair[], initializealg=BrownFullBasicInit(; abstol=1e-8), kwargs...,
+    overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...,
 )
     op = Pair{Any,Any}[_state_snapshot(ssys, sol_ss); overrides]
     return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)
