@@ -75,6 +75,27 @@ end
     @test isapprox(sol[ssys.R2.inlet.ṁ], p / r2; rtol=1e-8)
 end
 
+@testset "parallel heat exchangers mix by mass flow, rcold = $rc" for rc in (1.0e3, 2.0e3)
+    @named pump = Pump(4.0e4)
+    @named hxcold = HeatExchanger(20.0)
+    @named hxhot = HeatExchanger(40.0)
+    @named rboth = Resistor(4.0e3)
+    @named rhot = Resistor(1.0e3)
+    @named rcold = Resistor(rc)
+    conns = [
+        inparallel(pump, [(hxcold, rcold), (hxhot, rhot)], rboth),
+        inseries(rboth, pump),
+        pump.inlet.p ~ 1.0e5,
+    ]
+    @named sys = assembly(conns, pump, hxcold, hxhot, rcold, rhot, rboth)
+    s = mtkcompile(sys)
+    sol = solve_steady(s)
+    @test sol.retcode == ReturnCode.Success
+    ṁhot, ṁcold = sol[s.hxhot.inlet.ṁ], sol[s.hxcold.inlet.ṁ]
+    @test isapprox(sol[s.rboth.outlet.T], (40.0 * ṁhot + 20.0 * ṁcold) / (ṁhot + ṁcold))
+    rc == 1.0e3 && @test isapprox(sol[s.rboth.outlet.T], 30.0)
+end
+
 @testset "resistors in series against analytic solution" begin
     # Python: test_resistors_in_series_against_analytic_solution
     # N equal resistors (each total_r/N) in series carry the full flow; each drops p/N.
