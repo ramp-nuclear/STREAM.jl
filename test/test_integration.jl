@@ -11,6 +11,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
@@ -632,8 +633,8 @@ end
     # Quasi-static per-point steady (Python #16 is a nonlinear root-solve, not a transient). Each
     # solve is seeded from the previous converged full state, so it starts near-steady and converges
     # in a couple of Newton steps. The reversal emerges from the decaying head, not the seed.
-    # SSRootfind is a direct root-find with no time step, so it cannot underflow dt at the
-    # stiff near-reversal point.
+    # The root solve has no time step, so it cannot underflow dt at the stiff near-reversal
+    # point.
     carry = [
         Dt(ssys2.cold.inlet.ṁ) => 0.0,
         Dt(ssys2.hot.inlet.ṁ) => 0.0,
@@ -642,7 +643,7 @@ end
     ]
     for tt in times
         op = [ssys2.pump2.dP_pump => p_pump0 * exp(-tt); carry]
-        sol = solve_steady(ssys2, op; solver=SSRootfind())
+        sol = solve_steady(ssys2, op)
         push!(retcodes, sol.retcode) 
         push!(ṁ, sol[ssys2.cold.inlet.ṁ])
         append!(cold_cells, sol[ssys2.cold.T])

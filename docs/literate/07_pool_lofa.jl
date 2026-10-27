@@ -45,6 +45,7 @@ using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
 using OrdinaryDiffEq: Rodas5P
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using SteadyStateDiffEq: DynamicSS
 
 case = (
@@ -200,9 +201,12 @@ ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 # The solve integrates to where the model settles, the robust way to find a loop's operating
 # point (see [Get a steady solve to converge](../howto/steady_solve.md)). The core is at full
 # power, so it starts from the design flows: from the flow every port defaults to, the
-# coolant would heat far past what the correlations cover before the flow built up.
+# coolant would heat far past what the correlations cover before the flow built up. Each
+# path gets its flow, the riser included, so the start is consistent whichever of them the
+# compiled system keeps.
 
 design = [sys.primary.inlet.ṁ => ṁ_design,
+          sys.riser.inlet.ṁ => ṁ_design,
           ch_high.inlet.ṁ => case.types.high.design_ṁ,
           ch_low.inlet.ṁ => case.types.low.design_ṁ]
 sol_ss = solve_steady(sys, design; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
@@ -223,10 +227,15 @@ sol_ss.retcode
 # [`machine_callbacks`](@ref STREAM.Components.machine_callbacks), so each fires at the instant
 # its condition is met. Saving onto every output time with `tstops` keeps saved values off
 # the solver's interpolation, which strays for this model between widely spaced steps.
+#
+# After each event the algebraic equations are solved again. The plates' heat balances, in
+# watts, resolve no finer than about 5e-9 W, so that solve takes a tolerance of 1e-8 instead of
+# the default 1e-10.
 
 times = range(0.0, 1200.0; length=601)
 sol = solve_transient(sys, sol_ss, times; overrides=[sys.pump.dP_pump => 0.0],
-                      callbacks=machine_callbacks(sys, ctrl.machine, valve), tstops=times)
+                      callbacks=machine_callbacks(sys, ctrl.machine, valve), tstops=times,
+                      initializealg=BrownFullBasicInit(; abstol=1e-8))
 sol.retcode
 
 # The machines' logs say what happened and when:

@@ -41,7 +41,7 @@ function _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, relto
     algebraic = M isa AbstractMatrix ? findall(iszero, diag(M)) : Int[]
     isempty(algebraic) && return u0
     integrator = SciMLBase.init(remake(prob; u0=u0_plain, p=p_plain), solver;
-                                initializealg=OrdinaryDiffEq.BrownFullBasicInit(), abstol, reltol)
+                                initializealg=BrownFullBasicInit(), abstol, reltol)
     plain = integrator.u
     t0 = first(prob.tspan)
     u = copy(u0)
@@ -88,8 +88,8 @@ end
     _residual(prob, u, p, T=eltype(u)) -> Vector{T}
 
 The steady residual ``F(u, p)`` of `prob`, in element type `T`. A `SteadyStateProblem`'s
-function takes a time, and root finders call it at `t = Inf`; a root finder hands back its
-solution on the `NonlinearProblem` it converted that to, whose function takes none.
+function takes a pseudo-time it does not read; a root finder hands back its solution on the
+`NonlinearProblem` it converted that to, whose function takes none.
 """
 function _residual(prob::SciMLBase.SteadyStateProblem, u, p, T=eltype(u))
     du = similar(u, T)
@@ -112,8 +112,8 @@ same solver and tolerances, or `nothing` when that solve fails.
 function _resolve(steady, vals)
     (; sol, setter) = steady
     prob = remake(sol.prob; p=setter(sol.prob, vals), u0=sol.u)
-    inner = steady.solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
-    sol = solve(prob, steady.solver; steady.abstol, steady.reltol, inner...)
+    sol = solve(prob, steady.solver; steady.abstol, steady.reltol,
+                _dynamic_kwargs(steady.solver, steady.abstol)...)
     return SciMLBase.successful_retcode(sol) ? sol : nothing
 end
 

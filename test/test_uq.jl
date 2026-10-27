@@ -314,7 +314,7 @@ end
     end
 
     @testset "a nominal run that fails is reported" begin
-        broken = TransientUQ(ssys, with(op, ssys.ch.inlet.ṁ => NaN), parameters, times;
+        broken = TransientUQ(ssys, with(op, ssys.pump.dP_pump => NaN), parameters, times;
                              output=[ssys.ch.T_out])
         @test_throws ErrorException local_sensitivities(broken)
     end

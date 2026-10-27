@@ -255,8 +255,7 @@ only ones. Both were checked against the Python source, so do not re-derive them
   state with `solve_steady(...; solver=DynamicSS(Rodas5P()))`. Its flows need no values: every
   `FlowPort` flow defaults to `FLOW_START`, 0.1 kg/s, in the port's usual direction, so none
   starts at the ṁ = 0 a quadratic law stalls at. The bypass loss-of-flow testset in
-  `test/test_valves.jl` gives the pump head and the dummy derivative `mtkcompile` introduces,
-  and nothing else.
+  `test/test_valves.jl` gives nothing: the steady solve reads the pump's head at `t = 0`.
 
   Do not "fix" a failed solve with a sign constraint on ṁ. This loop's flow legitimately
   reverses after the pump trips, so forbidding negative flow would forbid the physics.

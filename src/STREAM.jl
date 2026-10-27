@@ -38,7 +38,9 @@ module STREAM
 
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
+using ModelingToolkit: SymbolicUtils
 using OrdinaryDiffEq
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using QuadGK
 using SteadyStateDiffEq
 
@@ -270,7 +272,7 @@ module Components
 using ModelingToolkit
 using OrdinaryDiffEq
 using ModelingToolkit: t_nounits as t, D_nounits as D
-using ModelingToolkit: ⋅
+using LinearAlgebra: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
 using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM
@@ -462,10 +464,10 @@ using ModelingToolkit: ODEProblem, System, setp_oop, unknowns
 using OrdinaryDiffEq: OrdinaryDiffEq, ReturnCode, Rodas5P, SciMLBase, remake, solve
 using Random: AbstractRNG, default_rng
 using Statistics: mean, std
-using SteadyStateDiffEq: DynamicSS
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using SymbolicIndexingInterface: getsym, is_parameter, setsym_oop
 using ..Components: StateMachine, reset!
-using ..STREAM: _saved_steps, solve_steady
+using ..STREAM: _dynamic_kwargs, _saved_steps, solve_steady
 include("uq/problems.jl")
 include("uq/implicit.jl")
 include("uq/inputs.jl")

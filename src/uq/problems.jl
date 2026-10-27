@@ -169,7 +169,7 @@ function TransientUQ(
         throw(ArgumentError("start must be :op or :steady, got $(repr(start))"))
     _check_parameters(ssys, parameters)
     initializealg = something(initializealg,
-                              start === :op ? SciMLBase.NoInit() : OrdinaryDiffEq.BrownFullBasicInit())
+                              start === :op ? SciMLBase.NoInit() : BrownFullBasicInit())
     return TransientUQ(ssys, collect(Pair{Any,Any}, op), collect(Any, parameters),
                        collect(Float64, t), output, start, collect(Pair{Any,Any}, overrides),
                        solver, abstol, reltol, initializealg, steady_solver, callbacks,
@@ -349,7 +349,7 @@ function _prepare(prob::TransientUQ)
         init = initializealg
         # BrownFullBasicInit drops the derivatives of the algebraic states it solves for, so the
         # start is made consistent here instead, and the run goes on without initializing again.
-        if init isa OrdinaryDiffEq.BrownFullBasicInit
+        if init isa BrownFullBasicInit
             u0 = _consistent_start(ode, u0, p, u0_plain, p_plain, solver, abstol, reltol)
             init = SciMLBase.NoInit()
         end

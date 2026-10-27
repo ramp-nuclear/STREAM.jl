@@ -117,7 +117,13 @@ function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=H2O, p
         append!(pars, As)
         (_ -> As[1]), (L -> As[1] * L)
     end
-    vars = @variables L(t) = L_start T(t) = T_start M(t)
+    # `T` shares an alias group with every port's temperature, whose connector default is
+    # `T_ROOM`. The priority keeps `T` as the unknown, so the run starts from `T0`.
+    vars = @variables begin
+        L(t) = L_start
+        T(t) = T_start, [state_priority = 10]
+        M(t)
+    end
 
     port_sys = [FlowPort(; name=k) for k in keys(ports)]
     rho = ρ(liquid, T)
