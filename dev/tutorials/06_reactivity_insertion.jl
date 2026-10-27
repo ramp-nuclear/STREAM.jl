@@ -4,7 +4,7 @@ using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndCon
 using STREAM.Assemblies: inseries, symmetric_plate, temperature_feedback
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
-using OrdinaryDiffEq: BrownFullBasicInit
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 
 L, n, nx = 0.6, 20, 4
 P_rated = 2.5e4                                       # plate power [W]
