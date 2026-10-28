@@ -48,7 +48,7 @@ A fuel plate between two channels (`rods.cac`, `rods.fuel`, joined by `symmetric
 a pumped loop, its power `1e4 * pk.P` from a `PointKinetics` (`pk`) driven by `ctrl` and
 starting critical at `P0`. `feedback = :cac => α` or `:fuel => α` gives every cell of that
 part the worth `α`, referred to `T_inlet`. Returns the compiled system and an operating point
-with the flow and every temperature at `T_inlet`.
+with every temperature at `T_inlet`.
 """
 function build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, P0=1.0, feedback=nothing,
                        power_input=nothing)
@@ -76,21 +76,8 @@ function build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, P0=1.0, feedback=not
         Connect.temperature_feedback(pk, felt),
         rods.fuel.power ~ pk.P * 1e4,   # the total, so a power_input reaches the plate
     ]
-    @named sys = assembly(connections, rods, pk, pump, bc)
-    ssys = mtkcompile(sys)
-
-    ic = Pair{Any,Any}[
-        ssys.rods.cac.T => fill(T_inlet, n),
-        ssys.rods.fuel.T => fill(T_inlet, nz, nx),
-    ]
-    # Which member of each port and contact alias set survives mtkcompile changes between
-    # runs and MTK versions, so all of them start at T_inlet. Left at the connector default
-    # of 26.85 °C, a loop with feedback would start off critical.
-    for part in (ssys.rods.cac, ssys.pump, ssys.bc), p in (part.inlet, part.outlet)
-        push!(ic, p.T => T_inlet)
-    end
-    for part in (ssys.rods.cac, ssys.rods.fuel), face in (:thermal_left, :thermal_right)
-        append!(ic, port(part, face, :T) .=> T_inlet)
-    end
-    return ssys, ic
+    @mtkcompile ssys = assembly(connections, rods, pk, pump, bc)
+    # Every temperature, ports and contacts too: left at the connector default of 26.85 °C, a
+    # loop with feedback would start off critical.
+    return ssys, uniform(ssys, T_inlet, :T)
 end

@@ -25,8 +25,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             faces((wall, :thermal) => (cac, :thermal_outer)),
             pump.inlet.p ~ 1.0e5,
         ]
-        @named sys = assembly(conns, pump, bc, cac, wall)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, bc, cac, wall)
         sol = solve_steady(ssys)
 
         @test sol.retcode == ReturnCode.Success
@@ -57,10 +56,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             ),
             pump.inlet.p ~ 1.0e5,
         ]
-        @named sys = assembly(
-            conns, pump, bc, cac, ct_l, ct_r
-        )
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l, ct_r)
         sol = solve_steady(ssys)
 
         @test sol.retcode == ReturnCode.Success
@@ -122,8 +118,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             faces((ct_l, :thermal) => (cac, :thermal_left), (ct_r, :thermal) => (cac, :thermal_right)),
             pump.inlet.p ~ 1.0e5,
         ]
-        @named sys = assembly(conns, pump, bc, cac, ct_l, ct_r)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l, ct_r)
         sol_lam = solve_steady(ssys)
         sol_turb = solve_steady(ssys, [ssys.pump.dP_pump => dP_turb])
         @test sol_lam.retcode == ReturnCode.Success

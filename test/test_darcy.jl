@@ -135,8 +135,7 @@ end
         @named fr = FrictionResistor(; geometry=geom, darcy=darcy)
         @named hx = HeatExchanger(40.0)
         conns = [inseries(pump, hx, fr, pump), pump.inlet.p ~ 1.0e5]
-        @named sys = assembly(conns, pump, fr, hx)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, fr, hx)
         sol = solve_steady(ssys)
         return ssys, sol
     end
@@ -166,8 +165,7 @@ end
             inseries(pump, hx, rs..., pump),
             pump.inlet.p ~ 1.0e5,
         ]
-        @named sys = assembly(conns, pump, hx, rs...)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, hx, rs...)
         sol = solve_steady(ssys)
         return sol[ssys.pump.inlet.ṁ]
     end
@@ -209,15 +207,8 @@ end
         @named R_comp = Resistor(R_val)
         @named hx = HeatExchanger(26.85)
         conns = [inseries(pump, L_comp, R_comp, hx, pump), pump.inlet.p ~ 1.0e5]
-        @named sys = assembly(conns, pump, L_comp, R_comp, hx)
-        ssys = mtkcompile(sys)
-        # The callable form's extra L_eff variable changes what MTK tears, which surfaces
-        # the dummy derivative; seed it so both forms initialise the same way.
-        op = Pair{Any,Any}[]
-        if any(contains("ṁˍt"), string.(unknowns(ssys)))
-            push!(op, Differential(t)(ssys.L_comp.inlet.ṁ) => 0.0)
-        end
-        sol_ss = solve_steady(ssys, op)
+        @mtkcompile ssys = assembly(conns, pump, L_comp, R_comp, hx)
+        sol_ss = solve_steady(ssys)
         sol = solve_transient(ssys, sol_ss, range(0.0, tmax; length=200);
                               overrides=[ssys.pump.dP_pump => 0.0])
         return ssys, sol

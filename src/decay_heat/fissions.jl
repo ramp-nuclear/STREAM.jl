@@ -148,15 +148,8 @@ function Fissions(
 )
     @named pk = PointKinetics(rho_c_fn; Lambda=Lambda, beta_k=beta_k, lambda_k=lambda_k)
     ssys = mtkcompile(pk)
-    # Unit operating power, so the sampled trajectory is already the normalized profile.
-    ic = point_kinetics_steady_state(1.0; Lambda=Lambda, beta_k=beta_k, lambda_k=lambda_k)
-    op = Pair{Any,Any}[
-        ssys.rho_c_fn => rho_c_fn,
-        ssys.P_neutron => ic.P_neutron,
-        (scalarize(ssys.C) .=> ic.C_k)...,
-    ]
-
-    sol = STREAM.solve_transient(ssys, op, times; kwargs...)
+    # Starts critical at the default unit power, so the trajectory is the normalized profile.
+    sol = STREAM.solve_transient(ssys, times; kwargs...)
     profile = sol[ssys.P_neutron, :]
     profile[profile .< _PROFILE_CUTOFF] .= 0.0
 

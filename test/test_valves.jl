@@ -240,8 +240,7 @@ end
             inseries(pool.high, high, ambient_high.port),
             inseries(pool.low, low, ambient_low.port),
         ]
-        @named sys = assembly(conns, pool, high, low, ambient_high, ambient_low)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pool, high, low, ambient_high, ambient_low)
         sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 700.0; length=301);
                               overrides=[ssys.pool.pinned => false],
                               callbacks=machine_callbacks(ssys, upper))
@@ -416,8 +415,7 @@ end
         inparallel(ine, ((heated.ch, ret), flapper), ext_res),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(connections, heated, pump, ine, hx, ret, flapper, ext_res)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(connections, heated, pump, ine, hx, ret, flapper, ext_res)
     C = ssys.heated.ch
 
     # Pump on, flapper shut, integrated to steady. The flows start from their guesses.

@@ -36,8 +36,7 @@ _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys))
         pump.inlet.p ~ 1.0e5,
         ch.T_wall_outer .~ T_INLET,
     ]
-    @named sys = assembly(connections, pump, bc, ch)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(connections, pump, bc, ch)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     # T_out ≈ T_inlet — no heating
@@ -53,8 +52,7 @@ end
         inseries(pump, bc, chf, pump),
         pump.inlet.p ~ 1.0e5, chf.q_outer .~ 0.0,
     ]
-    @named sys = assembly(connections, pump, bc, chf)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(connections, pump, bc, chf)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.chf.T_out], T_INLET; rtol=1e-5)
@@ -71,8 +69,7 @@ end
         pump.inlet.p ~ 1.0e5,
         ch.T_wall_outer .~ T_WALL,
     ]
-    @named sys = assembly(connections, pump, bc, ch)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(connections, pump, bc, ch)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_INLET
@@ -94,8 +91,7 @@ end
         pump.inlet.p ~ 1.0e5,
         chf.q_outer .~ Q_FLUX_DEFAULT,
     ]
-    @named sys = assembly(connections, pump, bc, chf)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(connections, pump, bc, chf)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.chf.T_out] > T_INLET
@@ -118,8 +114,7 @@ end
         inseries(pump, bc, chf, pump),
         pump.inlet.p ~ 1.0e5, chf.q_outer .~ q,
     ]
-    @named sys = assembly(connections, pump, bc, chf)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(connections, pump, bc, chf)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     dT = q * geom.heated.outer * dz / (ṁ * cp_mock)
@@ -141,8 +136,7 @@ end
         pump.inlet.p ~ 1.0e5,
         ch.T_wall_outer .~ T_w,
     ]
-    @named sys = assembly(connections, pump, bc, ch)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(connections, pump, bc, ch)
     sol = solve_steady(ssys)
     hot = solve_steady(ssys, [T_w => T_WALL + 50.0])
     @test sol.retcode == ReturnCode.Success
@@ -163,8 +157,7 @@ end
         pump.inlet.p ~ 1.0e5,
         ch.T_wall_outer .~ T_WALL,
     ]
-    @named sys = assembly(conns, pump, bc, ch)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, bc, ch)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
@@ -175,8 +168,7 @@ end
         pump.inlet.p ~ 1.0e5,
         ch2.T_wall_outer .~ T_WALL,
     ]
-    @named sys2 = assembly(conns, pump, bc, ch2)
-    ssys2 = mtkcompile(sys2)
+    @mtkcompile ssys2 = assembly(conns, pump, bc, ch2)
     sol2 = solve_steady(ssys2)
     @test sol2.retcode == ReturnCode.Success
     @test all(isapprox.(sol2[ssys2.ch2.T], sol[ssys.ch.T], rtol=1e-6))
@@ -196,8 +188,7 @@ end
         pump.inlet.p ~ 1.0e5,
         ch.T_wall_outer .~ T_WALL,
     ]
-    @named sys = assembly(conns, pump, bc, ch)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, bc, ch)
     sol = solve_steady(ssys)
     @named ch2 = Channel(; n=n, geometry=geom,
                            h=H_DEFAULT)
@@ -206,9 +197,7 @@ end
         pump.inlet.p ~ 1.0e5,
         ch2.T_wall_outer .~ T_WALL,
     ]
-    @named sys2 = assembly(conns, pump, bc, ch2)
-    ssys2 = mtkcompile(sys2)
-    # Callable parameter goes into the same op dict as ICs.
+    @mtkcompile ssys2 = assembly(conns, pump, bc, ch2)
     sol2 = solve_steady(ssys2)
     @test sol.retcode == ReturnCode.Success
     @test all(isapprox.(sol2[ssys2.ch2.T], sol[ssys.ch.T], rtol=1e-6))
@@ -262,8 +251,7 @@ end
             ),
             pump.inlet.p ~ 2e5,
         ]
-        @named sys = assembly(conns, pump, bc, cac, ct_l)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l)
         sol = solve_steady(ssys)
         return ssys, sol
     end
@@ -292,8 +280,7 @@ end
     @named pump = Pump(DP_PUMP)
     @named bc = HeatExchanger(T_INLET)
     conns = [inseries(pump, bc, ch, pump), pump.inlet.p ~ 1.0e5, ch.T_wall_left .~ T_WALL]
-    @named sys = assembly(conns, pump, bc, ch)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, bc, ch)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_INLET
@@ -311,9 +298,8 @@ end
     @test !hasproperty(riser, :T_wall_outer)
     @named pump = Pump(DP_PUMP)
     @named bc = HeatExchanger(T_INLET)
-    @named sys = assembly([inseries(pump, bc, riser, pump), pump.inlet.p ~ 1.0e5],
-                          pump, bc, riser)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly([inseries(pump, bc, riser, pump), pump.inlet.p ~ 1.0e5],
+                                pump, bc, riser)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.riser.T_out] ≈ T_INLET
@@ -336,8 +322,7 @@ const GEOM_SIGN       = Duct(0.6, Circular(0.01))
         pump.inlet.p ~ 1.0e5,
         ch.T_wall_outer .~ T_WALL_SIGN,
     ]
-    @named sys = assembly(conns, pump, bc, ch)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, bc, ch)
     sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
@@ -362,8 +347,7 @@ end
         ),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, bc, cac, ct_l)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l)
     sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
@@ -393,8 +377,7 @@ end
         pump.inlet.p ~ 1.0e5,
         chf.q_outer .~ Q_FLUX_DEFAULT,
     ]
-    @named sys = assembly(conns, pump, bc, chf)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, bc, chf)
     sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
@@ -433,8 +416,7 @@ end
             inseries(pump, hex, chf, pump),
             pump.inlet.p ~ 1.0e5, chf.q_outer .~ q_density_g3b,
         ]
-        @named sys = assembly(eqs, pump, hex, chf)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(eqs, pump, hex, chf)
         sol = solve_steady(ssys; abstol=1e-12, reltol=1e-12)
         return ssys, sol
     end
@@ -493,8 +475,7 @@ end
         inseries(pump_chf, bc_chf, chf, pump_chf),
         pump_chf.inlet.p ~ 1.0e5, chf.q_outer .~ q_per_cell,
     ]
-    @named sys_chf = assembly(conns_chf, pump_chf, bc_chf, chf)
-    ssys_chf = mtkcompile(sys_chf)
+    @mtkcompile ssys_chf = assembly(conns_chf, pump_chf, bc_chf, chf)
     sol_chf = solve_transient(ssys_chf, [ssys_chf.chf.T => fill(T_INLET, n)],
                               range(0.0, 1.0, length=50))
     @test sol_chf.retcode == ReturnCode.Success
@@ -531,8 +512,7 @@ end
             ),
             pump.inlet.p ~ 2e5,
         ]
-        @named sys = assembly(conns, pump, bc, cac, ct_l)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l)
         sol = solve_steady(ssys)
         return ssys, sol
     end

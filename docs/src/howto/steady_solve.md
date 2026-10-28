@@ -59,6 +59,7 @@ solve_steady(sys, [sys.ch.T => T_guess]).retcode
 
 ```julia
 uniform([sys.riser, sys.core.ch], 35.0, :T)   # every cell of both channels at 35 °C
+uniform(sys, 35.0, :T)                        # every temperature in the loop, ports too
 ```
 
 ## When the solver still fails: integrate to steady state

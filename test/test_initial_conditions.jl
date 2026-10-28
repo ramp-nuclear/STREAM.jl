@@ -28,4 +28,14 @@ using STREAM.Components
         sol = solve_steady(ssys, uniform([ssys.ch], 40.0, :T))
         @test sol.retcode == ReturnCode.Success
     end
+
+    @testset "uniform over a compiled system reaches every unknown of that name" begin
+        ssys = build_loop()
+        op = uniform(ssys, 40.0, :T)
+        @test all(==(40.0) ∘ last, op)
+        @test all(any(isequal(first(p)), unknowns(ssys)) for p in op)
+        @test count(p -> any(isequal(first(p)), collect(ssys.ch.T)), op) == 10
+        @test isempty(uniform(ssys, 40.0, :nope))
+        @test solve_steady(ssys, op).retcode == ReturnCode.Success
+    end
 end

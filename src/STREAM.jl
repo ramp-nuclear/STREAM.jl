@@ -337,7 +337,7 @@ module DecayHeat
 using DelimitedFiles
 using ModelingToolkit
 using OrdinaryDiffEq
-using ..Components: PointKinetics, point_kinetics_steady_state, ReactivityController
+using ..Components: PointKinetics, ReactivityController
 using ..Components: StateMachine, _entry_at   # the log lookup, private to Components
 using ..Components: U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 using ..STREAM

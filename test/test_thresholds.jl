@@ -469,8 +469,7 @@ end
         pump.inlet.p ~ 1.0e5,
         chf.q_outer .~ 1.0e4,
     ]
-    @named sys = assembly(conns, pump, bc, chf)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, bc, chf)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 

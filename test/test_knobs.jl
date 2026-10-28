@@ -104,8 +104,7 @@ end
             (hd, :thermal_right) => (cac_r, :thermal_left),
         ),
     ]
-    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
 
     # the gap is one shared knob across both channels and the plate
     @test count(p -> occursin("gap", string(p)), parameters(ssys)) == 1
