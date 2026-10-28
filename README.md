@@ -34,23 +34,22 @@ whose wall is held at 100 °C:
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, Channel
 using STREAM.Assemblies: inseries
-using ModelingToolkit: @named, mtkcompile
 
-@named pump = Pump(3.0e4)                 # pressure rise [Pa]
-@named hx = HeatExchanger(40.0)           # outlet temperature [°C]
-@named ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
-
-connections = [
-    inseries(pump, hx, ch, pump),         # a closed loop
-    pump.inlet.p ~ 1.0e5,                 # one absolute pressure fixes the level [Pa]
-    ch.T_wall_outer .~ 100.0,             # wall temperature [°C]
-]
-@named loop = assembly(connections, pump, hx, ch)
-sys = mtkcompile(loop)
+@assembly sys begin
+    pump = Pump(3.0e4)                 # pressure rise [Pa]
+    hx = HeatExchanger(40.0)           # outlet temperature [°C]
+    ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
+    inseries(pump, hx, ch, pump)       # a closed loop
+    pump.inlet.p ~ 1.0e5               # one absolute pressure fixes the level [Pa]
+    ch.T_wall_outer .~ 100.0           # wall temperature [°C]
+end
 
 sol = solve_steady(sys)
 sol[sys.ch.inlet.ṁ], sol[sys.ch.T_out]    # about 0.6 kg/s, leaving at about 42 °C
 ```
+
+`@assembly` names each component after its variable, composes the components the
+connections use, and compiles the model into `sys`.
 
 [A first loop](https://ramp-nuclear.github.io/STREAM.jl/stable/tutorials/01_first_loop/) walks
 through it step by step.
