@@ -10,7 +10,7 @@ connection list and the components to compose.
 ```@example wiring
 using STREAM
 using STREAM.Components: Pump, Resistor, HeatExchanger
-using STREAM.Assemblies: inseries, inparallel, weighted
+using STREAM.Assemblies: inseries, inparallel, weighted, @flowgraph
 using ModelingToolkit: connect
 nothing # hide
 ```
@@ -46,6 +46,42 @@ sol = solve_steady(sys)
 ```
 
 Branch `b` has twice the resistance, so it takes half the flow of branch `a`.
+
+## Drawing the path with arrows
+
+[`@flowgraph`](@ref STREAM.Assemblies.Connect.@flowgraph) writes the same wiring as a
+drawing: `-->` puts two steps in series and `||` puts them in parallel. `||` binds tighter
+than `-->`, so a branch of several components goes in parentheses. Inside `@assembly` an
+arrow line needs no macro of its own:
+
+```@example wiring
+@assembly sys begin
+    pump = Pump(1.0e4)
+    hx = HeatExchanger(40.0)
+    a = Resistor(1.0e3)
+    b1 = Resistor(1.0e3)
+    b2 = Resistor(1.0e3)
+    pump --> hx --> a || (b1 --> b2) --> pump
+    pump.inlet.p ~ 1.0e5
+end
+sol = solve_steady(sys)
+@assert sol[sys.a.inlet.ṁ] ≈ 2 * sol[sys.b1.inlet.ṁ]
+(a=sol[sys.a.inlet.ṁ], b=sol[sys.b1.inlet.ṁ])
+```
+
+Outside `@assembly`, `@flowgraph` gives the equations, for a connection list or a builder
+function. A path built elsewhere, a tuple or vector of components in series such as the one
+[`weighted`](@ref STREAM.Assemblies.Connect.weighted) returns, stands in a path or a branch
+as it is, and `branches... || c` adds every branch a vector holds:
+
+```julia
+hot = (hx_hot, riser)
+@flowgraph pump --> hot || bypass || (hx_cold --> downcomer) --> pump
+@flowgraph begin                       # several paths, one per line
+    pool.bottom --> breach --> room.port
+    pool.side --> pump --> pool.top
+end
+```
 
 ## Any junction
 

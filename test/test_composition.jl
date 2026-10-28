@@ -661,3 +661,74 @@ end
         push!(machine, (:A => :B, pump.inlet.ṁ < 0.1))
     end
 end
+
+"""The equations `eqs` give, as a set of strings, to compare two wirings."""
+_wiring(eqs) = Set(string.(eqs))
+
+@testset "@flowgraph gives the equations inseries and inparallel give" begin
+    @named pump = Pump(1.0e4)
+    @named hx = HeatExchanger(40.0)
+    @named a = Resistor(1.0e3)
+    @named b1 = Resistor(1.0e3)
+    @named b2 = Resistor(1.0e3)
+    @named c = Resistor(1.0e3)
+    @test _wiring(@flowgraph pump --> hx --> a || (b1 --> b2) --> pump) ==
+          _wiring([inseries(pump, hx); inparallel(hx, [a, (b1, b2)], pump)])
+    @test _wiring(@flowgraph pump --> a || b1 --> hx --> b2 || c --> pump) ==
+          _wiring([inparallel(pump, [a, b1], hx); inparallel(hx, [b2, c], pump)])
+    @test length(@flowgraph begin
+        pump --> hx
+        hx --> a --> pump
+    end) == 3
+end
+
+@testset "@flowgraph takes paths built outside it" begin
+    @named pump = Pump(1.0e4)
+    @named hx = HeatExchanger(40.0)
+    @named a = Resistor(1.0e3)
+    @named b1 = Resistor(1.0e3)
+    @named b2 = Resistor(1.0e3)
+    path = (b1, b2)
+    @test _wiring(@flowgraph hx --> path --> pump) == _wiring(inseries(hx, b1, b2, pump))
+    @test _wiring(@flowgraph hx --> path... --> pump) == _wiring(inseries(hx, b1, b2, pump))
+    @test _wiring(@flowgraph hx --> a || path --> pump) ==
+          _wiring(inparallel(hx, [a, path], pump))
+    @named c = Resistor(1.0e3)
+    branches = [a, path]
+    @test _wiring(@flowgraph hx --> branches... || c --> pump) ==
+          _wiring(inparallel(hx, [a, path, c], pump))
+    @named pool = Tank(; area=2.0, L0=4.0, ports=(bottom=0.0,))
+    @named ambient = Environment()
+    @test _wiring(@flowgraph pool.bottom --> a || b1 --> ambient.port) ==
+          _wiring(inparallel(pool.bottom, [a, b1], ambient.port))
+end
+
+@testset "@flowgraph rejects a path it cannot wire" begin
+    @named pump = Pump(1.0e4)
+    @named a = Resistor(1.0e3)
+    @named b = Resistor(1.0e3)
+    @test_throws r"at least two" @flowgraph pump
+    @test_throws r"on each side" @flowgraph a || b --> pump
+    @test_throws r"on each side" @flowgraph pump --> a || b --> a || b --> pump
+    @test_throws r"`a \|\| b`" Connect._flow_expr(:(pump --> [a, b] --> pump))
+    @test_throws r"cannot hold" Connect._flow_expr(:(pump --> a || (b --> a || b) --> pump))
+end
+
+@testset "@assembly reads an arrow line as @flowgraph does" begin
+    @assembly sys begin
+        pump = Pump(1.0e4)
+        hx = HeatExchanger(40.0)
+        a = Resistor(1.0e3)
+        b1 = Resistor(1.0e3)
+        b2 = Resistor(1.0e3)
+        pump --> hx --> a || (b1 --> b2) --> pump
+        pump.inlet.p ~ 1.0e5
+    end
+    sol = solve_steady(sys)
+    @test sol[sys.a.inlet.ṁ] ≈ 2 * sol[sys.b1.inlet.ṁ] rtol = 1e-8
+    @assembly again begin
+        @flowgraph pump --> hx --> a || (b1 --> b2) --> pump
+        pump.inlet.p ~ 1.0e5
+    end
+    @test solve_steady(again)[again.a.inlet.ṁ] ≈ sol[sys.a.inlet.ṁ] rtol = 1e-8
+end

@@ -387,6 +387,8 @@ using ..STREAM: assembly, @assembly, port, var_length
 
     The wiring verbs. Each takes components and returns the `Vector{Equation}` that joins them
     rather than a composed system, so results concatenate into one connection list.
+    [`@flowgraph`](@ref) draws a flow path with arrows and gives the equations
+    [`inseries`](@ref) and [`inparallel`](@ref) would.
     """
 module Connect
 using ModelingToolkit
@@ -395,13 +397,13 @@ using ...Components
 using ...Components: _row_major   # a feedback group's cell order, private to Components
 using ...STREAM: port, var_length, _flat
 include("assemblies/connections.jl")
-export inseries, inparallel, weighted, face, faces, temperature_feedback
+export inseries, inparallel, @flowgraph, weighted, face, faces, temperature_feedback
 end
 using .Connect
 
 include("assemblies/concrete_assemblies.jl")
 export Connect
-export inseries, inparallel, weighted, face, faces, port, temperature_feedback
+export inseries, inparallel, @flowgraph, weighted, face, faces, port, temperature_feedback
 export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
 export assembly, @assembly
 end
