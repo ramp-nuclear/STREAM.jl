@@ -612,3 +612,67 @@ end
     @test_throws r"side is a port" inseries(r1, pool.side, r2)
     @test_throws r"side is a port" inparallel(r1, ((r2, pool.side),), ambient.port)
 end
+
+@testset "@assembly names, composes and compiles a block" begin
+    @named hx = HeatExchanger(40.0)   # built before the block, and brought in by use
+    @assembly loop begin
+        geom = Duct(0.6, Circular(0.01))
+        pump = Pump(3.0e4)
+        ch = Channel(; n=10, geometry=geom, h=5000.0)
+        inseries(pump, hx, ch, pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_outer .~ 100.0
+    end
+    @test nameof(loop) === :loop && ModelingToolkit.iscomplete(loop)
+    @test nameof(pump) === :pump && nameof(ch) === :ch && geom isa Duct
+    @mtkcompile ssys = assembly([inseries(pump, hx, ch, pump), pump.inlet.p ~ 1.0e5,
+                                 ch.T_wall_outer .~ 100.0], pump, hx, ch)
+    @test solve_steady(loop)[loop.ch.T] ≈ solve_steady(ssys)[ssys.ch.T] rtol = 1e-10
+end
+
+@testset "@assembly composes a system only through the one built from it" begin
+    @assembly loop begin
+        cac = _fa_cac(:cac)
+        fuel = _fa_hd(:fuel)
+        rods = symmetric_plate(cac, fuel; name=:rods)
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, rods.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
+    @test solve_steady(loop).retcode == ReturnCode.Success
+end
+
+@testset "@assembly takes systems in vectors" begin
+    pumps = [Pump(; ṁ0=0.5i, name=Symbol(:pump, i)) for i in 1:2]
+    hxs = [HeatExchanger(30.0; name=Symbol(:hx, i)) for i in 1:2]
+    @assembly loops begin
+        [inseries(pumps[i], hxs[i], pumps[i]) for i in 1:2]
+        [pumps[i].inlet.p ~ 1.0e5 for i in 1:2]
+    end
+    @test solve_steady(loops)[loops.pump2.inlet.ṁ] ≈ 1.0
+end
+
+@testset "@assembly composes a system listed on its own, and passes keywords on" begin
+    @named lone = Inertia(1.0)   # connected to nothing, so the system is underdetermined
+    @parameters k_extra = 2.0
+    @assembly loop begin
+        pump = Pump(3.0e4)
+        hx = HeatExchanger(40.0)
+        inseries(pump, hx, pump)
+        pump.inlet.p ~ 1.0e5
+        lone
+    end parameters=[k_extra] fully_determined=false
+    @test occursin("lone₊", string(unknowns(loop)) * string(observed(loop)))
+    @test any(isequal(loop.k_extra), parameters(loop))
+end
+
+@testset "@assembly rejects a line that is neither equations nor systems" begin
+    machine = StateMachine()
+    @test_throws r"put it before the @assembly block" @assembly loop begin
+        pump = Pump(3.0e4)
+        hx = HeatExchanger(40.0)
+        inseries(pump, hx, pump)
+        push!(machine, (:A => :B, pump.inlet.ṁ < 0.1))
+    end
+end
