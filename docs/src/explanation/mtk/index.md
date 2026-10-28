@@ -75,7 +75,7 @@ STREAM wraps these in [`solve_steady`](@ref) and [`solve_transient`](@ref).
 | `mass_vector` | which equations hold a `D(...)`; MTK reads it off the equations |
 | keyword inputs of `calculate`, edges of the graph | connectors and `connect`, or one equation naming both sides |
 | external functions, `funcs` | parameters, and parameters holding a function of time |
-| `Aggregator` | the composed system: [`assembly`](@ref STREAM.Assemblies.assembly), then `mtkcompile` |
+| `Aggregator` | the composed and compiled system that [`@assembly`](@ref) builds |
 | `report(agr)` | `unknowns`, `equations` and `observed`; `mtkcompile` fails on a system with too few or too many equations |
 | `y0` and `yp0` | the operating point; consistent derivatives are found by initialization |
 | `jac=ALG_jacobian(agr)` | generated from the equations, with its sparsity |

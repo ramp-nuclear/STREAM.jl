@@ -8,7 +8,7 @@ the recipes, on a small reactor whose control rods withdraw slowly until it trip
 ```@example ev
 using STREAM
 using STREAM.Components: PointKinetics, ReactivityController, StateMachine, machine_callbacks
-using ModelingToolkit: @named, mtkcompile, @parameters
+using ModelingToolkit: @named, @parameters
 nothing # hide
 ```
 
@@ -29,8 +29,7 @@ end
 @named pk = PointKinetics(rods)
 machine.transitions = [(:NORMAL => :SCRAM, pk.P_neutron > 1.2, "power above 120%")]
 
-@named reactor = assembly([], pk)
-sys = mtkcompile(reactor)
+@assembly sys begin pk end
 sol = solve_transient(sys, 0.0:0.05:20.0; callbacks=machine_callbacks(sys, machine))
 machine.log
 ```
@@ -64,8 +63,7 @@ machine.transitions = [
     (:NORMAL => :SCRAM, pk.P_neutron > 1.2, "power above 120%"),
     (:SCRAM => :DONE, (m, sys, t) -> t - m.t_state - 5.0, "5 s after the scram"),
 ]
-@named reactor = assembly([], pk)
-sys = mtkcompile(reactor)
+@assembly sys begin pk end
 sol = solve_transient(sys, 0.0:0.05:60.0; callbacks=machine_callbacks(sys, machine))
 (sol.t[end], machine.log[end].cause)
 ```
@@ -86,8 +84,7 @@ rods = ReactivityController(machine=machine) do state, t_state, t
 end
 @named pk = PointKinetics(rods)
 machine.transitions = [(:NORMAL => :SCRAM, pk.P_neutron > trip_at, "high power")]
-@named reactor = assembly([], pk; parameters=[trip_at])
-sys = mtkcompile(reactor)
+@assembly sys begin pk end parameters=[trip_at]
 
 trip_times = map((1.2, 1.5, 2.0)) do setpoint
     Components.reset!(machine)
@@ -98,7 +95,7 @@ end
 ```
 
 A higher setpoint trips later, as the slow withdrawal takes longer to push the power there.
-`assembly` needs `parameters=[trip_at]` because no equation of the model mentions it, only the
+`@assembly` needs `parameters=[trip_at]` because no equation of the model mentions it, only the
 event.
 
 ## Several machines

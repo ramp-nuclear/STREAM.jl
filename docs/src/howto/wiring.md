@@ -1,14 +1,17 @@
 # Wire components together
 
-A model is its components plus a list of connections, joined by
-[`assembly`](@ref STREAM.Assemblies.assembly). The connection list can nest: it holds single
-equations next to the vectors the wiring functions return, and needs no splatting.
+A model is its components and the connections between them. [`@assembly`](@ref) takes both
+in one block: a line such as `pump = Pump(1.0e4)` builds a component named `pump`, and any
+other line is a connection, either an equation or one of the vectors the wiring functions
+below return. It composes the components the connections use and compiles the model.
+[`assembly`](@ref STREAM.Assemblies.assembly) is the uncompiled form underneath, taking a
+connection list and the components to compose.
 
 ```@example wiring
 using STREAM
 using STREAM.Components: Pump, Resistor, HeatExchanger
 using STREAM.Assemblies: inseries, inparallel, weighted
-using ModelingToolkit: @named, mtkcompile, connect
+using ModelingToolkit: connect
 nothing # hide
 ```
 
@@ -28,18 +31,16 @@ into several branches and joins them into another. A branch is one component, or
 components in series:
 
 ```@example wiring
-@named pump = Pump(1.0e4)
-@named hx = HeatExchanger(40.0)
-@named a = Resistor(1.0e3)
-@named b1 = Resistor(1.0e3)
-@named b2 = Resistor(1.0e3)
-connections = [
-    inseries(pump, hx),
-    inparallel(hx, [a, (b1, b2)], pump),     # branch b is b1 then b2
-    pump.inlet.p ~ 1.0e5,
-]
-@named loop = assembly(connections, pump, hx, a, b1, b2)
-sys = mtkcompile(loop)
+@assembly sys begin
+    pump = Pump(1.0e4)
+    hx = HeatExchanger(40.0)
+    a = Resistor(1.0e3)
+    b1 = Resistor(1.0e3)
+    b2 = Resistor(1.0e3)
+    inseries(pump, hx)
+    inparallel(hx, [a, (b1, b2)], pump)  # branch b is b1 then b2
+    pump.inlet.p ~ 1.0e5
+end
 sol = solve_steady(sys)
 (a=sol[sys.a.inlet.ṁ], b=sol[sys.b1.inlet.ṁ])
 ```
@@ -63,21 +64,23 @@ A core of fifty identical assemblies is fifty copies of the same equations.
 junctions at its ends see `N` times its flow, and the solve carries one branch's unknowns.
 
 ```@example wiring
-@named pump = Pump(1.0e4)
-@named hx = HeatExchanger(40.0)
-@named single = Resistor(1.0e3)
-@named extra = Resistor(1.0e3)
-many = weighted(50, single; name=:many)     # single standing for 50 in parallel
-connections = [inseries(pump, hx), inparallel(hx, [many, extra], pump), pump.inlet.p ~ 1.0e5]
-@named loop = assembly(connections, pump, hx, many..., extra)
-sys = mtkcompile(loop)
+@assembly sys begin
+    pump = Pump(1.0e4)
+    hx = HeatExchanger(40.0)
+    single = Resistor(1.0e3)
+    extra = Resistor(1.0e3)
+    many = weighted(50, single)  # single standing for 50 in parallel
+    inseries(pump, hx)
+    inparallel(hx, [many, extra], pump)
+    pump.inlet.p ~ 1.0e5
+end
 sol = solve_steady(sys)
 (total=sol[sys.pump.inlet.ṁ], each_of_many=sol[sys.single.inlet.ṁ], extra=sol[sys.extra.inlet.ṁ])
 ```
 
 The fifty and the extra branch share the head, so each carries the same flow, and the pump
-carries 51 times that. `weighted` returns a tuple, which goes into the branch list as a path and is
-splatted into `assembly` as components.
+carries 51 times that. `weighted` returns a tuple of the systems along the branch, which goes
+into the branch list as a path and which `@assembly` composes.
 
 ## Plates and channels
 
@@ -100,6 +103,26 @@ port(ch, :thermal_left, :T)       # the wall temperature of every cell
 
 For the usual arrangements of plates and channels, use the ready-made ones in
 [Build a fuel assembly](fuel_assembly.md).
+
+## Components built elsewhere
+
+A component built before the block joins the model when a connection uses it, so a builder
+function can take components as arguments. A connection that reaches into a composed system,
+as `inseries(pump, bc, rods.cac, pump)` reaches the channel of a plate built by
+[`symmetric_plate`](@ref STREAM.Assemblies.symmetric_plate), brings in the plate, and the
+channel is not composed a second time. A system no connection names, such as a vector of
+plates reached only through views into them, goes on a line of its own:
+
+```julia
+@assembly sys begin
+    plates  # composed whole
+    [inseries(pumps[i], plates_cac[i], pumps[i]) for i in eachindex(pumps)]
+end
+```
+
+A line that gives neither equations nor systems, such as `push!(machine, edge)`, is an error:
+put it before or after the block. Keywords after `end` go to `assembly` (`parameters`, `t`) or
+to `mtkcompile` (any other, such as `fully_determined=false`).
 
 ## Fixing the pressure
 

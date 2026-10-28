@@ -29,7 +29,7 @@
 using STREAM
 using STREAM.Components: Pump, Resistor, HeatExchanger, Gravity
 using STREAM.Assemblies: inseries
-using ModelingToolkit: @named, mtkcompile, connect
+using ModelingToolkit: @named, connect
 
 R = 1.0e4                                   # Pa per kg/s
 @named pump = Pump(3.0e4)
@@ -53,9 +53,11 @@ function corner(c)
     return connect(ports...)
 end
 
-connections = [corner.(0:7); pump.inlet.p ~ 1.0e5]
-@named cube = assembly(connections, pump, resistors...)
-sys = mtkcompile(cube)
+@assembly sys begin
+    corner.(0:7)
+    pump.inlet.p ~ 1.0e5
+    resistors  # the corners reach them inside a function, so they are listed
+end
 sol = solve_steady(sys);
 
 # The pump's head over its flow is the cube's resistance:
@@ -67,7 +69,7 @@ R_cube / R
 
 # and each edge carries the share the symmetry argument gave it:
 
-flows = [sol[getproperty(sys, nameof(r)).inlet.ṁ] / I for r in resistors]
+flows = [sol[r.inlet.ṁ] / I for r in resistors]
 @assert all(isapprox.(flows, [1/3, 1/3, 1/3, 1/6, 1/6, 1/6, 1/6, 1/3, 1/6, 1/6, 1/3, 1/3];
                       rtol=1e-8));
 # ## Flow driven by temperature
@@ -107,19 +109,17 @@ hxs = [HeatExchanger(T; name=Symbol(:hx_, n)) for (n, T) in zip(names, T_k)]
 rises = [Gravity(H; name=Symbol(:rise_, n)) for n in names]
 rs = [Resistor(R; name=Symbol(:r_, n)) for (n, R) in zip(names, R_k)]
 
-connections = [
-    [inseries(hx, rise, r) for (hx, rise, r) in zip(hxs, rises, rs)]...,
-    connect((hx.inlet for hx in hxs)...),   # the bottom plenum
-    connect((r.outlet for r in rs)...),     # the top plenum
-    hxs[1].inlet.p ~ 2.0e5,
-]
-@named syphon = assembly(connections, hxs..., rises..., rs...)
-sys = mtkcompile(syphon)
+@assembly sys begin
+    [inseries(hx, rise, r) for (hx, rise, r) in zip(hxs, rises, rs)]
+    connect((hx.inlet for hx in hxs)...)  # the bottom plenum
+    connect((r.outlet for r in rs)...)    # the top plenum
+    hxs[1].inlet.p ~ 2.0e5
+end
 sol = solve_steady(sys);
 
 # The flows STREAM finds, hot, mean and cold:
 
-ṁ = [sol[getproperty(sys, nameof(r)).inlet.ṁ] for r in rs]
+ṁ = [sol[r.inlet.ṁ] for r in rs]
 
 # and the closed form:
 

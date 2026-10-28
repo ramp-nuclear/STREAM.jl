@@ -28,17 +28,17 @@
 using STREAM
 using STREAM.Components: Pump, Inertia, ResistorFromKnownPoint, HeatExchanger
 using STREAM.Assemblies: inseries
-using ModelingToolkit: @named, mtkcompile, unknowns
+using ModelingToolkit: unknowns
 
 dp0, ṁ0, L_over_A = 3.0e4, 50.0, 2.0e4      # Pa, kg/s, 1/m
-@named pump = Pump(dp0)
-@named flywheel = Inertia(L_over_A)
-@named loss = ResistorFromKnownPoint(; dp=-dp0, ṁ=ṁ0, T=40.0)
-@named hx = HeatExchanger(40.0)
-
-connections = [inseries(pump, flywheel, loss, hx, pump), pump.inlet.p ~ 1.5e5]
-@named loop = assembly(connections, pump, flywheel, loss, hx)
-sys = mtkcompile(loop);
+@assembly sys begin
+    pump = Pump(dp0)
+    flywheel = Inertia(L_over_A)
+    loss = ResistorFromKnownPoint(; dp=-dp0, ṁ=ṁ0, T=40.0)
+    hx = HeatExchanger(40.0)
+    inseries(pump, flywheel, loss, hx, pump)
+    pump.inlet.p ~ 1.5e5
+end;
 
 # The heat exchanger holds the water at 40 °C, the temperature the resistance was
 # calibrated at, so its coefficient does not drift with the density.
@@ -128,13 +128,14 @@ fig_dp
 
 τ = 5.0
 head(t) = dp0 * exp(-t / τ)
-@named pump2 = Pump(head)
-@named flywheel2 = Inertia(L_over_A)
-@named loss2 = ResistorFromKnownPoint(; dp=-dp0, ṁ=ṁ0, T=40.0)
-@named hx2 = HeatExchanger(40.0)
-connections2 = [inseries(pump2, flywheel2, loss2, hx2, pump2), pump2.inlet.p ~ 1.5e5]
-@named loop2 = assembly(connections2, pump2, flywheel2, loss2, hx2)
-sys2 = mtkcompile(loop2);
+@assembly sys2 begin
+    pump2 = Pump(head)
+    flywheel2 = Inertia(L_over_A)
+    loss2 = ResistorFromKnownPoint(; dp=-dp0, ṁ=ṁ0, T=40.0)
+    hx2 = HeatExchanger(40.0)
+    inseries(pump2, flywheel2, loss2, hx2, pump2)
+    pump2.inlet.p ~ 1.5e5
+end;
 
 # The function becomes a parameter of the model, `dP_pump_fn`, whose value is `head` unless
 # an operating point replaces it. At ``t = 0`` the head is still the full 0.3 bar, so the loop

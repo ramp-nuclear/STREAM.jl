@@ -56,7 +56,8 @@ Each line of the block is one of:
   after it.
 - a connection: an equation, a broadcast equation, or a call that returns equations, such as
   `inseries(...)` or `pump.inlet.p ~ 1.0e5`.
-- a system or a vector of systems on its own, to compose one no connection mentions.
+- a system, or a vector or tuple of systems, on its own, to compose one no connection
+  mentions.
 
 The components are the systems the connections mention and the ones listed on their own,
 whether built in the block or before it. A system used only to build another one, such as a
@@ -191,7 +192,7 @@ end
 """
     _systems(x) -> Vector
 
-The systems in `x`, a system or an array of them.
+The systems in `x`, a system or an array or tuple of them.
 """
 _systems(x::ModelingToolkit.AbstractSystem) = Any[x]
 _systems(xs) = collect(Any, xs)
@@ -199,10 +200,10 @@ _systems(xs) = collect(Any, xs)
 """
     _holds_systems(x) -> Bool
 
-Whether `x` is a system or a non-empty array of systems.
+Whether `x` is a system or a non-empty array or tuple of systems.
 """
 _holds_systems(x) = x isa ModelingToolkit.AbstractSystem ||
-    (x isa AbstractArray && !isempty(x) && all(_holds_systems, x))
+    (x isa Union{AbstractArray,Tuple} && !isempty(x) && all(_holds_systems, x))
 
 """
     _holds_equations(x) -> Bool

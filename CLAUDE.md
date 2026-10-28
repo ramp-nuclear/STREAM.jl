@@ -157,7 +157,7 @@ src/
     source.jl               # DecayHeatSource: MeV/fission to power, and the trip clock
   assemblies/
     port.jl                 # port, var_length; loaded before Components
-    assembly.jl             # assembly; loaded before Components
+    assembly.jl             # assembly, @assembly; loaded before Components
     connections.jl          # module Connect: face, inseries, inparallel, weighted, ...
     concrete_assemblies.jl  # plate, symmetric_plate, one_sided, single_channel,
                             # fuel_assembly

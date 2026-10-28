@@ -125,16 +125,15 @@ end
     n = 10
     T_inlet = 40.0
     T_wall = 100.0
-    @named pump = Pump(3.0e4)
-    @named hx = HeatExchanger(T_inlet)
-    @named cac = ChannelAndContacts(; n=n, geometry=geom_simple)
-    @named wall = ConstantTemperature(T_wall; n=n)
-    conns = [
-        inseries(pump, hx, cac, pump),
-        pump.inlet.p ~ 1.0e5,
-        faces((wall, :thermal) => (cac, :thermal_outer)),
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, cac, wall)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        hx = HeatExchanger(T_inlet)
+        cac = ChannelAndContacts(; n=n, geometry=geom_simple)
+        wall = ConstantTemperature(T_wall; n=n)
+        inseries(pump, hx, cac, pump)
+        pump.inlet.p ~ 1.0e5
+        faces((wall, :thermal) => (cac, :thermal_outer))
+    end
 
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
@@ -215,18 +214,17 @@ end
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
     slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
                   material=Solid(2700.0, 900.0, 200.0))
-    @named hd = HeatDiffusion(slab; power=1e4)
-    conns = [
-        inseries(pump_l, hx_l, cac_l, pump_l),
-        pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r),
-        pump_r.inlet.p ~ 1.0e5,
+    @assembly ssys begin
+        hd = HeatDiffusion(slab; power=1e4)
+        inseries(pump_l, hx_l, cac_l, pump_l)
+        pump_l.inlet.p ~ 1.0e5
+        inseries(pump_r, hx_r, cac_r, pump_r)
+        pump_r.inlet.p ~ 1.0e5
         faces(
             (hd, :thermal_left) => (cac_l, :thermal_right),
             (hd, :thermal_right) => (cac_r, :thermal_left),
-        ),
-    ]
-    @mtkcompile ssys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+        )
+    end
 
     rows = ParityRow[]
     sol = solve_steady(ssys)
@@ -341,18 +339,17 @@ end
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
     slab = Slab(; x, z=range(0, 0.6, nz + 1), y=0.07,
                   material=ifelse.(meat, Solid(3000.0, 800.0, 100.0), Solid(2700.0, 900.0, 250.0)))
-    @named hd = HeatDiffusion(slab; power_shape=meat ./ sum(meat), power=1e4)
-    conns = [
-        inseries(pump_l, hx_l, cac_l, pump_l),
-        pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r),
-        pump_r.inlet.p ~ 1.0e5,
+    @assembly ssys begin
+        hd = HeatDiffusion(slab; power_shape=meat ./ sum(meat), power=1e4)
+        inseries(pump_l, hx_l, cac_l, pump_l)
+        pump_l.inlet.p ~ 1.0e5
+        inseries(pump_r, hx_r, cac_r, pump_r)
+        pump_r.inlet.p ~ 1.0e5
         faces(
             (hd, :thermal_left) => (cac_l, :thermal_right),
             (hd, :thermal_right) => (cac_r, :thermal_left),
-        ),
-    ]
-    @mtkcompile ssys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+        )
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
@@ -407,18 +404,17 @@ end
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
     slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
                   material=Solid(2700.0, 900.0, 200.0))
-    @named hd = HeatDiffusion(slab; power=1e4)
-    conns = [
-        inseries(pump_l, hx_l, cac_l, pump_l),
-        pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r),
-        pump_r.inlet.p ~ 1.0e5,
+    @assembly ssys begin
+        hd = HeatDiffusion(slab; power=1e4)
+        inseries(pump_l, hx_l, cac_l, pump_l)
+        pump_l.inlet.p ~ 1.0e5
+        inseries(pump_r, hx_r, cac_r, pump_r)
+        pump_r.inlet.p ~ 1.0e5
         faces(
             (hd, :thermal_left) => (cac_l, :thermal_right),
             (hd, :thermal_right) => (cac_r, :thermal_left),
-        ),
-    ]
-    @mtkcompile ssys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+        )
+    end
 
     op = [ssys.hd.T[i, nx] => 95.0 for i in 1:nz]
     rows = ParityRow[]
@@ -548,11 +544,11 @@ end
     scc = single_channel(cac_l, hd; fuel_side=:left, name=:scc)
     cac = scc.cac_l
     fuel = scc.hd
-    conns = [
-        inseries(pump_l, hx_l, cac, pump_l),
-        pump_l.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump_l, hx_l, scc)
+    @assembly ssys begin
+        inseries(pump_l, hx_l, cac, pump_l)
+        pump_l.inlet.p ~ 1.0e5
+        scc
+    end
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
@@ -670,16 +666,15 @@ end  # @testset "parity harness"
 
     slab = Slab(; x=range(0, Lx_v01, nx_v01 + 1), z=range(0, Lz_v01, nz_v01 + 1), y=y_v01,
                   material=Solid(rho_s_v01, cp_s_v01, k_s_v01))
-    @named hd_v01 = HeatDiffusion(slab; power=0.0)
-    @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
-    @named ct_r = ConstantTemperature(T_wall; n=nz_v01)
-    conns_v01 = [
+    @assembly ssys_v01 begin
+        hd_v01 = HeatDiffusion(slab; power=0.0)
+        ct_l = ConstantTemperature(T_wall; n=nz_v01)
+        ct_r = ConstantTemperature(T_wall; n=nz_v01)
         faces(
             (ct_l, :thermal) => (hd_v01, :thermal_left),
             (ct_r, :thermal) => (hd_v01, :thermal_right),
-        ),
-    ]
-    @mtkcompile ssys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
+        )
+    end
 
     op_ic_v01 = [ssys_v01.hd_v01.T => fill(T0, nz_v01, nx_v01)]
 
@@ -726,18 +721,17 @@ end
     @named hd1 = HeatDiffusion(slab; power=power_per_plate)
     @named hd2 = HeatDiffusion(slab; power=power_per_plate)
 
-    conns_v02 = [
-        # Hydraulic loop
-        inseries(pump_v02, hx_v02, cac_v02, pump_v02),
-        pump_v02.inlet.p ~ 1.0e5,
+    @assembly ssys_v02 begin
+  # Hydraulic loop
+        inseries(pump_v02, hx_v02, cac_v02, pump_v02)
+        pump_v02.inlet.p ~ 1.0e5
         faces(
             # hd1 left face → cac thermal_left (hd1 is on the left of the channel)
             (hd1, :thermal_left) => (cac_v02, :thermal_left),
             # hd2 left face → cac thermal_right (hd2 is on the right of the channel, facing inward)
             (hd2, :thermal_left) => (cac_v02, :thermal_right),
-        ),
-    ]
-    @mtkcompile ssys_v02 = assembly(conns_v02, pump_v02, hx_v02, cac_v02, hd1, hd2)
+        )
+    end
 
     # Initial guess: ṁ +0.250 (rectangular MTR at 30 kPa)
     sol_v02 = solve_steady(ssys_v02)

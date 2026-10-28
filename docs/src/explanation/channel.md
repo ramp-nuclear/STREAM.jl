@@ -129,24 +129,21 @@ using STREAM, CairoMakie
 using STREAM.Components: Pump, HeatExchanger, Channel
 using STREAM.Assemblies: inseries
 using STREAM.Utilities: cosine_shape
-using ModelingToolkit: @named, mtkcompile
 
 n = 20
 geometry = Duct(0.6, Rectangular(0.067, 0.0024))
 shape = cosine_shape(range(0.0, geometry.L; length=n + 1))
 T_wall = 60.0 .+ 60.0 .* shape ./ maximum(shape)   # 60 °C at the ends, 120 °C mid-height
 
-@named pump = Pump(2.0e4)
-@named hx = HeatExchanger(40.0)
-@named ch = Channel(; n, geometry, g=-G_EARTH, h=2.0e4)
-connections = [
-    inseries(pump, hx, ch, pump),
-    pump.inlet.p ~ 1.7e5,
-    ch.T_wall_left .~ T_wall,
-    ch.T_wall_right .~ T_wall,
-]
-@named loop = assembly(connections, pump, hx, ch)
-sys = mtkcompile(loop)
+@assembly sys begin
+    pump = Pump(2.0e4)
+    hx = HeatExchanger(40.0)
+    ch = Channel(; n, geometry, g=-G_EARTH, h=2.0e4)
+    inseries(pump, hx, ch, pump)
+    pump.inlet.p ~ 1.7e5
+    ch.T_wall_left .~ T_wall
+    ch.T_wall_right .~ T_wall
+end
 sol = solve_steady(sys)
 
 z = ((1:n) .- 0.5) .* geometry.L ./ n

@@ -30,7 +30,7 @@ using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndCon
 using STREAM.Assemblies: inseries, symmetric_plate
 using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
-using ModelingToolkit: @named, mtkcompile
+using ModelingToolkit: @named
 
 L = 0.6                  # heated length [m]
 n = 20                   # axial cells
@@ -86,11 +86,12 @@ shape = repeat(cosine_shape(z_edges, 1.4) ./ nx, 1, nx)
 # loop. With the flow fixed, the loop has no zero-flow solution to fall into, and the solver
 # needs no guess.
 
-@named pump = Pump(; ṁ0=ṁ)
-@named hx = HeatExchanger(T_in)
-connections = [inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ p_in]
-@named loop = assembly(connections, pump, hx, cell)
-sys = mtkcompile(loop)
+@assembly sys begin
+    pump = Pump(; ṁ0=ṁ)
+    hx = HeatExchanger(T_in)
+    inseries(pump, hx, cell.ch, pump)
+    pump.outlet.p ~ p_in
+end
 sol = solve_steady(sys)
 sol.retcode
 

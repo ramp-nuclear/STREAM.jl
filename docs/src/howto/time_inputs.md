@@ -6,12 +6,15 @@ an input.
 
 ## An expression in time
 
-An equation in the connection list can use the time variable directly. This suits a boundary
+A connection can use the time variable directly. This suits a boundary
 value with a formula:
 
 ```julia
 using ModelingToolkit: t_nounits as t
-connections = [..., ch.T_wall_left .~ 60.0 + 40.0 * (1 - exp(-t / 10))]
+@assembly sys begin
+    ...
+    ch.T_wall_left .~ 60.0 + 40.0 * (1 - exp(-t / 10))
+end
 ```
 
 [Bind a wall temperature or heat flux](wall_boundary.md) runs this case.
@@ -38,16 +41,16 @@ coasting down:
 using STREAM
 using STREAM.Components: Pump, Inertia, ResistorFromKnownPoint, HeatExchanger
 using STREAM.Assemblies: inseries
-using ModelingToolkit: @named, mtkcompile
 
 head(t) = 3.0e4 * exp(-t / 5)               # coasting down with a 5 s time constant
-@named pump = Pump(head)
-@named flywheel = Inertia(2.0e4)
-@named loss = ResistorFromKnownPoint(; dp=-3.0e4, ṁ=50.0, T=40.0)
-@named hx = HeatExchanger(40.0)
-@named loop = assembly([inseries(pump, flywheel, loss, hx, pump), pump.inlet.p ~ 1.5e5],
-                       pump, flywheel, loss, hx)
-sys = mtkcompile(loop)
+@assembly sys begin
+    pump = Pump(head)
+    flywheel = Inertia(2.0e4)
+    loss = ResistorFromKnownPoint(; dp=-3.0e4, ṁ=50.0, T=40.0)
+    hx = HeatExchanger(40.0)
+    inseries(pump, flywheel, loss, hx, pump)
+    pump.inlet.p ~ 1.5e5
+end
 sol = solve_transient(sys, [sys.loss.inlet.ṁ => 50.0], 0.0:1.0:30.0)
 sol[sys.loss.inlet.ṁ, end]
 ```
@@ -62,13 +65,14 @@ a value has one type whatever the value, so make the varying quantity a captured
 
 ```@example ti
 coastdown(τ) = t -> 3.0e4 * exp(-t / τ)       # every τ gives a function of the same type
-@named pump = Pump(coastdown(5.0))
-@named flywheel = Inertia(2.0e4)
-@named loss = ResistorFromKnownPoint(; dp=-3.0e4, ṁ=50.0, T=40.0)
-@named hx = HeatExchanger(40.0)
-@named loop = assembly([inseries(pump, flywheel, loss, hx, pump), pump.inlet.p ~ 1.5e5],
-                       pump, flywheel, loss, hx)
-sys = mtkcompile(loop)
+@assembly sys begin
+    pump = Pump(coastdown(5.0))
+    flywheel = Inertia(2.0e4)
+    loss = ResistorFromKnownPoint(; dp=-3.0e4, ṁ=50.0, T=40.0)
+    hx = HeatExchanger(40.0)
+    inseries(pump, flywheel, loss, hx, pump)
+    pump.inlet.p ~ 1.5e5
+end
 map((2.0, 5.0, 20.0)) do τ
     sol = solve_transient(sys, [sys.loss.inlet.ṁ => 50.0, sys.pump.dP_pump_fn => coastdown(τ)],
                           0.0:1.0:30.0)

@@ -212,18 +212,17 @@ end
     T_inlet, T_wall_bc, h_fixed = 40.0, 100.0, 7500.0
     geom = Duct(0.6, Circular(0.01))
 
-    @named pump_u = Pump(3.0e4)
-    @named cac_u = ChannelAndContacts(;
-        n=n, geometry=geom, htc=HTC.FromFunction((Tw, Tb, m, liq, duct) -> h_fixed)
-    )
-    @named bc_u = HeatExchanger(T_inlet)
-    @named wall = ConstantTemperature(T_wall_bc; n=n)
-    conns = [
-        inseries(pump_u, bc_u, cac_u, pump_u),
-        faces((wall, :thermal) => (cac_u, :thermal_outer)),
-        pump_u.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys_u = assembly(conns, pump_u, bc_u, cac_u, wall)
+    @assembly ssys_u begin
+        pump_u = Pump(3.0e4)
+        cac_u = ChannelAndContacts(;
+     n=n, geometry=geom, htc=HTC.FromFunction((Tw, Tb, m, liq, duct) -> h_fixed)
+ )
+        bc_u = HeatExchanger(T_inlet)
+        wall = ConstantTemperature(T_wall_bc; n=n)
+        inseries(pump_u, bc_u, cac_u, pump_u)
+        faces((wall, :thermal) => (cac_u, :thermal_outer))
+        pump_u.inlet.p ~ 1.0e5
+    end
     sol_u = solve_steady(ssys_u)
 
     @test sol_u.retcode == ReturnCode.Success

@@ -76,6 +76,25 @@ foreach(println, unknowns(sys))
 # temperature in each cell and the mass flow. Everything else, the pressures, the friction,
 # the outlet temperature, follows from them, and can still be read from a solution.
 #
+# ## In one block
+#
+# [`@assembly`](@ref) does the naming, the joining and the compiling in one block, and the
+# later tutorials use it. A line that assigns a component names it after its variable, and
+# every other line is a connection. The same model:
+
+@assembly sys begin
+    pump = Pump(3.0e4)
+    hx = HeatExchanger(40.0)
+    ch = Channel(; n=10, geometry, h=5000.0)
+    inseries(pump, hx, ch, pump)
+    pump.inlet.p ~ 1.0e5
+    ch.T_wall_outer .~ 100.0
+end
+length(unknowns(sys))
+
+# A component built before the block, as all three were above, joins the model when a
+# connection uses it.
+#
 # ## Solving
 #
 # [`solve_steady`](@ref) finds the state where nothing changes in time. A loop also has a

@@ -151,16 +151,15 @@ using STREAM, CairoMakie
 using STREAM.Components: Tank, Orifice, Environment, StateMachine
 using STREAM.Assemblies: inseries
 using STREAM.LocalLoss: discharge_cd
-using ModelingToolkit: @named, mtkcompile
 
 A_t, a, h0 = 2.0, 5.0e-4, 4.0
 cd = discharge_cd(:sharp)
-@named pool = Tank(; area=A_t, L0=h0, ports=(bottom=0.0,))
-@named hole = Orifice(; area=a, cd, dp_linear=1e-3,
-                      machine=StateMachine(; initial_state=:OPEN))
-@named room = Environment()
-@named draining = assembly(inseries(pool.bottom, hole, room.port), pool, hole, room)
-sys = mtkcompile(draining)
+@assembly sys begin
+    pool = Tank(; area=A_t, L0=h0, ports=(bottom=0.0,))
+    hole = Orifice(; area=a, cd, dp_linear=1e-3, machine=StateMachine(; initial_state=:OPEN))
+    room = Environment()
+    inseries(pool.bottom, hole, room.port)
+end
 times = range(0.0, 3000.0; length=301)
 sol = solve_transient(sys, solve_steady(sys), times; overrides=[sys.pool.pinned => false])
 

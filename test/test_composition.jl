@@ -76,13 +76,12 @@ end
     rods = symmetric_plate(cac, fuel; name=:rods)
     @test rods isa ModelingToolkit.AbstractSystem
     # Add a pump loop to make it solvable
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, rods, pump, bc)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, rods.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     @test ssys isa ModelingToolkit.AbstractSystem
     # Solve briefly to verify composition produces meaningful steady state
     sol = solve_transient(ssys, range(0.0, 0.5, length=10))
@@ -93,14 +92,12 @@ end
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=4)
     rods = symmetric_plate(cac, fuel; name=:rods)
     @test rods isa ModelingToolkit.AbstractSystem
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, rods, pump, bc; name=:fullx4)
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, rods.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     @test ssys isa ModelingToolkit.AbstractSystem
     sol = solve_transient(ssys, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
@@ -110,14 +107,12 @@ end
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=3)
     rods = symmetric_plate(cac, fuel; name=:rods)
     @test rods isa ModelingToolkit.AbstractSystem
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, rods, pump, bc; name=:fullx3)
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, rods.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     @test ssys isa ModelingToolkit.AbstractSystem
     sol = solve_transient(ssys, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
@@ -143,18 +138,16 @@ end
     @named fuel = HeatDiffusion(slab; power=power_val)
     pl = plate(ch_left, ch_right, fuel; name=:pl)
     @test pl isa ModelingToolkit.AbstractSystem
-    @named pump_l = Pump(3.0e4)
-    @named bc_l = HeatExchanger(40.0)
-    @named pump_r = Pump(3.0e4)
-    @named bc_r = HeatExchanger(40.0)
-    conns = [
-        inseries(pump_l, bc_l, pl.ch_left, pump_l),
-        pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, bc_r, pl.ch_right, pump_r),
-        pump_r.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, pl, pump_l, bc_l, pump_r, bc_r; name=:dualcac)
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        pump_l = Pump(3.0e4)
+        bc_l = HeatExchanger(40.0)
+        pump_r = Pump(3.0e4)
+        bc_r = HeatExchanger(40.0)
+        inseries(pump_l, bc_l, pl.ch_left, pump_l)
+        pump_l.inlet.p ~ 1.0e5
+        inseries(pump_r, bc_r, pl.ch_right, pump_r)
+        pump_r.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     # Both fuel faces exchange heat with their own channel. thermal_left[i].Q is
@@ -200,14 +193,12 @@ function _build_osc_loop(side::Symbol, name_suffix)
                   material=Solid(2700.0, 900.0, 200.0))
     @named fuel = HeatDiffusion(slab; power=1e4)
     osc = one_sided(cac, fuel; side=side, name=Symbol(:osc_, name_suffix))
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, osc.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, osc, pump, bc; name=Symbol(:osc_full_, name_suffix))
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, osc.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     return ssys, sol, getproperty(ssys, Symbol(:osc_, name_suffix)), nz, nx
 end
@@ -274,14 +265,12 @@ end
     # One ConvectiveBoundary per axial cell on the far face (n=4).
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(scc)))
     @test count(s -> startswith(s, "scc_l_far"), sub_names) == 4
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, scc.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, scc, pump, bc; name=:scc_full_l)
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, scc.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
@@ -290,14 +279,12 @@ end
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     scc = single_channel(cac, fuel; fuel_side=:right, name=:scc_r)
     @test scc isa ModelingToolkit.AbstractSystem
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, scc.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, scc, pump, bc; name=:scc_full_r)
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, scc.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
@@ -313,14 +300,12 @@ end
                   material=Solid(2700.0, 900.0, 200.0))
     @named fuel = HeatDiffusion(slab; power=1e4)
     scc = single_channel(cac, fuel; fuel_side=:left, name=:scc_s)
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, scc.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, scc, pump, bc; name=:scc_full_s)
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, scc.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     # Far face carries heat into the convective sink (one_sided would be adiabatic here).
@@ -345,14 +330,12 @@ end
     cac2, fuel2 = _mtr_pair(; n=4, nz=4, nx=2)
     p1 = symmetric_plate(cac1, fuel1; name=:p1)
     p2 = symmetric_plate(cac2, fuel2; name=:p2)
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, p1.cac, p2.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, p1, p2, pump, bc; name=:two_plates)
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, p1.cac, p2.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     @test ssys isa ModelingToolkit.AbstractSystem
     sol = solve_transient(ssys, range(0.0, 0.2, length=5))
     @test sol.retcode == ReturnCode.Success
@@ -475,10 +458,12 @@ _fa_pair(left, right) = (left, :thermal_right) => (right, :thermal_left)
     miswired = (chain[1:3]..., (p2, :thermal_left) => (c3, :thermal_left))
     @test _fa_connections(asm) != _fa_hand(miswired, parts)
 
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump), pump.inlet.p ~ 1.0e5]
-    @mtkcompile ssys = assembly(conns, asm, pump, bc)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 end
@@ -510,10 +495,12 @@ end
     @test _fa_connections(asm) == _fa_hand(chain, (c1, c2, c3, p1, p2, p3))
 
     # The ring is the one shape with no free face, so it is compiled and solved too.
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump), pump.inlet.p ~ 1.0e5]
-    @mtkcompile ssys = assembly(conns, asm, pump, bc)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(40.0)
+        inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 end
@@ -568,17 +555,15 @@ end
     N, n = 50, 4
     geom = Duct(0.6, Circular(0.01))
     function channel_loop(; copies)
-        @named pump = Pump(3.0e4)
-        @named hx = HeatExchanger(40.0)
-        @named ch = Channel(; n=n, geometry=geom, g=0.0, h=5000.0)
-        branch = copies === nothing ? (ch,) : weighted(copies, ch; name=:core)
-        conns = [
-            inseries(pump, hx, branch..., pump),
-            pump.inlet.p ~ 1.0e5,
-            ch.T_wall_outer .~ 100.0,
-        ]
-        # The tuple weighted returns is both the path to wire and the systems to compose.
-        @mtkcompile ssys = assembly(conns, pump, hx, branch...)
+        @assembly ssys begin
+            pump = Pump(3.0e4)
+            hx = HeatExchanger(40.0)
+            ch = Channel(; n=n, geometry=geom, g=0.0, h=5000.0)
+            branch = copies === nothing ? (ch,) : weighted(copies, ch; name=:core)
+            inseries(pump, hx, branch..., pump)
+            pump.inlet.p ~ 1.0e5
+            ch.T_wall_outer .~ 100.0
+        end
         sol = solve_steady(ssys)
         @test sol.retcode == ReturnCode.Success
         return ssys, sol

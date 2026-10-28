@@ -43,7 +43,7 @@ using STREAM.Components: Pump, Inertia, ResistorFromKnownPoint, HeatExchanger, C
 using STREAM.Assemblies: inseries, inparallel, weighted, symmetric_plate
 using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
-using ModelingToolkit: @named, mtkcompile
+using ModelingToolkit: @named
 using OrdinaryDiffEq: Rodas5P
 using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using SteadyStateDiffEq: DynamicSS
@@ -115,7 +115,7 @@ source(0.0)
 # divides the flow entering the path by `N` and multiplies the flow leaving it by `N`.
 
 z_edges = range(0.0, case.L; length=case.n + 1)
-core_parts = []
+plates = []
 paths = []
 power_eqs = []
 for (key, ty) in pairs(case.types)
@@ -137,7 +137,7 @@ for (key, ty) in pairs(case.types)
     orifice = ResistorFromKnownPoint(; name=Symbol(:orifice_, key), dp=-ty.orifice_dp,
                                      ṁ=ty.design_ṁ, T=case.T_pool)
     path = weighted(ty.N, pool, orifice, rods.ch; name=key)
-    append!(core_parts, [first(path), pool, orifice, rods, last(path)])
+    push!(plates, rods)
     push!(paths, path)
     push!(power_eqs, rods.fuel.power ~ pk.P * case.P_rated * ty.power_fraction / ty.N)
 end
@@ -184,16 +184,15 @@ push!(ctrl.machine, (:NORMAL => :SCRAM, flywheel.inlet.ṁ < case.trip_fraction 
 # the core's top from the pool, to the flapper node. The flapper's path runs in parallel with
 # the primary piping. One pressure is fixed: the pool above the core.
 
-connections = [
-    inparallel(flywheel, paths, riser),
-    inparallel(flywheel, [(pool_flapper, flapper)], primary),
-    inseries(riser, primary, pump, flywheel),
-    flywheel.outlet.p ~ case.p_pool,
-    power_eqs,
-]
-@named plant = assembly(connections, pk, pump, flywheel, primary, riser, pool_flapper, flapper,
-                        core_parts...)
-sys = mtkcompile(plant)
+@assembly sys begin
+    inparallel(flywheel, paths, riser)
+    inparallel(flywheel, [(pool_flapper, flapper)], primary)
+    inseries(riser, primary, pump, flywheel)
+    flywheel.outlet.p ~ case.p_pool
+    power_eqs
+    pk      # read only inside power_eqs
+    plates  # reached only through their channels
+end
 ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 
 # ## The steady state at full power

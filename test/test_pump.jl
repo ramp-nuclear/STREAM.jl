@@ -21,13 +21,12 @@ end
     dP_scalar = 1.2e5
     @named p_real = Pump(dP_scalar)
     @test p_real isa ModelingToolkit.System
-    @named res_real = Resistor(R_val)
-    @named hx_real = HeatExchanger(40.0)
-    conns_real = [
-        inseries(p_real, hx_real, res_real, p_real),
-        p_real.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys_real = assembly(conns_real, p_real, hx_real, res_real)
+    @assembly ssys_real begin
+        res_real = Resistor(R_val)
+        hx_real = HeatExchanger(40.0)
+        inseries(p_real, hx_real, res_real, p_real)
+        p_real.inlet.p ~ 1.0e5
+    end
     sol_real = solve_steady(ssys_real)
     @test sol_real.retcode == ReturnCode.Success
     # Defining relation of scalar mode: the head equals the prescribed dP (rtol=1e-8, the
@@ -51,13 +50,12 @@ end
     dP_call = (_tt) -> dP_call_val
     @named p_fn = Pump(dP_call)
     @test p_fn isa ModelingToolkit.System
-    @named res_fn = Resistor(R_val)
-    @named hx_fn = HeatExchanger(40.0)
-    conns_fn = [
-        inseries(p_fn, hx_fn, res_fn, p_fn),
-        p_fn.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys_fn = assembly(conns_fn, p_fn, hx_fn, res_fn)
+    @assembly ssys_fn begin
+        res_fn = Resistor(R_val)
+        hx_fn = HeatExchanger(40.0)
+        inseries(p_fn, hx_fn, res_fn, p_fn)
+        p_fn.inlet.p ~ 1.0e5
+    end
     sol_fn = solve_steady(ssys_fn)
     @test sol_fn.retcode == ReturnCode.Success
     # Defining relation of callable mode: the head equals the callable's value (rtol=1e-8,
@@ -72,14 +70,12 @@ end
     ṁ_set = 0.6
     @named p_ṁ = Pump(; ṁ0=ṁ_set)
     @test p_ṁ isa ModelingToolkit.System
-    @named res_m = Resistor(R_val)
-    @named hx_m = HeatExchanger(40.0)
-    conns_m = [
-        inseries(p_ṁ, hx_m, res_m, p_ṁ),
-        p_ṁ.inlet.p ~ 1.0e5,
-    ]
-    @named sys_m = assembly(conns_m, p_ṁ, hx_m, res_m)
-    ssys_m = mtkcompile(sys_m; fully_determined=false)
+    @assembly ssys_m begin
+        res_m = Resistor(R_val)
+        hx_m = HeatExchanger(40.0)
+        inseries(p_ṁ, hx_m, res_m, p_ṁ)
+        p_ṁ.inlet.p ~ 1.0e5
+    end fully_determined=false
     sol_m = solve_steady(ssys_m)
     @test sol_m.retcode == ReturnCode.Success
     # Defining relation of fixed-flow mode: the flow is pinned to ṁ0 (rtol=1e-8, exact
@@ -116,11 +112,10 @@ end
     # Closed loop: pump -> inertia -> resistor -> heat exchanger -> pump. The heat exchanger pins
     # the loop temperature (a bare hydraulics-only loop has degenerate circular instream temps) and
     # gives solve_steady the same well-posed topology the integration coastdowns use.
-    conns = [
-        inseries(pump, ine, res, hx, pump),
-        pump.inlet.p ~ 1e5,       # pressure anchor
-    ]
-    @mtkcompile ssys = assembly(conns, pump, ine, res, hx)
+    @assembly ssys begin
+        inseries(pump, ine, res, hx, pump)
+        pump.inlet.p ~ 1e5  # pressure anchor
+    end
 
     ṁ_0 = dP0 / R_val
 

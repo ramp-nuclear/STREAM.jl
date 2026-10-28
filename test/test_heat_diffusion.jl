@@ -22,9 +22,9 @@ Compile `hd` with every face in `walls` held at a fixed temperature, the paramet
 """
 function fixed_walls(hd, walls=faces_of(hd))
     bcs = [ConstantTemperature(zeros(var_length(hd, f)); name=Symbol(f, :_T)) for f in walls]
-    @named sys = assembly([faces((bc, :thermal) => (hd, f)) for (bc, f) in zip(bcs, walls)],
-                          hd, bcs...)
-    return mtkcompile(sys)
+    @assembly sys begin
+        [faces((bc, :thermal) => (hd, f)) for (bc, f) in zip(bcs, walls)]
+    end
 end
 
 """Operating point setting the fixed wall temperatures of `ssys`, one `face => T` per wall."""

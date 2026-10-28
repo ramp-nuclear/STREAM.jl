@@ -94,17 +94,16 @@ end
                   material=Solid(2700.0, 900.0, 200.0))
     @named hd = HeatDiffusion(slab; power=1e4)
 
-    conns = [
-        inseries(pump_l, hx_l, cac_l, pump_l),
-        pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r),
-        pump_r.inlet.p ~ 1.0e5,
+    @assembly ssys begin
+        inseries(pump_l, hx_l, cac_l, pump_l)
+        pump_l.inlet.p ~ 1.0e5
+        inseries(pump_r, hx_r, cac_r, pump_r)
+        pump_r.inlet.p ~ 1.0e5
         Connect.faces(
             (hd, :thermal_left) => (cac_l, :thermal_right),
             (hd, :thermal_right) => (cac_r, :thermal_left),
-        ),
-    ]
-    @mtkcompile ssys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+        )
+    end
 
     # the gap is one shared knob across both channels and the plate
     @test count(p -> occursin("gap", string(p)), parameters(ssys)) == 1

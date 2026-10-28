@@ -20,24 +20,21 @@ return leg (`ret`) that falls the same height.
 """
 function build_loop(; n=10, dP_pump=3.0e4, T_inlet=40.0, T_wall=100.0, g_acc=0.0)
     L = 0.6
-    @named pump = Pump(dP_pump)
-    @named bc = HeatExchanger(T_inlet)
-    @named ch = Channel(; n, geometry=Duct(L, Circular(0.01)), g=g_acc, h=5000.0)
-    parts = Any[pump, bc, ch]
-    iszero(g_acc) || push!(parts, Gravity(-L, g_acc; name=:ret))
     pars, wall = [], T_wall
     if T_wall isa Function
         FType = typeof(T_wall)
         pars = @parameters (T_wall_callable::FType)(..)
         wall = pars[1](t)
     end
-    connections = [
-        inseries(parts..., pump),
-        pump.inlet.p ~ 1.0e5,
-        ch.T_wall_outer .~ wall,
-    ]
-    @named sys = assembly(connections, parts...; parameters=pars)
-    return mtkcompile(sys)
+    @assembly sys begin
+        pump = Pump(dP_pump)
+        bc = HeatExchanger(T_inlet)
+        ch = Channel(; n, geometry=Duct(L, Circular(0.01)), g=g_acc, h=5000.0)
+        ret = iszero(g_acc) ? [] : [Gravity(-L, g_acc; name=:ret)]
+        inseries(pump, bc, ch, ret..., pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_outer .~ wall
+    end parameters=pars
 end
 
 """
@@ -70,13 +67,12 @@ function build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, P0=1.0, feedback=not
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(T_inlet)
 
-    connections = [
-        inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-        Connect.temperature_feedback(pk, felt),
-        rods.fuel.power ~ pk.P * 1e4,   # the total, so a power_input reaches the plate
-    ]
-    @mtkcompile ssys = assembly(connections, rods, pk, pump, bc)
+    @assembly ssys begin
+        inseries(pump, bc, rods.cac, pump)
+        pump.inlet.p ~ 1.0e5
+        Connect.temperature_feedback(pk, felt)
+        rods.fuel.power ~ pk.P * 1e4  # the total, so a power_input reaches the plate
+    end
     # Every temperature, ports and contacts too: left at the connector default of 26.85 °C, a
     # loop with feedback would start off critical.
     return ssys, uniform(ssys, T_inlet, :T)

@@ -14,18 +14,17 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         dP_pump = 3.0e4
         geom = Duct(0.6, Circular(0.01))
 
-        @named pump = Pump(dP_pump)
-        @named cac = ChannelAndContacts(
-            n=n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=8.235)
-        )
-        @named bc = HeatExchanger(T_inlet)
-        @named wall = ConstantTemperature(T_wall; n=n)
-        conns = [
-            inseries(pump, bc, cac, pump),
-            faces((wall, :thermal) => (cac, :thermal_outer)),
-            pump.inlet.p ~ 1.0e5,
-        ]
-        @mtkcompile ssys = assembly(conns, pump, bc, cac, wall)
+        @assembly ssys begin
+            pump = Pump(dP_pump)
+            cac = ChannelAndContacts(
+                n=n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=8.235)
+            )
+            bc = HeatExchanger(T_inlet)
+            wall = ConstantTemperature(T_wall; n=n)
+            inseries(pump, bc, cac, pump)
+            faces((wall, :thermal) => (cac, :thermal_outer))
+            pump.inlet.p ~ 1.0e5
+        end
         sol = solve_steady(ssys)
 
         @test sol.retcode == ReturnCode.Success
@@ -38,25 +37,24 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         T_wall = 100.0
         geom = Duct(0.6, Rectangular(0.07, 0.00127))
 
-        @named pump = Pump(30.0)
-        @named cac = ChannelAndContacts(
-            n=n,
-            geometry=geom,
-            htc=HTC.ConstantNusselt(; Nu=8.235),
-            darcy=Friction.RectangularLaminar(),
-        )
-        @named bc = HeatExchanger(T_inlet)
-        @named ct_l = ConstantTemperature(T_wall; n=n)
-        @named ct_r = ConstantTemperature(T_wall; n=n)
-        conns = [
-            inseries(pump, bc, cac, pump),
+        @assembly ssys begin
+            pump = Pump(30.0)
+            cac = ChannelAndContacts(
+                n=n,
+                geometry=geom,
+                htc=HTC.ConstantNusselt(; Nu=8.235),
+                darcy=Friction.RectangularLaminar(),
+            )
+            bc = HeatExchanger(T_inlet)
+            ct_l = ConstantTemperature(T_wall; n=n)
+            ct_r = ConstantTemperature(T_wall; n=n)
+            inseries(pump, bc, cac, pump)
             faces(
                 (ct_l, :thermal) => (cac, :thermal_left),
                 (ct_r, :thermal) => (cac, :thermal_right),
-            ),
-            pump.inlet.p ~ 1.0e5,
-        ]
-        @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l, ct_r)
+            )
+            pump.inlet.p ~ 1.0e5
+        end
         sol = solve_steady(ssys)
 
         @test sol.retcode == ReturnCode.Success
@@ -108,17 +106,16 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         dP_lam = 30.0
         dP_turb = 3.0e4
 
-        @named pump = Pump(dP_lam)
-        @named cac = ChannelAndContacts(n=n, geometry=geom, htc=htc_rd, darcy=friction_rd)
-        @named bc = HeatExchanger(T_inlet)
-        @named ct_l = ConstantTemperature(T_wall; n=n)
-        @named ct_r = ConstantTemperature(T_wall; n=n)
-        conns = [
-            inseries(pump, bc, cac, pump),
-            faces((ct_l, :thermal) => (cac, :thermal_left), (ct_r, :thermal) => (cac, :thermal_right)),
-            pump.inlet.p ~ 1.0e5,
-        ]
-        @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l, ct_r)
+        @assembly ssys begin
+            pump = Pump(dP_lam)
+            cac = ChannelAndContacts(n=n, geometry=geom, htc=htc_rd, darcy=friction_rd)
+            bc = HeatExchanger(T_inlet)
+            ct_l = ConstantTemperature(T_wall; n=n)
+            ct_r = ConstantTemperature(T_wall; n=n)
+            inseries(pump, bc, cac, pump)
+            faces((ct_l, :thermal) => (cac, :thermal_left), (ct_r, :thermal) => (cac, :thermal_right))
+            pump.inlet.p ~ 1.0e5
+        end
         sol_lam = solve_steady(ssys)
         sol_turb = solve_steady(ssys, [ssys.pump.dP_pump => dP_turb])
         @test sol_lam.retcode == ReturnCode.Success

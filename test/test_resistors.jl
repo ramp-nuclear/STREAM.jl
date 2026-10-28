@@ -25,20 +25,19 @@ using STREAM.Components
     ṁ = dP / (5 / 6 * R)
     @test sol[ssys.pump.inlet.ṁ] ≈ ṁ rtol = 1e-6
     share(e) = 0 in e || 7 in e ? 1 / 3 : 1 / 6
-    @test [sol[getproperty(ssys, Symbol(:r, e...)).inlet.ṁ] for e in edges] ≈ ṁ .* share.(edges) rtol = 1e-6
+    @test [sol[r[e].inlet.ṁ] for e in edges] ≈ ṁ .* share.(edges) rtol = 1e-6
 end
 
 @testset "VolumetricFlowResistor — quadratic drop dP = k*ṁ^2 (rho=1)" begin
     dP = 3.0e4
     k = 1.0e5
-    @named pump = Pump(dP)
-    @named hx = HeatExchanger(26.85)
-    @named vfr = VolumetricFlowResistor(; k=k, density=1.0)
-    conns = [
-        inseries(pump, hx, vfr, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, vfr)
+    @assembly ssys begin
+        pump = Pump(dP)
+        hx = HeatExchanger(26.85)
+        vfr = VolumetricFlowResistor(; k=k, density=1.0)
+        inseries(pump, hx, vfr, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     ṁ = sol[ssys.vfr.inlet.ṁ]
@@ -53,14 +52,13 @@ end
     dP = 1.0e4
     k = 5.0e4
     klow = 2.0e3
-    @named pump = Pump(dP)
-    @named hx = HeatExchanger(26.85)
-    @named vfr = VolumetricFlowResistor(; k=k, klow=klow, density=1.0)
-    conns = [
-        inseries(pump, hx, vfr, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, vfr)
+    @assembly ssys begin
+        pump = Pump(dP)
+        hx = HeatExchanger(26.85)
+        vfr = VolumetricFlowResistor(; k=k, klow=klow, density=1.0)
+        inseries(pump, hx, vfr, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     q = sol[ssys.vfr.inlet.ṁ]                         # rho=1 ⇒ Q = ṁ
@@ -88,14 +86,13 @@ end
     k0 = 1.0e5        # Pa*s^2/kg^2 at t=0 (density=1 -> Q = ṁ)
     kfn = tt -> k0 * (1.0 + tt)
 
-    @named pump = Pump(dP_head)
-    @named hx = HeatExchanger(26.85)
-    @named vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
-    conns = [
-        inseries(pump, hx, vfr, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, vfr)
+    @assembly ssys begin
+        pump = Pump(dP_head)
+        hx = HeatExchanger(26.85)
+        vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
+        inseries(pump, hx, vfr, pump)
+        pump.inlet.p ~ 1.0e5
+    end
 
     # The loop is purely algebraic in flow (no inertia), so the flow tracks the instantaneous
     # k(t): at each t, k(t)*Q*|Q| = dP_head. Solve the steady balance at t=0, then integrate
@@ -135,14 +132,13 @@ end
     A1, A2 = 1.0, 2.0
     Tin = 20.0
     ṁ = 3.0
-    @named pump = Pump(; ṁ0=ṁ)        # fixed-flow so ṁ is exact
-    @named hx = HeatExchanger(Tin)
-    @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
-    conns = [
-        inseries(pump, hx, lpd, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, lpd)
+    @assembly ssys begin
+        pump = Pump(; ṁ0=ṁ)        # fixed-flow so ṁ is exact
+        hx = HeatExchanger(Tin)
+        lpd = LocalPressureDrop(; A1=A1, A2=A2)
+        inseries(pump, hx, lpd, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     A = min(A1, A2)
@@ -159,8 +155,10 @@ end
         @named pump = Pump(head)
         @named hx = HeatExchanger(T)
         r = make_resistor(:r)
-        conns = [inseries(pump, hx, r, pump), pump.inlet.p ~ 1.0e5]
-        @mtkcompile ssys = assembly(conns, pump, hx, r)
+        @assembly ssys begin
+            inseries(pump, hx, r, pump)
+            pump.inlet.p ~ 1.0e5
+        end
         sol = solve_steady(ssys)
         @test sol.retcode == ReturnCode.Success
         return sol[ssys.r.inlet.ṁ]

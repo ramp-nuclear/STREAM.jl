@@ -12,22 +12,20 @@ using STREAM.LocalLoss
 
 # A closed flapper blocks all flow, so it sits in PARALLEL with a bypass resistor that
 # carries the loop flow while the valve is shut.
-function _flapper_parallel_loop(; flapper, pump, name)
-    @named bypass = Resistor(1.0e5)
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inparallel(pump, (bypass, flapper), hx),
-        inseries(hx, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    return assembly(conns, pump, bypass, flapper, hx; name=name), bypass
+function _flapper_parallel_loop(; flapper, pump)
+    @assembly loop begin
+        bypass = Resistor(1.0e5)
+        hx = HeatExchanger(26.85)
+        inparallel(pump, (bypass, flapper), hx)
+        inseries(hx, pump)
+        pump.inlet.p ~ 1.0e5
+    end
 end
 
 @testset "Flapper closed admits no flow" begin
     @named pump = Pump(3.0e4)
     @named flapper = Flapper(; f=1.0, area=1.0, open_rate=1.0, liquid=Liquid())
-    sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_closed)
-    ssys = mtkcompile(sys)
+    ssys = _flapper_parallel_loop(; flapper=flapper, pump=pump)
     # A fresh machine stays :CLOSED, so the valve never opens.
     sol = solve_transient(ssys, range(0.0, 5.0; length=20))
     @test sol.retcode == ReturnCode.Success
@@ -41,8 +39,7 @@ end
     @named pump = Pump(3.0e4)
     @named flapper = Flapper(; f=f, area=area, open_rate=10.0,
                              machine=StateMachine(; initial_state=:OPEN), liquid=Liquid())
-    sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_open)
-    ssys = mtkcompile(sys)
+    ssys = _flapper_parallel_loop(; flapper=flapper, pump=pump)
     # The machine starts :OPEN at t = 0, and the run goes past the 1/open_rate ramp.
     sol = solve_transient(ssys, range(0.0, 1.0; length=20))
     @test sol.retcode == ReturnCode.Success
@@ -90,8 +87,7 @@ end
     push!(machine, (:OPEN => :CLOSED, t > 0.5, "close at 0.5 s"))
     @named pump = Pump(3.0e4)
     @named flapper = Flapper(; open_rate=10.0, machine=machine, liquid=Liquid())
-    sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_shuts)
-    ssys = mtkcompile(sys)
+    ssys = _flapper_parallel_loop(; flapper=flapper, pump=pump)
     sol = solve_transient(ssys, range(0.0, 1.0; length=101);
                           callbacks=machine_callbacks(ssys, machine))
     @test sol.retcode == ReturnCode.Success
@@ -111,23 +107,20 @@ end
     # it crosses a threshold ṁ₀ at 5·ln(1/ṁ₀). The threshold is a parameter of the model, so
     # a second threshold needs no recompile, only a reset of the latched machine.
     @parameters ṁ_open_at = 0.01
-    @named pump = Pump(1.0e5)
-    @named ine = Inertia(5.0e5)
-    @named res = Resistor(1.0e5)
     machine = StateMachine(; initial_state=:CLOSED)
-    @named flapper = Flapper(; f=1.0e6, area=1.0, open_rate=1.0 / 3.0, machine=machine,
-                             liquid=Liquid())
+    @assembly ssys begin
+        pump = Pump(1.0e5)
+        ine = Inertia(5.0e5)
+        res = Resistor(1.0e5)
+        flapper = Flapper(; f=1.0e6, area=1.0, open_rate=1.0 / 3.0, machine=machine,
+                          liquid=Liquid())
+        hx = HeatExchanger(26.85)
+        inseries(pump, ine)
+        inparallel(ine, (res, flapper), hx)
+        inseries(hx, pump)
+        pump.inlet.p ~ 1.0e5
+    end parameters=[ṁ_open_at]
     push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < ṁ_open_at))
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inseries(pump, ine),
-        inparallel(ine, (res, flapper), hx),
-        inseries(hx, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    sys = assembly(conns, pump, ine, res, flapper, hx;
-                   parameters=[ṁ_open_at], name=:flap_param)
-    ssys = mtkcompile(sys)
     sol_ss = solve_steady(ssys)
     coast(threshold) = solve_transient(
         ssys, sol_ss, range(0.0, 30.0; length=301);
@@ -148,8 +141,7 @@ end
 @testset "solve_transient passes user callbacks" begin
     @named pump = Pump(1.0e5)
     @named flapper = Flapper(; liquid=Liquid())
-    sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_cb)
-    ssys = mtkcompile(sys)
+    ssys = _flapper_parallel_loop(; flapper=flapper, pump=pump)
     fired = Ref(false)
     user_cb = ContinuousCallback((u, t_val, integ) -> t_val - 5.0, integ -> (fired[] = true))
     sol = solve_transient(ssys, range(0.0, 20.0; length=200); callbacks=CallbackSet(user_cb))
@@ -162,11 +154,11 @@ const CD_SHARP = discharge_cd(:sharp)
 
 """An orifice between two ambients `dp` apart, compiled."""
 function _orifice_between_ambients(orifice; dp=2e4)
-    @named upstream = Environment(; p=ATM + dp, T=T_POOL)
-    @named downstream = Environment()
-    @named sys = assembly(inseries(upstream.port, orifice, downstream.port),
-                          upstream, orifice, downstream)
-    return mtkcompile(sys)
+    @assembly sys begin
+        upstream = Environment(; p=ATM + dp, T=T_POOL)
+        downstream = Environment()
+        inseries(upstream.port, orifice, downstream.port)
+    end
 end
 
 """Saved times fine over the opening ramp, then spread over the drain."""
@@ -182,22 +174,22 @@ to `solve_transient`.
 """
 function _siphon(; T0=T_POOL, breaker=nothing, open_rate=10.0, kwargs...)
     z_intake, z_crest, z_outlet = 1.5, 5.0, -3.0
-    @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(intake=z_intake,), T0=T0)
     line = StateMachine(; initial_state=:OPEN, initial_time=0.0)
-    @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP, cc=CD_SHARP, dp_linear=1e-3,
-                            open_rate=open_rate, machine=line)
+    @assembly ssys begin
+        pool = Tank(; area=A_TANK, L0=L_POOL, ports=(intake=z_intake,), T0=T0)
+        breach = Orifice(; area=A_HOLE, cd=CD_SHARP, cc=CD_SHARP, dp_linear=1e-3,
+                         open_rate=open_rate, machine=line)
+        climb = Gravity(z_crest - z_intake)
+        fall = Gravity(z_outlet - z_crest)
+        ambient = Environment(; T=T0)
+        inseries(pool.intake, climb, breach, fall, ambient.port)
+    end
     breaker === nothing ||
         push!(line, (:OPEN => :SHUT, pool.L < breaker, "siphon breaker"))
-    @named climb = Gravity(z_crest - z_intake)
-    @named fall = Gravity(z_outlet - z_crest)
-    @named ambient = Environment(; T=T0)
-    @named sys = assembly(inseries(pool.intake, climb, breach, fall, ambient.port),
-                          pool, climb, breach, fall, ambient)
     watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))
     push!(watch, (:INTACT => :UNCOVERED, pool.L < 0.2, "uncovered"))
     throat = StateMachine(; initial_state=:LIQUID)
     push!(throat, (:LIQUID => :FLASHING, breach.subcooling < 0, "crest at saturation"))
-    ssys = mtkcompile(sys)
     sol = solve_transient(ssys, solve_steady(ssys), _opening_grid(3500.0);
                           overrides=[ssys.pool.pinned => false],
                           callbacks=machine_callbacks(ssys, line, watch, throat), kwargs...)
@@ -232,15 +224,14 @@ end
         upper = StateMachine(; initial_state=:OPEN, initial_time=0.0)
         @named high = Orifice(; area=area, cd=CD_SHARP, dp_linear=100.0, machine=upper)
         push!(upper, (:OPEN => :SHUT, pool.L < z_high, "surface below the upper break"))
-        @named low = Orifice(; area=area, cd=CD_SHARP, dp_linear=100.0,
-                             machine=StateMachine(; initial_state=:OPEN, initial_time=0.0))
-        @named ambient_high = Environment()
-        @named ambient_low = Environment()
-        conns = [
-            inseries(pool.high, high, ambient_high.port),
-            inseries(pool.low, low, ambient_low.port),
-        ]
-        @mtkcompile ssys = assembly(conns, pool, high, low, ambient_high, ambient_low)
+        @assembly ssys begin
+            low = Orifice(; area=area, cd=CD_SHARP, dp_linear=100.0,
+                          machine=StateMachine(; initial_state=:OPEN, initial_time=0.0))
+            ambient_high = Environment()
+            ambient_low = Environment()
+            inseries(pool.high, high, ambient_high.port)
+            inseries(pool.low, low, ambient_low.port)
+        end
         sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 700.0; length=301);
                               overrides=[ssys.pool.pinned => false],
                               callbacks=machine_callbacks(ssys, upper))
@@ -319,26 +310,26 @@ drives 1 kg/s through the intact loop and, from `t = 0`, its head decays with ti
 function _drain_pool(; break_at=:bottom, t_break=0.0, coast=Inf)
     R_core, R_suction = 5e3, 2e3
     dp0 = break_at === :suction ? R_core + R_suction : R_core
-    @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(suction=0.0, inflow=0.0), T0=T_POOL)
-    @named core = Resistor(R_core)
-    @named pump = Pump(_Coastdown(dp0, coast))
-    @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP, dp_linear=1e-3,
-                            machine=StateMachine(; initial_state=:OPEN, initial_time=t_break))
-    @named ambient = Environment(; T=T_POOL)
-    parts = Any[pool, core, pump, breach, ambient]
-    connections = if break_at === :bottom
-        [inseries(pool.suction, core), connect(core.outlet, pump.inlet, breach.inlet),
-         inseries(pump, pool.inflow)]
-    else
-        @named suction_line = Resistor(R_suction)
-        push!(parts, suction_line)
-        [inseries(pool.suction, suction_line),
-         connect(suction_line.outlet, pump.inlet, breach.inlet), inseries(pump, core, pool.inflow)]
+    @assembly ssys begin
+        pool = Tank(; area=A_TANK, L0=L_POOL, ports=(suction=0.0, inflow=0.0), T0=T_POOL)
+        core = Resistor(R_core)
+        pump = Pump(_Coastdown(dp0, coast))
+        breach = Orifice(; area=A_HOLE, cd=CD_SHARP, dp_linear=1e-3,
+                         machine=StateMachine(; initial_state=:OPEN, initial_time=t_break))
+        ambient = Environment(; T=T_POOL)
+        if break_at === :bottom
+            [inseries(pool.suction, core), connect(core.outlet, pump.inlet, breach.inlet),
+             inseries(pump, pool.inflow)]
+        else
+            @named suction_line = Resistor(R_suction)
+            [inseries(pool.suction, suction_line),
+             connect(suction_line.outlet, pump.inlet, breach.inlet),
+             inseries(pump, core, pool.inflow)]
+        end
+        inseries(breach, ambient.port)
     end
-    @named sys = assembly([connections; inseries(breach, ambient.port)], parts...)
     watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))
     push!(watch, (:INTACT => :UNCOVERED, pool.L < 1.0, "core uncovered"))
-    ssys = mtkcompile(sys)
 
     sol_ss = solve_steady(ssys)
     # Fine over the break's opening ramp, then spread to the end.
@@ -398,24 +389,23 @@ end
     darcy = Friction.RegimeDependent(; turbulent=Friction.blasius)
     machine = StateMachine(; initial_state=:CLOSED)
 
-    @named pump = Pump(head(t_trip))
-    @named ine = Inertia(1.75e5)
-    @named hx = HeatExchanger(T_in)
-    @named ext_res = Resistor(1.0e6)
-    @named ch = ChannelAndContacts(; n, geometry=geom, g=-G_EARTH, htc, darcy)
-    @named ret = Channel(; n, geometry=geom, g=G_EARTH)
-    @named flapper = Flapper(; machine, f=50.0, area=0.01, open_rate=1 / 5.0)
-    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))
     slab = Slab(; x=range(0, 0.005, 3), z=range(0, L, n + 1), y=0.07,
                 material=Solid(19300.0, 116.0, 174.0))
-    @named fuel = HeatDiffusion(slab; power)
-    @named heated = assembly(faces((ch, :thermal_outer) => (fuel, :thermal_right)), ch, fuel)
-    connections = [
-        inseries(ext_res, hx, pump, ine),
-        inparallel(ine, ((heated.ch, ret), flapper), ext_res),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(connections, heated, pump, ine, hx, ret, flapper, ext_res)
+    @assembly ssys begin
+        pump = Pump(head(t_trip))
+        ine = Inertia(1.75e5)
+        hx = HeatExchanger(T_in)
+        ext_res = Resistor(1.0e6)
+        ch = ChannelAndContacts(; n, geometry=geom, g=-G_EARTH, htc, darcy)
+        ret = Channel(; n, geometry=geom, g=G_EARTH)
+        flapper = Flapper(; machine, f=50.0, area=0.01, open_rate=1 / 5.0)
+        fuel = HeatDiffusion(slab; power)
+        heated = assembly(faces((ch, :thermal_outer) => (fuel, :thermal_right)), ch, fuel)
+        inseries(ext_res, hx, pump, ine)
+        inparallel(ine, ((heated.ch, ret), flapper), ext_res)
+        pump.inlet.p ~ 1.0e5
+    end
+    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))
     C = ssys.heated.ch
 
     # Pump on, flapper shut, integrated to steady. The flows start from their guesses.

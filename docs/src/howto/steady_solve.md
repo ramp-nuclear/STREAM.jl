@@ -7,16 +7,18 @@ guess. Most failures come from the guess.
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, Channel
 using STREAM.Assemblies: inseries
-using ModelingToolkit: @named, mtkcompile, unknowns
+using ModelingToolkit: unknowns
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
 
-@named pump = Pump(3.0e4)
-@named hx = HeatExchanger(40.0)
-@named ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
-connections = [inseries(pump, hx, ch, pump), pump.inlet.p ~ 1.0e5, ch.T_wall_outer .~ 100.0]
-@named loop = assembly(connections, pump, hx, ch)
-sys = mtkcompile(loop)
+@assembly sys begin
+    pump = Pump(3.0e4)
+    hx = HeatExchanger(40.0)
+    ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
+    inseries(pump, hx, ch, pump)
+    pump.inlet.p ~ 1.0e5
+    ch.T_wall_outer .~ 100.0
+end
 nothing # hide
 ```
 

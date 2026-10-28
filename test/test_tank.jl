@@ -139,10 +139,12 @@ end
 
     @testset "two tanks joined at the bottom settle at one level" begin
         A_wide, A_narrow, L_wide, L_narrow, R = 2.0, 1.0, 4.0, 1.0, 1500.0
-        @named wide = Tank(; area=A_wide, L0=L_wide, ports=(bottom=0.0,), T0=T_POOL)
-        @named narrow = Tank(; area=A_narrow, L0=L_narrow, ports=(bottom=0.0,), T0=T_POOL)
-        @named pipe = Resistor(R)
-        @mtkcompile ssys = assembly(inseries(wide.bottom, pipe, narrow.bottom), wide, pipe, narrow)
+        @assembly ssys begin
+            wide = Tank(; area=A_wide, L0=L_wide, ports=(bottom=0.0,), T0=T_POOL)
+            narrow = Tank(; area=A_narrow, L0=L_narrow, ports=(bottom=0.0,), T0=T_POOL)
+            pipe = Resistor(R)
+            inseries(wide.bottom, pipe, narrow.bottom)
+        end
         sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 1000.0; length=201);
                               overrides=[ssys.wide.pinned => false, ssys.narrow.pinned => false])
         L_w, L_n = sol[ssys.wide.L], sol[ssys.narrow.L]
@@ -163,19 +165,18 @@ end
         # A small surface so the level settles within the run: its time constant is
         # 2·ρ·A·L/ṁ ≈ 450 s.
         m_in, T_hot, area, t_end = 2.0, 40.0, 0.2, 5000.0
-        @named pool = Tank(; area=area, L0=L_POOL, ports=(bottom=0.0, feed=0.0), T0=T_POOL,
-                           fixed_temperature=false)
-        @named supply = Environment(; T=T_POOL)
-        @named feed = Pump(; ṁ0=m_in)
-        @named heater = HeatExchanger(T_POOL)
-        @named drain = Orifice(; area=A_HOLE, cd=CD_SHARP, dp_linear=1e-3, open_rate=1.0,
-                               machine=StateMachine(; initial_state=:OPEN, initial_time=0.0))
-        @named ambient = Environment()
-        conns = [
-            inseries(supply.port, feed, heater, pool.feed),
-            inseries(pool.bottom, drain, ambient.port),
-        ]
-        @mtkcompile ssys = assembly(conns, pool, supply, feed, heater, drain, ambient)
+        @assembly ssys begin
+            pool = Tank(; area=area, L0=L_POOL, ports=(bottom=0.0, feed=0.0), T0=T_POOL,
+                        fixed_temperature=false)
+            supply = Environment(; T=T_POOL)
+            feed = Pump(; ṁ0=m_in)
+            heater = HeatExchanger(T_POOL)
+            drain = Orifice(; area=A_HOLE, cd=CD_SHARP, dp_linear=1e-3, open_rate=1.0,
+                            machine=StateMachine(; initial_state=:OPEN, initial_time=0.0))
+            ambient = Environment()
+            inseries(supply.port, feed, heater, pool.feed)
+            inseries(pool.bottom, drain, ambient.port)
+        end
         # The pinned pool settles at the feed temperature. The run turns the heater up.
         sol_ss = solve_steady(ssys)
         @test sol_ss[ssys.pool.T] ≈ T_POOL

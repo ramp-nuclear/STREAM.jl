@@ -28,15 +28,14 @@ _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys))
 
 @testset "Channel with no h and no wall temperature gradient outputs the inlet" begin
     n = N_DEFAULT
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named ch = Channel(; n=n, geometry=geom)
-    connections = [
-        inseries(pump, bc, ch, pump),
-        pump.inlet.p ~ 1.0e5,
-        ch.T_wall_outer .~ T_INLET,
-    ]
-    @mtkcompile ssys = assembly(connections, pump, bc, ch)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        ch = Channel(; n=n, geometry=geom)
+        inseries(pump, bc, ch, pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_outer .~ T_INLET
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     # T_out ≈ T_inlet — no heating
@@ -45,14 +44,14 @@ end
 
 @testset "ChannelHeatFlux with zero q outputs the inlet" begin
     n = N_DEFAULT
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named chf = ChannelHeatFlux(; n=n, geometry=geom)
-    connections = [
-        inseries(pump, bc, chf, pump),
-        pump.inlet.p ~ 1.0e5, chf.q_outer .~ 0.0,
-    ]
-    @mtkcompile ssys = assembly(connections, pump, bc, chf)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        chf = ChannelHeatFlux(; n=n, geometry=geom)
+        inseries(pump, bc, chf, pump)
+        pump.inlet.p ~ 1.0e5
+        chf.q_outer .~ 0.0
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.chf.T_out], T_INLET; rtol=1e-5)
@@ -60,16 +59,14 @@ end
 
 @testset "Channel heated with higher wall than inlet increases temperature" begin
     n = N_DEFAULT
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named ch = Channel(; n=n, geometry=geom,
-                          h=H_DEFAULT)
-    connections = [
-        inseries(pump, bc, ch, pump),
-        pump.inlet.p ~ 1.0e5,
-        ch.T_wall_outer .~ T_WALL,
-    ]
-    @mtkcompile ssys = assembly(connections, pump, bc, ch)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        ch = Channel(; n=n, geometry=geom, h=H_DEFAULT)
+        inseries(pump, bc, ch, pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_outer .~ T_WALL
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_INLET
@@ -83,15 +80,14 @@ end
     n = N_DEFAULT
     dz = L_DEFAULT / n
     expected = Q_FLUX_DEFAULT * geom.heated.outer * dz
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named chf = ChannelHeatFlux(; n=n, geometry=geom)
-    connections = [
-        inseries(pump, bc, chf, pump),
-        pump.inlet.p ~ 1.0e5,
-        chf.q_outer .~ Q_FLUX_DEFAULT,
-    ]
-    @mtkcompile ssys = assembly(connections, pump, bc, chf)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        chf = ChannelHeatFlux(; n=n, geometry=geom)
+        inseries(pump, bc, chf, pump)
+        pump.inlet.p ~ 1.0e5
+        chf.q_outer .~ Q_FLUX_DEFAULT
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.chf.T_out] > T_INLET
@@ -107,14 +103,14 @@ end
     ṁ = 0.5
     q = Q_FLUX_DEFAULT
     liquid = Liquid(; cₚ=cp_mock)
-    @named pump = Pump(; ṁ0=ṁ)        # fixed-flow (current source), so ṁ is exact
-    @named bc = HeatExchanger(T_INLET)
-    @named chf = ChannelHeatFlux(; n=n, geometry=geom, liquid=liquid)
-    connections = [
-        inseries(pump, bc, chf, pump),
-        pump.inlet.p ~ 1.0e5, chf.q_outer .~ q,
-    ]
-    @mtkcompile ssys = assembly(connections, pump, bc, chf)
+    @assembly ssys begin
+        pump = Pump(; ṁ0=ṁ)        # fixed-flow (current source), so ṁ is exact
+        bc = HeatExchanger(T_INLET)
+        chf = ChannelHeatFlux(; n=n, geometry=geom, liquid=liquid)
+        inseries(pump, bc, chf, pump)
+        pump.inlet.p ~ 1.0e5
+        chf.q_outer .~ q
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     dT = q * geom.heated.outer * dz / (ṁ * cp_mock)
@@ -128,15 +124,14 @@ end
 @testset "Channel wall bound to a parameter changes without recompiling" begin
     n = N_DEFAULT
     @parameters T_w = T_WALL
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named ch = Channel(; n=n, geometry=geom, h=H_DEFAULT)
-    connections = [
-        inseries(pump, bc, ch, pump),
-        pump.inlet.p ~ 1.0e5,
-        ch.T_wall_outer .~ T_w,
-    ]
-    @mtkcompile ssys = assembly(connections, pump, bc, ch)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        ch = Channel(; n=n, geometry=geom, h=H_DEFAULT)
+        inseries(pump, bc, ch, pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_outer .~ T_w
+    end
     sol = solve_steady(ssys)
     hot = solve_steady(ssys, [T_w => T_WALL + 50.0])
     @test sol.retcode == ReturnCode.Success
@@ -148,27 +143,23 @@ end
 
 @testset "Channel h::Real (broadcast) same as constant vector" begin
     n = N_DEFAULT
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named ch = Channel(; n=n, geometry=geom,
-                          h=H_DEFAULT)
-    conns = [
-        inseries(pump, bc, ch, pump),
-        pump.inlet.p ~ 1.0e5,
-        ch.T_wall_outer .~ T_WALL,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, bc, ch)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        ch = Channel(; n=n, geometry=geom, h=H_DEFAULT)
+        inseries(pump, bc, ch, pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_outer .~ T_WALL
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
-    @named ch2 = Channel(; n=n, geometry=geom,
-                           h=collect([H_DEFAULT for i in 1:n]))
-    conns = [
-        inseries(pump, bc, ch2, pump),
-        pump.inlet.p ~ 1.0e5,
-        ch2.T_wall_outer .~ T_WALL,
-    ]
-    @mtkcompile ssys2 = assembly(conns, pump, bc, ch2)
+    @assembly ssys2 begin
+        ch2 = Channel(; n=n, geometry=geom, h=collect([H_DEFAULT for i in 1:n]))
+        inseries(pump, bc, ch2, pump)
+        pump.inlet.p ~ 1.0e5
+        ch2.T_wall_outer .~ T_WALL
+    end
     sol2 = solve_steady(ssys2)
     @test sol2.retcode == ReturnCode.Success
     @test all(isapprox.(sol2[ssys2.ch2.T], sol[ssys.ch.T], rtol=1e-6))
@@ -179,25 +170,21 @@ end
 @testset "Channel h:: constant Function same as constant" begin
     n = N_DEFAULT
     h_fn(t) = H_DEFAULT
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named ch = Channel(; n=n, geometry=geom,
-                          h=h_fn)
-    conns = [
-        inseries(pump, bc, ch, pump),
-        pump.inlet.p ~ 1.0e5,
-        ch.T_wall_outer .~ T_WALL,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, bc, ch)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        ch = Channel(; n=n, geometry=geom, h=h_fn)
+        inseries(pump, bc, ch, pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_outer .~ T_WALL
+    end
     sol = solve_steady(ssys)
-    @named ch2 = Channel(; n=n, geometry=geom,
-                           h=H_DEFAULT)
-    conns = [
-        inseries(pump, bc, ch2, pump),
-        pump.inlet.p ~ 1.0e5,
-        ch2.T_wall_outer .~ T_WALL,
-    ]
-    @mtkcompile ssys2 = assembly(conns, pump, bc, ch2)
+    @assembly ssys2 begin
+        ch2 = Channel(; n=n, geometry=geom, h=H_DEFAULT)
+        inseries(pump, bc, ch2, pump)
+        pump.inlet.p ~ 1.0e5
+        ch2.T_wall_outer .~ T_WALL
+    end
     sol2 = solve_steady(ssys2)
     @test sol.retcode == ReturnCode.Success
     @test all(isapprox.(sol2[ssys2.ch2.T], sol[ssys.ch.T], rtol=1e-6))
@@ -206,22 +193,20 @@ end
 
 @testset "CAC with HTC.DittusBoelter solves a transient without crashing" begin
     n = N_DEFAULT
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                     htc=HTC.DittusBoelter(),
-                                     darcy=Friction.Blasius())
-    # Pin each cell's left thermal port T to T_WALL via per-cell ConstantTemperature.
-    @named ct_l = ConstantTemperature(T_WALL; n=n)
-    conns = [
-        inseries(pump, bc, cac, pump),
-        pump.inlet.p ~ 1.0e5,
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        cac = ChannelAndContacts(; n=n, geometry=geom,
+                                  htc=HTC.DittusBoelter(),
+                                  darcy=Friction.Blasius())
+        # Pin each cell's left thermal port T to T_WALL via per-cell ConstantTemperature.
+        ct_l = ConstantTemperature(T_WALL; n=n)
+        inseries(pump, bc, cac, pump)
+        pump.inlet.p ~ 1.0e5
         faces(
             (ct_l, :thermal) => (cac, :thermal_outer),
-        ),
-    ]
-    @named sys = assembly(conns, pump, bc, cac, ct_l)
-    ssys = mtkcompile(sys; fully_determined=false)
+        )
+    end fully_determined=false
     sol = solve_transient(ssys, range(0.0, 1.0, length=50))
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.cac.T_out, end] > T_INLET
@@ -238,20 +223,19 @@ end
     function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
         htc = scb_correction === nothing ? HTC.DittusBoelter() :
               HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_correction)
-        @named pump = Pump(dP_pump_iscb)
-        @named cac = ChannelAndContacts(
-            n=n, geometry=Duct(L_ch, Circular(D_ch)), htc=htc
-        )
-        @named bc = HeatExchanger(T_inlet_iscb)
-        @named ct_l = ConstantTemperature(T_wall_bc; n=n)
-        conns = [
-            inseries(pump, bc, cac, pump),
+        @assembly ssys begin
+            pump = Pump(dP_pump_iscb)
+            cac = ChannelAndContacts(
+                n=n, geometry=Duct(L_ch, Circular(D_ch)), htc=htc
+            )
+            bc = HeatExchanger(T_inlet_iscb)
+            ct_l = ConstantTemperature(T_wall_bc; n=n)
+            inseries(pump, bc, cac, pump)
             faces(
                 (ct_l, :thermal) => (cac, :thermal_outer),
-            ),
-            pump.inlet.p ~ 2e5,
-        ]
-        @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l)
+            )
+            pump.inlet.p ~ 2e5
+        end
         sol = solve_steady(ssys)
         return ssys, sol
     end
@@ -277,10 +261,13 @@ end
     @test !hasproperty(ch, :T_wall_right)
     @test_throws ArgumentError Channel(; name=:bad, n=3, geometry=rect, h=(right=H_DEFAULT,))
 
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    conns = [inseries(pump, bc, ch, pump), pump.inlet.p ~ 1.0e5, ch.T_wall_left .~ T_WALL]
-    @mtkcompile ssys = assembly(conns, pump, bc, ch)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        inseries(pump, bc, ch, pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_left .~ T_WALL
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_INLET
@@ -296,10 +283,12 @@ end
     plain = Duct(L_DEFAULT, Circular(D_DEFAULT); heated=(;))
     @named riser = Channel(; n=3, geometry=plain)
     @test !hasproperty(riser, :T_wall_outer)
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @mtkcompile ssys = assembly([inseries(pump, bc, riser, pump), pump.inlet.p ~ 1.0e5],
-                                pump, bc, riser)
+    @assembly ssys begin
+        pump = Pump(DP_PUMP)
+        bc = HeatExchanger(T_INLET)
+        inseries(pump, bc, riser, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.riser.T_out] ≈ T_INLET
@@ -313,16 +302,14 @@ const ṁ_NEG = -0.490
 const GEOM_SIGN       = Duct(0.6, Circular(0.01))
 
 @testset "flow reversal: Channel ṁ < 0 " begin
-    @named pump = Pump(; ṁ0=ṁ_NEG)
-    @named ch = Channel(; n=N_SIGN, geometry=GEOM_SIGN,
-                          h=H_DEFAULT)
-    @named bc = HeatExchanger(T_INLET_SIGN)
-    conns = [
-        inseries(pump, bc, ch, pump),
-        pump.inlet.p ~ 1.0e5,
-        ch.T_wall_outer .~ T_WALL_SIGN,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, bc, ch)
+    @assembly ssys begin
+        pump = Pump(; ṁ0=ṁ_NEG)
+        ch = Channel(; n=N_SIGN, geometry=GEOM_SIGN, h=H_DEFAULT)
+        bc = HeatExchanger(T_INLET_SIGN)
+        inseries(pump, bc, ch, pump)
+        pump.inlet.p ~ 1.0e5
+        ch.T_wall_outer .~ T_WALL_SIGN
+    end
     sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
@@ -336,18 +323,17 @@ const GEOM_SIGN       = Duct(0.6, Circular(0.01))
 end
 
 @testset "flow reversal: ChannelAndContacts ṁ < 0" begin
-    @named pump = Pump(; ṁ0=ṁ_NEG)
-    @named cac = ChannelAndContacts(n=N_SIGN, geometry=GEOM_SIGN)
-    @named bc = HeatExchanger(T_INLET_SIGN)
-    @named ct_l = ConstantTemperature(T_WALL_SIGN; n=N_SIGN)
-    conns = [
-        inseries(pump, bc, cac, pump),
+    @assembly ssys begin
+        pump = Pump(; ṁ0=ṁ_NEG)
+        cac = ChannelAndContacts(n=N_SIGN, geometry=GEOM_SIGN)
+        bc = HeatExchanger(T_INLET_SIGN)
+        ct_l = ConstantTemperature(T_WALL_SIGN; n=N_SIGN)
+        inseries(pump, bc, cac, pump)
         faces(
             (ct_l, :thermal) => (cac, :thermal_outer),
-        ),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l)
+        )
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
@@ -369,15 +355,14 @@ end
 
 @testset "flow reversal: ChannelHeatFlux ṁ < 0" begin
     # CHF flux is intrinsic: the sign of q_outer[i] does not depend on the flow direction.
-    @named pump = Pump(; ṁ0=ṁ_NEG)
-    @named chf = ChannelHeatFlux(n=N_SIGN, geometry=GEOM_SIGN)
-    @named bc = HeatExchanger(T_INLET_SIGN)
-    conns = [
-        inseries(pump, bc, chf, pump),
-        pump.inlet.p ~ 1.0e5,
-        chf.q_outer .~ Q_FLUX_DEFAULT,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, bc, chf)
+    @assembly ssys begin
+        pump = Pump(; ṁ0=ṁ_NEG)
+        chf = ChannelHeatFlux(n=N_SIGN, geometry=GEOM_SIGN)
+        bc = HeatExchanger(T_INLET_SIGN)
+        inseries(pump, bc, chf, pump)
+        pump.inlet.p ~ 1.0e5
+        chf.q_outer .~ Q_FLUX_DEFAULT
+    end
     sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success
@@ -409,14 +394,14 @@ end
     T_in = 46.85
 
     function _build_loop_g3b(ṁ0)
-        @named pump = Pump(; ṁ0=ṁ0)
-        @named hex  = HeatExchanger(T_in)
-        @named chf  = ChannelHeatFlux(; n=n, geometry=geom)
-        eqs = [
-            inseries(pump, hex, chf, pump),
-            pump.inlet.p ~ 1.0e5, chf.q_outer .~ q_density_g3b,
-        ]
-        @mtkcompile ssys = assembly(eqs, pump, hex, chf)
+        @assembly ssys begin
+            pump = Pump(; ṁ0=ṁ0)
+            hex = HeatExchanger(T_in)
+            chf = ChannelHeatFlux(; n=n, geometry=geom)
+            inseries(pump, hex, chf, pump)
+            pump.inlet.p ~ 1.0e5
+            chf.q_outer .~ q_density_g3b
+        end
         sol = solve_steady(ssys; abstol=1e-12, reltol=1e-12)
         return ssys, sol
     end
@@ -442,20 +427,17 @@ end
 @testset "CAC ↔ CHF cross-equivalence" begin
     n = N_DEFAULT
     # CAC side: constant-Nusselt drives h_tc, ConstantTemperature pins T_wall per cell.
-    @named pump_cac = Pump(DP_PUMP)
-    @named bc_cac = HeatExchanger(T_INLET)
-    @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                     htc=HTC.ConstantNusselt(; Nu=4.0))
-    @named ct_l_xeq = ConstantTemperature(T_WALL; n=n)
-    conns_cac = [
-        inseries(pump_cac, bc_cac, cac, pump_cac),
-        pump_cac.inlet.p ~ 1.0e5,
+    @assembly ssys_cac begin
+        pump_cac = Pump(DP_PUMP)
+        bc_cac = HeatExchanger(T_INLET)
+        cac = ChannelAndContacts(; n=n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=4.0))
+        ct_l_xeq = ConstantTemperature(T_WALL; n=n)
+        inseries(pump_cac, bc_cac, cac, pump_cac)
+        pump_cac.inlet.p ~ 1.0e5
         faces(
             (ct_l_xeq, :thermal) => (cac, :thermal_outer),
-        ),
-    ]
-    @named sys_cac = assembly(conns_cac, pump_cac, bc_cac, cac, ct_l_xeq)
-    ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding
+        )
+    end fully_determined=false
     sol_cac = solve_transient(ssys_cac, [ssys_cac.cac.T => fill(T_INLET, n)],
                               range(0.0, 1.0, length=50))
     @test sol_cac.retcode == ReturnCode.Success
@@ -468,14 +450,14 @@ end
     ]
 
     # CHF side: the flux pinned to per-cell q_per_cell.
-    @named pump_chf = Pump(DP_PUMP)
-    @named bc_chf = HeatExchanger(T_INLET)
-    @named chf = ChannelHeatFlux(; n=n, geometry=geom)
-    conns_chf = [
-        inseries(pump_chf, bc_chf, chf, pump_chf),
-        pump_chf.inlet.p ~ 1.0e5, chf.q_outer .~ q_per_cell,
-    ]
-    @mtkcompile ssys_chf = assembly(conns_chf, pump_chf, bc_chf, chf)
+    @assembly ssys_chf begin
+        pump_chf = Pump(DP_PUMP)
+        bc_chf = HeatExchanger(T_INLET)
+        chf = ChannelHeatFlux(; n=n, geometry=geom)
+        inseries(pump_chf, bc_chf, chf, pump_chf)
+        pump_chf.inlet.p ~ 1.0e5
+        chf.q_outer .~ q_per_cell
+    end
     sol_chf = solve_transient(ssys_chf, [ssys_chf.chf.T => fill(T_INLET, n)],
                               range(0.0, 1.0, length=50))
     @test sol_chf.retcode == ReturnCode.Success
@@ -497,22 +479,21 @@ end
     function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
         htc = scb_correction === nothing ? HTC.DittusBoelter() :
               HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_correction)
-        @named pump = Pump(dP_pump_scb)
-        @named cac = ChannelAndContacts(
-            n=n_scb,
-            geometry=Duct(L_ch_scb, Circular(D_ch_scb)),
-            htc=htc,
-        )
-        @named bc = HeatExchanger(T_inlet_scb)
-        @named ct_l = ConstantTemperature(T_wall_bc; n=n_scb)
-        conns = [
-            inseries(pump, bc, cac, pump),
+        @assembly ssys begin
+            pump = Pump(dP_pump_scb)
+            cac = ChannelAndContacts(
+                n=n_scb,
+                geometry=Duct(L_ch_scb, Circular(D_ch_scb)),
+                htc=htc,
+            )
+            bc = HeatExchanger(T_inlet_scb)
+            ct_l = ConstantTemperature(T_wall_bc; n=n_scb)
+            inseries(pump, bc, cac, pump)
             faces(
                 (ct_l, :thermal) => (cac, :thermal_outer),
-            ),
-            pump.inlet.p ~ 2e5,
-        ]
-        @mtkcompile ssys = assembly(conns, pump, bc, cac, ct_l)
+            )
+            pump.inlet.p ~ 2e5
+        end
         sol = solve_steady(ssys)
         return ssys, sol
     end
