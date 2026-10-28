@@ -127,7 +127,6 @@ A rectangular channel 2.4 mm by 67 mm and 0.6 m long, with water entering at the
 ```@example channel
 using STREAM, CairoMakie
 using STREAM.Components: Pump, HeatExchanger, Channel
-using STREAM.Assemblies: inseries
 using STREAM.Utilities: cosine_shape
 
 n = 20
@@ -139,7 +138,7 @@ T_wall = 60.0 .+ 60.0 .* shape ./ maximum(shape)   # 60 °C at the ends, 120 °C
     pump = Pump(2.0e4)
     hx = HeatExchanger(40.0)
     ch = Channel(; n, geometry, g=-G_EARTH, h=2.0e4)
-    inseries(pump, hx, ch, pump)
+    pump --> hx --> ch --> pump
     pump.inlet.p ~ 1.7e5
     ch.T_wall_left .~ T_wall
     ch.T_wall_right .~ T_wall

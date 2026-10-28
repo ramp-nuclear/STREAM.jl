@@ -6,7 +6,6 @@ guess. Most failures come from the guess.
 ```@example ss
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, Channel
-using STREAM.Assemblies: inseries
 using ModelingToolkit: unknowns
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
@@ -15,7 +14,7 @@ using SteadyStateDiffEq: DynamicSS
     pump = Pump(3.0e4)
     hx = HeatExchanger(40.0)
     ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
-    inseries(pump, hx, ch, pump)
+    pump --> hx --> ch --> pump
     pump.inlet.p ~ 1.0e5
     ch.T_wall_outer .~ 100.0
 end

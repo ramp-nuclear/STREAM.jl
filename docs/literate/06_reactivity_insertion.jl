@@ -20,7 +20,7 @@
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts,
                          PointKinetics
-using STREAM.Assemblies: inseries, symmetric_plate, temperature_feedback
+using STREAM.Assemblies: symmetric_plate, temperature_feedback
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named
 using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
@@ -45,7 +45,7 @@ cell = unit_cell(; power=P_rated)
 @assembly sys0 begin
     pump = Pump(; ṁ0=0.4)
     hx = HeatExchanger(40.0)
-    inseries(pump, hx, cell.ch, pump)
+    pump --> hx --> cell.ch --> pump
     pump.outlet.p ~ 1.7e5
 end
 sol0 = solve_steady(sys0)
@@ -90,7 +90,7 @@ fuel, ch = cell.fuel, cell.ch
 @assembly sys begin
     pump = Pump(; ṁ0=0.4)
     hx = HeatExchanger(40.0)
-    inseries(pump, hx, cell.ch, pump)
+    pump --> hx --> cell.ch --> pump
     pump.outlet.p ~ 1.7e5
     fuel.power ~ pk.P * P_rated
     temperature_feedback(pk, [fuel, ch])

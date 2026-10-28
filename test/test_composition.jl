@@ -79,7 +79,7 @@ end
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, rods.cac, pump)
+        pump --> bc --> rods.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     @test ssys isa ModelingToolkit.AbstractSystem
@@ -95,7 +95,7 @@ end
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, rods.cac, pump)
+        pump --> bc --> rods.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     @test ssys isa ModelingToolkit.AbstractSystem
@@ -110,7 +110,7 @@ end
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, rods.cac, pump)
+        pump --> bc --> rods.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     @test ssys isa ModelingToolkit.AbstractSystem
@@ -143,9 +143,9 @@ end
         bc_l = HeatExchanger(40.0)
         pump_r = Pump(3.0e4)
         bc_r = HeatExchanger(40.0)
-        inseries(pump_l, bc_l, pl.ch_left, pump_l)
+        pump_l --> bc_l --> pl.ch_left --> pump_l
         pump_l.inlet.p ~ 1.0e5
-        inseries(pump_r, bc_r, pl.ch_right, pump_r)
+        pump_r --> bc_r --> pl.ch_right --> pump_r
         pump_r.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -196,7 +196,7 @@ function _build_osc_loop(side::Symbol, name_suffix)
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, osc.cac, pump)
+        pump --> bc --> osc.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -268,7 +268,7 @@ end
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, scc.cac, pump)
+        pump --> bc --> scc.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     @test ssys isa ModelingToolkit.AbstractSystem
@@ -282,7 +282,7 @@ end
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, scc.cac, pump)
+        pump --> bc --> scc.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     @test ssys isa ModelingToolkit.AbstractSystem
@@ -303,7 +303,7 @@ end
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, scc.cac, pump)
+        pump --> bc --> scc.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -333,7 +333,7 @@ end
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, p1.cac, p2.cac, pump)
+        pump --> bc --> p1.cac --> p2.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     @test ssys isa ModelingToolkit.AbstractSystem
@@ -461,7 +461,7 @@ _fa_pair(left, right) = (left, :thermal_right) => (right, :thermal_left)
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump)
+        pump --> bc --> asm.c1 --> asm.c2 --> asm.c3 --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -498,7 +498,7 @@ end
     @assembly ssys begin
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump)
+        pump --> bc --> asm.c1 --> asm.c2 --> asm.c3 --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -560,7 +560,7 @@ end
             hx = HeatExchanger(40.0)
             ch = Channel(; n=n, geometry=geom, g=0.0, h=5000.0)
             branch = copies === nothing ? (ch,) : weighted(copies, ch; name=:core)
-            inseries(pump, hx, branch..., pump)
+            pump --> hx --> branch... --> pump
             pump.inlet.p ~ 1.0e5
             ch.T_wall_outer .~ 100.0
         end
@@ -604,7 +604,7 @@ end
         geom = Duct(0.6, Circular(0.01))
         pump = Pump(3.0e4)
         ch = Channel(; n=10, geometry=geom, h=5000.0)
-        inseries(pump, hx, ch, pump)
+        pump --> hx --> ch --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_outer .~ 100.0
     end
@@ -622,7 +622,7 @@ end
         rods = symmetric_plate(cac, fuel; name=:rods)
         pump = Pump(3.0e4)
         bc = HeatExchanger(40.0)
-        inseries(pump, bc, rods.cac, pump)
+        pump --> bc --> rods.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     @test solve_steady(loop).retcode == ReturnCode.Success
@@ -644,7 +644,7 @@ end
     @assembly loop begin
         pump = Pump(3.0e4)
         hx = HeatExchanger(40.0)
-        inseries(pump, hx, pump)
+        pump --> hx --> pump
         pump.inlet.p ~ 1.0e5
         lone
     end parameters=[k_extra] fully_determined=false
@@ -657,7 +657,7 @@ end
     @test_throws r"put it before the @assembly block" @assembly loop begin
         pump = Pump(3.0e4)
         hx = HeatExchanger(40.0)
-        inseries(pump, hx, pump)
+        pump --> hx --> pump
         push!(machine, (:A => :B, pump.inlet.ṁ < 0.1))
     end
 end

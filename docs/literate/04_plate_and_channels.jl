@@ -27,7 +27,7 @@
 
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
-using STREAM.Assemblies: inseries, symmetric_plate
+using STREAM.Assemblies: symmetric_plate
 using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named
@@ -89,7 +89,7 @@ shape = repeat(cosine_shape(z_edges, 1.4) ./ nx, 1, nx)
 @assembly sys begin
     pump = Pump(; ṁ0=ṁ)
     hx = HeatExchanger(T_in)
-    inseries(pump, hx, cell.ch, pump)
+    pump --> hx --> cell.ch --> pump
     pump.outlet.p ~ p_in
 end
 sol = solve_steady(sys)

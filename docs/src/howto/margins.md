@@ -12,7 +12,7 @@ The examples use a plate cooled on both faces by one channel, as in
 using STREAM
 using STREAM.Thresholds
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
-using STREAM.Assemblies: inseries, symmetric_plate
+using STREAM.Assemblies: symmetric_plate
 
 n = 10
 geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
@@ -24,7 +24,7 @@ plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1),
     cell = symmetric_plate(ch, fuel)
     pump = Pump(; ṁ0=0.4)
     hx = HeatExchanger(40.0)
-    inseries(pump, hx, cell.ch, pump)
+    pump --> hx --> cell.ch --> pump
     pump.outlet.p ~ 1.7e5
 end
 sol = solve_steady(sys)

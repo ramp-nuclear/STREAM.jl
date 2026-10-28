@@ -33,7 +33,7 @@ end
         L_comp = Inertia(L_over_A)
         R_comp = Resistor(R_val)
         hx = HeatExchanger(26.85)
-        inseries(pump, L_comp, R_comp, hx, pump)
+        pump --> L_comp --> R_comp --> hx --> pump
         pump.inlet.p ~ 1.0e5
     end
 

@@ -24,7 +24,7 @@ end
     @assembly ssys_real begin
         res_real = Resistor(R_val)
         hx_real = HeatExchanger(40.0)
-        inseries(p_real, hx_real, res_real, p_real)
+        p_real --> hx_real --> res_real --> p_real
         p_real.inlet.p ~ 1.0e5
     end
     sol_real = solve_steady(ssys_real)
@@ -53,7 +53,7 @@ end
     @assembly ssys_fn begin
         res_fn = Resistor(R_val)
         hx_fn = HeatExchanger(40.0)
-        inseries(p_fn, hx_fn, res_fn, p_fn)
+        p_fn --> hx_fn --> res_fn --> p_fn
         p_fn.inlet.p ~ 1.0e5
     end
     sol_fn = solve_steady(ssys_fn)
@@ -73,7 +73,7 @@ end
     @assembly ssys_m begin
         res_m = Resistor(R_val)
         hx_m = HeatExchanger(40.0)
-        inseries(p_ṁ, hx_m, res_m, p_ṁ)
+        p_ṁ --> hx_m --> res_m --> p_ṁ
         p_ṁ.inlet.p ~ 1.0e5
     end fully_determined=false
     sol_m = solve_steady(ssys_m)
@@ -113,7 +113,7 @@ end
     # the loop temperature (a bare hydraulics-only loop has degenerate circular instream temps) and
     # gives solve_steady the same well-posed topology the integration coastdowns use.
     @assembly ssys begin
-        inseries(pump, ine, res, hx, pump)
+        pump --> ine --> res --> hx --> pump
         pump.inlet.p ~ 1e5  # pressure anchor
     end
 

@@ -33,13 +33,12 @@ whose wall is held at 100 °C:
 ```julia
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, Channel
-using STREAM.Assemblies: inseries
 
 @assembly sys begin
     pump = Pump(3.0e4)                 # pressure rise [Pa]
     hx = HeatExchanger(40.0)           # outlet temperature [°C]
     ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
-    inseries(pump, hx, ch, pump)       # a closed loop
+    pump --> hx --> ch --> pump        # a closed loop
     pump.inlet.p ~ 1.0e5               # one absolute pressure fixes the level [Pa]
     ch.T_wall_outer .~ 100.0           # wall temperature [°C]
 end
@@ -80,7 +79,7 @@ The package is a stack of submodules, each using only the ones below it:
 | `Thresholds` | the thermal-hydraulic limits: boiling onset, flow instability, critical heat flux |
 | `Components` | pumps, valves, pipes, tanks, coolant channels, fuel, point kinetics, state machines |
 | `DecayHeat` | decay heat after shutdown |
-| `Assemblies` | wiring components together: `inseries`, `inparallel`, fuel assemblies |
+| `Assemblies` | wiring components together: `@assembly`, `@flowgraph`, fuel assemblies |
 
 `src/STREAM.jl` declares them and everything they export, and the
 [reference](https://ramp-nuclear.github.io/STREAM.jl/stable/reference/) lists each one. Code

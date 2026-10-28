@@ -35,7 +35,7 @@ end
         pump = Pump(dP)
         hx = HeatExchanger(26.85)
         vfr = VolumetricFlowResistor(; k=k, density=1.0)
-        inseries(pump, hx, vfr, pump)
+        pump --> hx --> vfr --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -56,7 +56,7 @@ end
         pump = Pump(dP)
         hx = HeatExchanger(26.85)
         vfr = VolumetricFlowResistor(; k=k, klow=klow, density=1.0)
-        inseries(pump, hx, vfr, pump)
+        pump --> hx --> vfr --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -90,7 +90,7 @@ end
         pump = Pump(dP_head)
         hx = HeatExchanger(26.85)
         vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
-        inseries(pump, hx, vfr, pump)
+        pump --> hx --> vfr --> pump
         pump.inlet.p ~ 1.0e5
     end
 
@@ -136,7 +136,7 @@ end
         pump = Pump(; ṁ0=ṁ)        # fixed-flow so ṁ is exact
         hx = HeatExchanger(Tin)
         lpd = LocalPressureDrop(; A1=A1, A2=A2)
-        inseries(pump, hx, lpd, pump)
+        pump --> hx --> lpd --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -156,7 +156,7 @@ end
         @named hx = HeatExchanger(T)
         r = make_resistor(:r)
         @assembly ssys begin
-            inseries(pump, hx, r, pump)
+            pump --> hx --> r --> pump
             pump.inlet.p ~ 1.0e5
         end
         sol = solve_steady(ssys)

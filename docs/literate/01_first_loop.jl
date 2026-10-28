@@ -80,13 +80,14 @@ foreach(println, unknowns(sys))
 #
 # [`@assembly`](@ref) does the naming, the joining and the compiling in one block, and the
 # later tutorials use it. A line that assigns a component names it after its variable, and
-# every other line is a connection. The same model:
+# every other line is a connection. A path drawn with `-->` is a chain of components in
+# series, the connections `inseries` gives. The same model:
 
 @assembly sys begin
     pump = Pump(3.0e4)
     hx = HeatExchanger(40.0)
     ch = Channel(; n=10, geometry, h=5000.0)
-    inseries(pump, hx, ch, pump)
+    pump --> hx --> ch --> pump
     pump.inlet.p ~ 1.0e5
     ch.T_wall_outer .~ 100.0
 end

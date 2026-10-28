@@ -33,7 +33,7 @@ using STREAM
 using STREAM.Components: Tank, Environment, Orifice, Pump, ChannelHeatFlux, Gravity,
                          ResistorFromKnownPoint, StateMachine, machine_callbacks, trip!,
                          reset!
-using STREAM.Assemblies: inseries, weighted
+using STREAM.Assemblies: weighted
 using STREAM.LocalLoss: discharge_cd
 using ModelingToolkit: @named, @parameters, connect, unknowns
 using OrdinaryDiffEq: Rodas5P
@@ -143,15 +143,15 @@ hole = StateMachine(; initial_state=:SHUT)
 nothing #hide
 
 # The break sits at the junction of the core's outlet pipe and the decay tank's inlet line.
-# [`inseries`](@ref STREAM.Assemblies.Connect.inseries) starts and ends at the tanks'
-# nozzles, and `connect` makes the junction:
+# A path drawn with `-->` starts and ends at the tanks' nozzles, and `connect` makes the
+# junction:
 
 @assembly sys begin
-    inseries(pool.core, core..., down, down_loss)
+    pool.core --> core... --> down --> down_loss
     connect(down_loss.outlet, tank_line.inlet, breach.inlet)
-    inseries(tank_line, tank_rise, tank_valve, dtank.inlet)
-    inseries(dtank.suction, pump, lift, return_line, return_valve, pool.ret)
-    inseries(breach, room.port)
+    tank_line --> tank_rise --> tank_valve --> dtank.inlet
+    dtank.suction --> pump --> lift --> return_line --> return_valve --> pool.ret
+    breach --> room.port
     ch.q_left .~ q_wall
     ch.q_right .~ q_wall
 end

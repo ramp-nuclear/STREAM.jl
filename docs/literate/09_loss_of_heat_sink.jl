@@ -28,7 +28,7 @@
 using STREAM
 using STREAM.Components: Tank, Pump, Inertia, HeatExchanger, ChannelHeatFlux, Gravity,
                          ResistorFromKnownPoint
-using STREAM.Assemblies: inseries, weighted
+using STREAM.Assemblies: weighted
 using ModelingToolkit: @named, @parameters
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
@@ -102,8 +102,8 @@ nothing #hide
 
 function build_plant(hx)
     @assembly plant begin
-        inseries(pool.core, core..., pump, hx.primary, lift, return_line, pool.ret)
-        inseries(spump, flywheel, hx.secondary, tower, sec_loss, spump)
+        pool.core --> core... --> pump --> hx.primary --> lift --> return_line --> pool.ret
+        spump --> flywheel --> hx.secondary --> tower --> sec_loss --> spump
         spump.inlet.p ~ 2.0e5
         ch.q_left .~ q_wall
         ch.q_right .~ q_wall

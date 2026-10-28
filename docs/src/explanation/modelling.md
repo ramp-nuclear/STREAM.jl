@@ -78,7 +78,10 @@ generate the connections of a chain and of parallel branches, [`face`](@ref STRE
 and [`faces`](@ref STREAM.Assemblies.Connect.faces) the per-cell thermal connections between a
 channel and a plate, and any other equation can sit in the same list, such as a boundary
 condition `ch.T_wall_left .~ 100.0`. [`assembly`](@ref STREAM.Assemblies.assembly) composes
-the components with the list into one system.
+the components with the list into one system. A chain can also be drawn as a path,
+`pump --> hx --> a || b --> pump`, with `-->` for series and `||` for parallel:
+[`@assembly`](@ref) reads such a line as a connection, and
+[`@flowgraph`](@ref STREAM.Assemblies.Connect.@flowgraph) gives its equations anywhere else.
 
 A closed hydraulic loop determines pressure *differences* only, so one absolute pressure has
 to be fixed somewhere, as in `pump.inlet.p ~ 1.0e5`. Without it the system is singular.

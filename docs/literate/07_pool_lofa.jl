@@ -40,7 +40,7 @@ using STREAM.Components: Pump, Inertia, ResistorFromKnownPoint, HeatExchanger, C
                          ChannelAndContacts, HeatDiffusion, Slab, Flapper, PointKinetics,
                          ReactivityController, StateMachine, machine_callbacks,
                          U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
-using STREAM.Assemblies: inseries, inparallel, weighted, symmetric_plate
+using STREAM.Assemblies: inparallel, weighted, symmetric_plate
 using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named
@@ -186,8 +186,8 @@ push!(ctrl.machine, (:NORMAL => :SCRAM, flywheel.inlet.ṁ < case.trip_fraction 
 
 @assembly sys begin
     inparallel(flywheel, paths, riser)
-    inparallel(flywheel, [(pool_flapper, flapper)], primary)
-    inseries(riser, primary, pump, flywheel)
+    flywheel --> pool_flapper --> flapper --> primary
+    riser --> primary --> pump --> flywheel
     flywheel.outlet.p ~ case.p_pool
     power_eqs
     pk      # read only inside power_eqs

@@ -99,7 +99,7 @@ using STREAM.Components
             ine = Inertia(L)
             res = Resistor(r)
             hx = HeatExchanger(26.85)
-            inseries(pump, ine, res, hx, pump)
+            pump --> ine --> res --> hx --> pump
             pump.inlet.p ~ 1.0e5
         end
         sol_ss = solve_steady(ssys)

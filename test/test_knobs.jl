@@ -95,9 +95,9 @@ end
     @named hd = HeatDiffusion(slab; power=1e4)
 
     @assembly ssys begin
-        inseries(pump_l, hx_l, cac_l, pump_l)
+        pump_l --> hx_l --> cac_l --> pump_l
         pump_l.inlet.p ~ 1.0e5
-        inseries(pump_r, hx_r, cac_r, pump_r)
+        pump_r --> hx_r --> cac_r --> pump_r
         pump_r.inlet.p ~ 1.0e5
         Connect.faces(
             (hd, :thermal_left) => (cac_l, :thermal_right),

@@ -10,7 +10,7 @@ mesh, what every cell is made of, and the contacts between cells. The equations 
 using STREAM
 using STREAM.Components: HeatDiffusion, Slab, Cylinder, ChannelAndContacts, Pump,
                          HeatExchanger, ConvectiveBoundary
-using STREAM.Assemblies: inseries, symmetric_plate, face
+using STREAM.Assemblies: symmetric_plate, face
 using STREAM.Utilities: cosine_shape, x_boundaries
 using ModelingToolkit: @named
 nothing # hide
@@ -63,7 +63,7 @@ geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
     cell = symmetric_plate(ch, fuel)
     pump = Pump(; ṁ0=0.4)
     hx = HeatExchanger(40.0)
-    inseries(pump, hx, cell.ch, pump)
+    pump --> hx --> cell.ch --> pump
     pump.outlet.p ~ 1.7e5
 end
 sol = solve_steady(sys)

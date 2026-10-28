@@ -32,7 +32,7 @@ _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys))
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
         ch = Channel(; n=n, geometry=geom)
-        inseries(pump, bc, ch, pump)
+        pump --> bc --> ch --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_outer .~ T_INLET
     end
@@ -48,7 +48,7 @@ end
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
         chf = ChannelHeatFlux(; n=n, geometry=geom)
-        inseries(pump, bc, chf, pump)
+        pump --> bc --> chf --> pump
         pump.inlet.p ~ 1.0e5
         chf.q_outer .~ 0.0
     end
@@ -63,7 +63,7 @@ end
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
         ch = Channel(; n=n, geometry=geom, h=H_DEFAULT)
-        inseries(pump, bc, ch, pump)
+        pump --> bc --> ch --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_outer .~ T_WALL
     end
@@ -84,7 +84,7 @@ end
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
         chf = ChannelHeatFlux(; n=n, geometry=geom)
-        inseries(pump, bc, chf, pump)
+        pump --> bc --> chf --> pump
         pump.inlet.p ~ 1.0e5
         chf.q_outer .~ Q_FLUX_DEFAULT
     end
@@ -107,7 +107,7 @@ end
         pump = Pump(; ṁ0=ṁ)        # fixed-flow (current source), so ṁ is exact
         bc = HeatExchanger(T_INLET)
         chf = ChannelHeatFlux(; n=n, geometry=geom, liquid=liquid)
-        inseries(pump, bc, chf, pump)
+        pump --> bc --> chf --> pump
         pump.inlet.p ~ 1.0e5
         chf.q_outer .~ q
     end
@@ -128,7 +128,7 @@ end
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
         ch = Channel(; n=n, geometry=geom, h=H_DEFAULT)
-        inseries(pump, bc, ch, pump)
+        pump --> bc --> ch --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_outer .~ T_w
     end
@@ -147,7 +147,7 @@ end
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
         ch = Channel(; n=n, geometry=geom, h=H_DEFAULT)
-        inseries(pump, bc, ch, pump)
+        pump --> bc --> ch --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_outer .~ T_WALL
     end
@@ -156,7 +156,7 @@ end
 
     @assembly ssys2 begin
         ch2 = Channel(; n=n, geometry=geom, h=collect([H_DEFAULT for i in 1:n]))
-        inseries(pump, bc, ch2, pump)
+        pump --> bc --> ch2 --> pump
         pump.inlet.p ~ 1.0e5
         ch2.T_wall_outer .~ T_WALL
     end
@@ -174,14 +174,14 @@ end
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
         ch = Channel(; n=n, geometry=geom, h=h_fn)
-        inseries(pump, bc, ch, pump)
+        pump --> bc --> ch --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_outer .~ T_WALL
     end
     sol = solve_steady(ssys)
     @assembly ssys2 begin
         ch2 = Channel(; n=n, geometry=geom, h=H_DEFAULT)
-        inseries(pump, bc, ch2, pump)
+        pump --> bc --> ch2 --> pump
         pump.inlet.p ~ 1.0e5
         ch2.T_wall_outer .~ T_WALL
     end
@@ -201,7 +201,7 @@ end
                                   darcy=Friction.Blasius())
         # Pin each cell's left thermal port T to T_WALL via per-cell ConstantTemperature.
         ct_l = ConstantTemperature(T_WALL; n=n)
-        inseries(pump, bc, cac, pump)
+        pump --> bc --> cac --> pump
         pump.inlet.p ~ 1.0e5
         faces(
             (ct_l, :thermal) => (cac, :thermal_outer),
@@ -230,7 +230,7 @@ end
             )
             bc = HeatExchanger(T_inlet_iscb)
             ct_l = ConstantTemperature(T_wall_bc; n=n)
-            inseries(pump, bc, cac, pump)
+            pump --> bc --> cac --> pump
             faces(
                 (ct_l, :thermal) => (cac, :thermal_outer),
             )
@@ -264,7 +264,7 @@ end
     @assembly ssys begin
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
-        inseries(pump, bc, ch, pump)
+        pump --> bc --> ch --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_left .~ T_WALL
     end
@@ -286,7 +286,7 @@ end
     @assembly ssys begin
         pump = Pump(DP_PUMP)
         bc = HeatExchanger(T_INLET)
-        inseries(pump, bc, riser, pump)
+        pump --> bc --> riser --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -306,7 +306,7 @@ const GEOM_SIGN       = Duct(0.6, Circular(0.01))
         pump = Pump(; ṁ0=ṁ_NEG)
         ch = Channel(; n=N_SIGN, geometry=GEOM_SIGN, h=H_DEFAULT)
         bc = HeatExchanger(T_INLET_SIGN)
-        inseries(pump, bc, ch, pump)
+        pump --> bc --> ch --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_outer .~ T_WALL_SIGN
     end
@@ -328,7 +328,7 @@ end
         cac = ChannelAndContacts(n=N_SIGN, geometry=GEOM_SIGN)
         bc = HeatExchanger(T_INLET_SIGN)
         ct_l = ConstantTemperature(T_WALL_SIGN; n=N_SIGN)
-        inseries(pump, bc, cac, pump)
+        pump --> bc --> cac --> pump
         faces(
             (ct_l, :thermal) => (cac, :thermal_outer),
         )
@@ -359,7 +359,7 @@ end
         pump = Pump(; ṁ0=ṁ_NEG)
         chf = ChannelHeatFlux(n=N_SIGN, geometry=GEOM_SIGN)
         bc = HeatExchanger(T_INLET_SIGN)
-        inseries(pump, bc, chf, pump)
+        pump --> bc --> chf --> pump
         pump.inlet.p ~ 1.0e5
         chf.q_outer .~ Q_FLUX_DEFAULT
     end
@@ -398,7 +398,7 @@ end
             pump = Pump(; ṁ0=ṁ0)
             hex = HeatExchanger(T_in)
             chf = ChannelHeatFlux(; n=n, geometry=geom)
-            inseries(pump, hex, chf, pump)
+            pump --> hex --> chf --> pump
             pump.inlet.p ~ 1.0e5
             chf.q_outer .~ q_density_g3b
         end
@@ -432,7 +432,7 @@ end
         bc_cac = HeatExchanger(T_INLET)
         cac = ChannelAndContacts(; n=n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=4.0))
         ct_l_xeq = ConstantTemperature(T_WALL; n=n)
-        inseries(pump_cac, bc_cac, cac, pump_cac)
+        pump_cac --> bc_cac --> cac --> pump_cac
         pump_cac.inlet.p ~ 1.0e5
         faces(
             (ct_l_xeq, :thermal) => (cac, :thermal_outer),
@@ -454,7 +454,7 @@ end
         pump_chf = Pump(DP_PUMP)
         bc_chf = HeatExchanger(T_INLET)
         chf = ChannelHeatFlux(; n=n, geometry=geom)
-        inseries(pump_chf, bc_chf, chf, pump_chf)
+        pump_chf --> bc_chf --> chf --> pump_chf
         pump_chf.inlet.p ~ 1.0e5
         chf.q_outer .~ q_per_cell
     end
@@ -488,7 +488,7 @@ end
             )
             bc = HeatExchanger(T_inlet_scb)
             ct_l = ConstantTemperature(T_wall_bc; n=n_scb)
-            inseries(pump, bc, cac, pump)
+            pump --> bc --> cac --> pump
             faces(
                 (ct_l, :thermal) => (cac, :thermal_outer),
             )

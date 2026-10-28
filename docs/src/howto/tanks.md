@@ -9,7 +9,6 @@ this page shows the setup for each case.
 ```@example tanks
 using STREAM
 using STREAM.Components: Tank, Pump, HeatExchanger, Orifice, Environment, StateMachine
-using STREAM.Assemblies: inseries
 using STREAM.LocalLoss: discharge_cd
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
@@ -28,7 +27,7 @@ here a heater's outlet:
                 fixed_temperature=false)
     pump = Pump(; ṁ0=5.0)
     heater = HeatExchanger(45.0)
-    inseries(tank.out, pump, heater, tank.back)
+    tank.out --> pump --> heater --> tank.back
 end
 sol = solve_steady(sys)
 @assert sol[sys.tank.T] ≈ 45.0
@@ -54,7 +53,7 @@ Q, V = 1.0e5, 2.0 * 4.0                   # heat [W] and volume [m³]
                   fixed_temperature=false)
     shut = Orifice(; area=5e-4, cd=discharge_cd(:sharp))  # never opens
     room = Environment()
-    inseries(sealed.bottom, shut, room.port)
+    sealed.bottom --> shut --> room.port
 end
 sol = solve_transient(sys, [sys.sealed.pinned => false], range(0.0, 600.0; length=61))
 warming = Q * 600.0 / (ρ(H2O, 30.0) * V * cₚ(H2O, 30.0))
@@ -78,8 +77,8 @@ hole passes the feed, ``ṁ = C_d a ρ \sqrt{2 g L}``:
     drain = Orifice(; area=a, cd, dp_linear=1e-3,
                     machine=StateMachine(; initial_state=:OPEN, initial_time=-1.0))
     outside = Environment()
-    inseries(supply.port, feed, pool.feed)
-    inseries(pool.bottom, drain, outside.port)
+    supply.port --> feed --> pool.feed
+    pool.bottom --> drain --> outside.port
 end
 sol = solve_steady(sys, [sys.pool.pinned => false]; solver=DynamicSS(Rodas5P()),
                   abstol=1e-10, reltol=1e-10)

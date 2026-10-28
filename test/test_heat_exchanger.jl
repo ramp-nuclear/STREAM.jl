@@ -37,9 +37,9 @@ function hx_loops(hx; dPp=2.0, dPs=4.0)
         ps = Pump(dPs)
         rs = Resistor(1.0)
         cold = HeatExchanger(HX_T_COLD)
-        inseries(pp, hot, hx.primary, rp, pp)
+        pp --> hot --> hx.primary --> rp --> pp
         pp.inlet.p ~ 1.0e5
-        inseries(ps, cold, hx.secondary, rs, ps)
+        ps --> cold --> hx.secondary --> rs --> ps
         ps.inlet.p ~ 2.0e5
     end
 end
@@ -143,7 +143,7 @@ end
             p = Pump(2.0)
             r = Resistor(1.0)
             hot = HeatExchanger(HX_T_HOT)
-            inseries(p, hot, sink, r, p)
+            p --> hot --> sink --> r --> p
             p.inlet.p ~ 1.0e5
         end
         return ssys, solve_steady(ssys)

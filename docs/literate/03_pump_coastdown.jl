@@ -27,7 +27,6 @@
 
 using STREAM
 using STREAM.Components: Pump, Inertia, ResistorFromKnownPoint, HeatExchanger
-using STREAM.Assemblies: inseries
 using ModelingToolkit: unknowns
 
 dp0, ṁ0, L_over_A = 3.0e4, 50.0, 2.0e4      # Pa, kg/s, 1/m
@@ -36,7 +35,7 @@ dp0, ṁ0, L_over_A = 3.0e4, 50.0, 2.0e4      # Pa, kg/s, 1/m
     flywheel = Inertia(L_over_A)
     loss = ResistorFromKnownPoint(; dp=-dp0, ṁ=ṁ0, T=40.0)
     hx = HeatExchanger(40.0)
-    inseries(pump, flywheel, loss, hx, pump)
+    pump --> flywheel --> loss --> hx --> pump
     pump.inlet.p ~ 1.5e5
 end;
 
@@ -133,7 +132,7 @@ head(t) = dp0 * exp(-t / τ)
     flywheel2 = Inertia(L_over_A)
     loss2 = ResistorFromKnownPoint(; dp=-dp0, ṁ=ṁ0, T=40.0)
     hx2 = HeatExchanger(40.0)
-    inseries(pump2, flywheel2, loss2, hx2, pump2)
+    pump2 --> flywheel2 --> loss2 --> hx2 --> pump2
     pump2.inlet.p ~ 1.5e5
 end;
 
