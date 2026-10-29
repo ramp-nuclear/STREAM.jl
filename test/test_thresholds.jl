@@ -465,7 +465,7 @@ end
         pump = Pump(3.0e4)
         bc = HeatExchanger(20.0)
         chf = ChannelHeatFlux(; n=n, geometry=geo)
-        inseries(pump, bc, chf, pump)
+        pump --> bc --> chf --> pump
         pump.inlet.p ~ 1.0e5
         chf.q_outer .~ 1.0e4
     end

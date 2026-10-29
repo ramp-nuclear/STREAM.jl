@@ -31,7 +31,7 @@ function build_loop(; n=10, dP_pump=3.0e4, T_inlet=40.0, T_wall=100.0, g_acc=0.0
         bc = HeatExchanger(T_inlet)
         ch = Channel(; n, geometry=Duct(L, Circular(0.01)), g=g_acc, h=5000.0)
         ret = iszero(g_acc) ? [] : [Gravity(-L, g_acc; name=:ret)]
-        inseries(pump, bc, ch, ret..., pump)
+        pump --> bc --> ch --> ret... --> pump
         pump.inlet.p ~ 1.0e5
         ch.T_wall_outer .~ wall
     end parameters=pars
@@ -68,7 +68,7 @@ function build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, P0=1.0, feedback=not
     @named bc = HeatExchanger(T_inlet)
 
     @assembly ssys begin
-        inseries(pump, bc, rods.cac, pump)
+        pump --> bc --> rods.cac --> pump
         pump.inlet.p ~ 1.0e5
         Connect.temperature_feedback(pk, felt)
         rods.fuel.power ~ pk.P * 1e4  # the total, so a power_input reaches the plate

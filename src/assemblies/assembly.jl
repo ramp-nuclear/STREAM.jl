@@ -54,8 +54,10 @@ Each line of the block is one of:
   gets `name=:pump`, as `@named` gives it; otherwise, as in `geom = Duct(...)`, the line
   runs as written. The variable is set in the scope around the block, so `pump` can be used
   after it.
-- a connection: an equation, a broadcast equation, or a call that returns equations, such as
-  `inseries(...)` or `pump.inlet.p ~ 1.0e5`.
+- a connection: an equation, a broadcast equation, a call that returns equations, such as
+  `inseries(...)` or `pump.inlet.p ~ 1.0e5`, or a flow path drawn with arrows,
+  `pump --> hx --> a || b --> pump`, read as
+  [`@flowgraph`](@ref STREAM.Assemblies.Connect.@flowgraph) reads it.
 - a system, or a vector or tuple of systems, on its own, to compose one no connection
   mentions.
 
@@ -77,7 +79,7 @@ The compiled `System`, also assigned to `name`.
     pump = Pump(3.0e4)
     hx = HeatExchanger(40.0)
     ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
-    inseries(pump, hx, ch, pump)
+    pump --> hx --> ch --> pump
     pump.inlet.p ~ 1.0e5
     ch.T_wall_outer .~ 100.0
 end
@@ -89,13 +91,14 @@ macro assembly(name::Symbol, block::Expr, kwargs...)
         throw(ArgumentError("@assembly takes a name and a begin ... end block"))
     body, parts, lines, mentioned = Any[], Symbol[], String[], Symbol[]
     for ex in block.args
-        if ex isa LineNumberNode || Meta.isexpr(ex, :macrocall)
+        if ex isa LineNumberNode || (Meta.isexpr(ex, :macrocall) && !_is_flowgraph(ex))
             push!(body, ex)
         elseif Meta.isexpr(ex, :(=)) && first(ex.args) isa Symbol
             push!(body, _auto_named(ex))
         else
             part = gensym(:part)
-            push!(body, :($part = $ex))
+            value = Meta.isexpr(ex, :-->) ? Assemblies.Connect._flow_expr(ex) : ex
+            push!(body, :($part = $value))
             push!(parts, part)
             push!(lines, string(ex))
             _mentions!(mentioned, ex)
@@ -109,6 +112,16 @@ macro assembly(name::Symbol, block::Expr, kwargs...)
     call = :($_assemble($(QuoteNode(name)), Any[$(parts...)], $lines, Any[$(found...)];
                         $(keywords...)))
     return esc(Expr(:block, body..., :($name = $call)))
+end
+
+"""
+    _is_flowgraph(ex) -> Bool
+
+Whether `ex` is a call of [`@flowgraph`](@ref), qualified or not.
+"""
+function _is_flowgraph(ex)
+    m = first(ex.args)
+    return Symbol("@flowgraph") in (m, Meta.isexpr(m, :.) ? last(m.args).value : nothing)
 end
 
 """
@@ -144,11 +157,12 @@ end
     _mentions!(names, ex) -> Vector{Symbol}
 
 Append to `names` every variable `ex` reads: the root of a property access `a.b.c`, and
-every symbol outside keyword names and quoted ones. `begin`, `end` and `_` are left out:
-they are not variables.
+every symbol outside keyword names and quoted ones. `begin`, `end`, `_` and macro names are
+left out: they are not variables.
 """
 function _mentions!(names, ex::Symbol)
-    (ex in (:begin, :end) || all(==('_'), string(ex))) && return names
+    (ex in (:begin, :end) || all(==('_'), string(ex)) || startswith(string(ex), '@')) &&
+        return names
     return push!(names, ex)
 end
 function _mentions!(names, ex::Expr)

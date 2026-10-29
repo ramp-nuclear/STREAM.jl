@@ -143,7 +143,7 @@ end
             wide = Tank(; area=A_wide, L0=L_wide, ports=(bottom=0.0,), T0=T_POOL)
             narrow = Tank(; area=A_narrow, L0=L_narrow, ports=(bottom=0.0,), T0=T_POOL)
             pipe = Resistor(R)
-            inseries(wide.bottom, pipe, narrow.bottom)
+            wide.bottom --> pipe --> narrow.bottom
         end
         sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 1000.0; length=201);
                               overrides=[ssys.wide.pinned => false, ssys.narrow.pinned => false])
@@ -174,8 +174,8 @@ end
             drain = Orifice(; area=A_HOLE, cd=CD_SHARP, dp_linear=1e-3, open_rate=1.0,
                             machine=StateMachine(; initial_state=:OPEN, initial_time=0.0))
             ambient = Environment()
-            inseries(supply.port, feed, heater, pool.feed)
-            inseries(pool.bottom, drain, ambient.port)
+            supply.port --> feed --> heater --> pool.feed
+            pool.bottom --> drain --> ambient.port
         end
         # The pinned pool settles at the feed temperature. The run turns the heater up.
         sol_ss = solve_steady(ssys)

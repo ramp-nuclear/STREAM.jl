@@ -16,8 +16,7 @@ function _flapper_parallel_loop(; flapper, pump)
     @assembly loop begin
         bypass = Resistor(1.0e5)
         hx = HeatExchanger(26.85)
-        inparallel(pump, (bypass, flapper), hx)
-        inseries(hx, pump)
+        pump --> bypass || flapper --> hx --> pump
         pump.inlet.p ~ 1.0e5
     end
 end
@@ -115,9 +114,7 @@ end
         flapper = Flapper(; f=1.0e6, area=1.0, open_rate=1.0 / 3.0, machine=machine,
                           liquid=Liquid())
         hx = HeatExchanger(26.85)
-        inseries(pump, ine)
-        inparallel(ine, (res, flapper), hx)
-        inseries(hx, pump)
+        pump --> ine --> res || flapper --> hx --> pump
         pump.inlet.p ~ 1.0e5
     end parameters=[ṁ_open_at]
     push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < ṁ_open_at))
@@ -157,7 +154,7 @@ function _orifice_between_ambients(orifice; dp=2e4)
     @assembly sys begin
         upstream = Environment(; p=ATM + dp, T=T_POOL)
         downstream = Environment()
-        inseries(upstream.port, orifice, downstream.port)
+        upstream.port --> orifice --> downstream.port
     end
 end
 
@@ -182,7 +179,7 @@ function _siphon(; T0=T_POOL, breaker=nothing, open_rate=10.0, kwargs...)
         climb = Gravity(z_crest - z_intake)
         fall = Gravity(z_outlet - z_crest)
         ambient = Environment(; T=T0)
-        inseries(pool.intake, climb, breach, fall, ambient.port)
+        pool.intake --> climb --> breach --> fall --> ambient.port
     end
     breaker === nothing ||
         push!(line, (:OPEN => :SHUT, pool.L < breaker, "siphon breaker"))
@@ -229,8 +226,8 @@ end
                           machine=StateMachine(; initial_state=:OPEN, initial_time=0.0))
             ambient_high = Environment()
             ambient_low = Environment()
-            inseries(pool.high, high, ambient_high.port)
-            inseries(pool.low, low, ambient_low.port)
+            pool.high --> high --> ambient_high.port
+            pool.low --> low --> ambient_low.port
         end
         sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 700.0; length=301);
                               overrides=[ssys.pool.pinned => false],
@@ -326,7 +323,7 @@ function _drain_pool(; break_at=:bottom, t_break=0.0, coast=Inf)
              connect(suction_line.outlet, pump.inlet, breach.inlet),
              inseries(pump, core, pool.inflow)]
         end
-        inseries(breach, ambient.port)
+        breach --> ambient.port
     end
     watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))
     push!(watch, (:INTACT => :UNCOVERED, pool.L < 1.0, "core uncovered"))
@@ -401,8 +398,7 @@ end
         flapper = Flapper(; machine, f=50.0, area=0.01, open_rate=1 / 5.0)
         fuel = HeatDiffusion(slab; power)
         heated = assembly(faces((ch, :thermal_outer) => (fuel, :thermal_right)), ch, fuel)
-        inseries(ext_res, hx, pump, ine)
-        inparallel(ine, ((heated.ch, ret), flapper), ext_res)
+        ext_res --> hx --> pump --> ine --> (heated.ch --> ret) || flapper --> ext_res
         pump.inlet.p ~ 1.0e5
     end
     push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))

@@ -40,7 +40,6 @@ coasting down:
 ```@example ti
 using STREAM
 using STREAM.Components: Pump, Inertia, ResistorFromKnownPoint, HeatExchanger
-using STREAM.Assemblies: inseries
 
 head(t) = 3.0e4 * exp(-t / 5)               # coasting down with a 5 s time constant
 @assembly sys begin
@@ -48,7 +47,7 @@ head(t) = 3.0e4 * exp(-t / 5)               # coasting down with a 5 s time cons
     flywheel = Inertia(2.0e4)
     loss = ResistorFromKnownPoint(; dp=-3.0e4, ṁ=50.0, T=40.0)
     hx = HeatExchanger(40.0)
-    inseries(pump, flywheel, loss, hx, pump)
+    pump --> flywheel --> loss --> hx --> pump
     pump.inlet.p ~ 1.5e5
 end
 sol = solve_transient(sys, [sys.loss.inlet.ṁ => 50.0], 0.0:1.0:30.0)
@@ -70,7 +69,7 @@ coastdown(τ) = t -> 3.0e4 * exp(-t / τ)       # every τ gives a function of t
     flywheel = Inertia(2.0e4)
     loss = ResistorFromKnownPoint(; dp=-3.0e4, ṁ=50.0, T=40.0)
     hx = HeatExchanger(40.0)
-    inseries(pump, flywheel, loss, hx, pump)
+    pump --> flywheel --> loss --> hx --> pump
     pump.inlet.p ~ 1.5e5
 end
 map((2.0, 5.0, 20.0)) do τ

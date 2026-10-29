@@ -30,13 +30,12 @@ then through a heated pipe whose wall is held at 100 °C:
 ```@example index
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, Channel
-using STREAM.Assemblies: inseries
 
 @assembly sys begin
     pump = Pump(3.0e4)                 # pressure rise [Pa]
     hx = HeatExchanger(40.0)           # outlet temperature [°C]
     ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
-    inseries(pump, hx, ch, pump)       # a closed loop
+    pump --> hx --> ch --> pump        # a closed loop
     pump.inlet.p ~ 1.0e5               # one absolute pressure fixes the level [Pa]
     ch.T_wall_outer .~ 100.0           # wall temperature [°C]
 end

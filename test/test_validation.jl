@@ -130,7 +130,7 @@ end
         hx = HeatExchanger(T_inlet)
         cac = ChannelAndContacts(; n=n, geometry=geom_simple)
         wall = ConstantTemperature(T_wall; n=n)
-        inseries(pump, hx, cac, pump)
+        pump --> hx --> cac --> pump
         pump.inlet.p ~ 1.0e5
         faces((wall, :thermal) => (cac, :thermal_outer))
     end
@@ -216,9 +216,9 @@ end
                   material=Solid(2700.0, 900.0, 200.0))
     @assembly ssys begin
         hd = HeatDiffusion(slab; power=1e4)
-        inseries(pump_l, hx_l, cac_l, pump_l)
+        pump_l --> hx_l --> cac_l --> pump_l
         pump_l.inlet.p ~ 1.0e5
-        inseries(pump_r, hx_r, cac_r, pump_r)
+        pump_r --> hx_r --> cac_r --> pump_r
         pump_r.inlet.p ~ 1.0e5
         faces(
             (hd, :thermal_left) => (cac_l, :thermal_right),
@@ -341,9 +341,9 @@ end
                   material=ifelse.(meat, Solid(3000.0, 800.0, 100.0), Solid(2700.0, 900.0, 250.0)))
     @assembly ssys begin
         hd = HeatDiffusion(slab; power_shape=meat ./ sum(meat), power=1e4)
-        inseries(pump_l, hx_l, cac_l, pump_l)
+        pump_l --> hx_l --> cac_l --> pump_l
         pump_l.inlet.p ~ 1.0e5
-        inseries(pump_r, hx_r, cac_r, pump_r)
+        pump_r --> hx_r --> cac_r --> pump_r
         pump_r.inlet.p ~ 1.0e5
         faces(
             (hd, :thermal_left) => (cac_l, :thermal_right),
@@ -406,9 +406,9 @@ end
                   material=Solid(2700.0, 900.0, 200.0))
     @assembly ssys begin
         hd = HeatDiffusion(slab; power=1e4)
-        inseries(pump_l, hx_l, cac_l, pump_l)
+        pump_l --> hx_l --> cac_l --> pump_l
         pump_l.inlet.p ~ 1.0e5
-        inseries(pump_r, hx_r, cac_r, pump_r)
+        pump_r --> hx_r --> cac_r --> pump_r
         pump_r.inlet.p ~ 1.0e5
         faces(
             (hd, :thermal_left) => (cac_l, :thermal_right),
@@ -545,7 +545,7 @@ end
     cac = scc.cac_l
     fuel = scc.hd
     @assembly ssys begin
-        inseries(pump_l, hx_l, cac, pump_l)
+        pump_l --> hx_l --> cac --> pump_l
         pump_l.inlet.p ~ 1.0e5
         scc
     end

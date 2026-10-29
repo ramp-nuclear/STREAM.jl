@@ -7,7 +7,6 @@ leaves the heat flux instead. Either way the value is an equation in the connect
 ```@example wall
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, Channel, ChannelHeatFlux
-using STREAM.Assemblies: inseries
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @parameters, t_nounits as t
 
@@ -28,7 +27,7 @@ T_profile = 60.0 .+ 40.0 .* shape ./ maximum(shape)   # 60 °C at the ends, 100 
     pump = Pump(3.0e4)
     hx = HeatExchanger(40.0)
     ch = Channel(; n, geometry, h=5000.0)
-    inseries(pump, hx, ch, pump)
+    pump --> hx --> ch --> pump
     pump.inlet.p ~ 1.0e5
     ch.T_wall_outer .~ T_profile
 end
@@ -53,7 +52,7 @@ Bind the wall to a parameter. Its value then goes in the operating point of each
     pump = Pump(3.0e4)
     hx = HeatExchanger(40.0)
     ch = Channel(; n, geometry, h=5000.0)
-    inseries(pump, hx, ch, pump)
+    pump --> hx --> ch --> pump
     pump.inlet.p ~ 1.0e5
     ch.T_wall_outer .~ T_wall
 end
@@ -71,7 +70,7 @@ The right side can be any expression in the time variable `t`, here a wall heati
     pump = Pump(3.0e4)
     hx = HeatExchanger(40.0)
     ch = Channel(; n, geometry, h=5000.0)
-    inseries(pump, hx, ch, pump)
+    pump --> hx --> ch --> pump
     pump.inlet.p ~ 1.0e5
     ch.T_wall_outer .~ 60.0 + 40.0 * (1 - exp(-t / 10))
 end
@@ -92,7 +91,7 @@ for this pipe. Bind every face:
     pump = Pump(3.0e4)
     hx = HeatExchanger(40.0)
     ch = ChannelHeatFlux(; n, geometry)
-    inseries(pump, hx, ch, pump)
+    pump --> hx --> ch --> pump
     pump.inlet.p ~ 1.0e5
     ch.q_outer .~ 2.0e5
 end

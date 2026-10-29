@@ -37,7 +37,7 @@ using STREAM.Substances
         pump = Pump(dp)
         hx = HeatExchanger(T)  # anchors the loop temperature (Python's Tin)
         R = Resistor(r)
-        inseries(pump, hx, R, pump)
+        pump --> hx --> R --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -58,8 +58,7 @@ end
         hx = HeatExchanger(26.85)
         R1 = Resistor(r1)
         R2 = Resistor(r2)
-        inseries(pump, hx)
-        inparallel(hx, (R1, R2), pump)
+        pump --> hx --> R1 || R2 --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -79,8 +78,7 @@ end
         rboth = Resistor(4.0e3)
         rhot = Resistor(1.0e3)
         rcold = Resistor(rc)
-        inparallel(pump, [(hxcold, rcold), (hxhot, rhot)], rboth)
-        inseries(rboth, pump)
+        pump --> (hxcold --> rcold) || (hxhot --> rhot) --> rboth --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(s)
@@ -101,7 +99,7 @@ end
         pump = Pump(pressure)
         hx = HeatExchanger(26.85)
         Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
-        inseries(pump, hx, Rs..., pump)
+        pump --> hx --> Rs... --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -122,7 +120,7 @@ end
         P1 = Pump(p)         # fixed-pressure
         P2 = Pump(; ṁ0=ṁ)  # fixed-flow (current source)
         hx = HeatExchanger(26.85)
-        inseries(P1, hx, P2, P1)
+        P1 --> hx --> P2 --> P1
         P1.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -142,7 +140,7 @@ end
             HX1 = HeatExchanger(T1)
             HX2 = HeatExchanger(T2)
             R = Resistor(1.0)
-            inseries(pump, HX1, R, HX2, pump)
+            pump --> HX1 --> R --> HX2 --> pump
             pump.inlet.p ~ 1.0e5
         end
     end
@@ -174,7 +172,7 @@ end
         L_el = Inertia(L)
         R = Resistor(r)
         hx = HeatExchanger(26.85)
-        inseries(pump, L_el, R, hx, pump)
+        pump --> L_el --> R --> hx --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol_ss = solve_steady(ssys)
@@ -206,7 +204,7 @@ end
         L_el = Inertia(inertia)
         R = VolumetricFlowResistor(; k=K, density=1.0)
         hx = HeatExchanger(T)
-        inseries(pump, L_el, R, hx, pump)
+        pump --> L_el --> R --> hx --> pump
         pump.inlet.p ~ 1.0e5
     end
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts from it. Mirror
@@ -241,9 +239,7 @@ end
         R1 = VolumetricFlowResistor(; k=k1, density=1.0)
         R2 = VolumetricFlowResistor(; k=k2, density=1.0)
         hx = HeatExchanger(26.85)
-        inseries(pump, L_el)
-        inparallel(L_el, (R1, R2), hx)
-        inseries(hx, pump)
+        pump --> L_el --> R1 || R2 --> hx --> pump
         pump.inlet.p ~ 1.0e5
     end
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts. Solve_steady
@@ -277,7 +273,7 @@ end
         hx = HeatExchanger(26.85)
         R1 = Resistor(r1 / s)  # bundle resistance (s parallel copies of r1)
         R2 = Resistor(r2)
-        inseries(pump, hx, R1, R2, pump)
+        pump --> hx --> R1 --> R2 --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_steady(ssys)
@@ -302,7 +298,7 @@ end
         hx = HeatExchanger(26.85)
         R1s = [Resistor(r1; name=Symbol(:R1_, i)) for i in 1:signify]
         R2 = Resistor(r2)
-        inseries(R2, pump, hx)
+        R2 --> pump --> hx
         inparallel(hx, R1s, R2)
         pump.inlet.p ~ 1.0e5
     end
@@ -329,7 +325,7 @@ end
         pump = Pump(; ṁ0=3.0)
         hx = HeatExchanger(Tin)
         lpd = LocalPressureDrop(; A1=A1, A2=A2)
-        inseries(pump, hx, lpd, pump)
+        pump --> hx --> lpd --> pump
         pump.inlet.p ~ 1.0e5
     end
     ṁ = Float64[]
@@ -360,8 +356,7 @@ end
         flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0, machine=machine,
                           liquid=Liquid())
         hx = HeatExchanger(26.85)
-        inparallel(pump, (R, flapper), hx)
-        inseries(hx, pump)
+        pump --> R || flapper --> hx --> pump
         pump.inlet.p ~ 1.0e5
     end
     push!(machine, (:CLOSED => :OPEN, R.inlet.ṁ < 0.1 * ṁ0))
@@ -391,7 +386,7 @@ end
                           machine=StateMachine(; initial_state=:OPEN, initial_time=t_open),
                           liquid=Liquid())
         hx = HeatExchanger(26.85)
-        inseries(pump, flapper, hx, pump)
+        pump --> flapper --> hx --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_transient(ssys, range(0.0, 5.0; length=500))
@@ -419,8 +414,7 @@ end
         flapper = Flapper(; f=2 * k, area=1.0, open_rate=1.0, machine=machine,
                           dp_linear=1e-3, liquid=Liquid())
         hx = HeatExchanger(26.85)
-        inseries(hx, pump, ine)
-        inparallel(ine, (R, flapper), hx)
+        hx --> pump --> ine --> R || flapper --> hx
         pump.inlet.p ~ 1.0e5
     end
     # The machine is :CLOSED for the steady solve; opening it at a time you already know is a
@@ -454,8 +448,7 @@ end
         R = VolumetricFlowResistor(; k=k1, density=1.0)
         transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
         hx = HeatExchanger(26.85)
-        inseries(hx, pump, ine)
-        inparallel(ine, (R, transistor), hx)
+        hx --> pump --> ine --> R || transistor --> hx
         pump.inlet.p ~ 1.0e5
     end
     # Python solves the driven steady state (transistor stiff, near-all flow through R), then
@@ -506,7 +499,7 @@ end
         G1 = Gravity(-1.0)  # hot leg
         G2 = Gravity(1.0)   # cold leg
         R = Resistor(1.0e5)
-        inseries(pump, HX_hot, G1, HX_cold, G2, R, pump)
+        pump --> HX_hot --> G1 --> HX_cold --> G2 --> R --> pump
         pump.inlet.p ~ 1.0e5
     end
     delta_rho = ρ(H2O, low_T) - ρ(H2O, high_T)   # = ρ(low_T) - ρ(high_T) > 0
@@ -559,7 +552,7 @@ end
             HXc2 = HeatExchanger(T_cold)
             HXh1 = HeatExchanger(T_hot)
             HXh2 = HeatExchanger(T_hot)
-            inseries(pumpcomp, HXc1, cold, HXc2, HXh1, hot, HXh2, pumpcomp)
+            pumpcomp --> HXc1 --> cold --> HXc2 --> HXh1 --> hot --> HXh2 --> pumpcomp
             pumpcomp.inlet.p ~ 1.0e5
         end
     end
@@ -677,7 +670,7 @@ end
         osc = one_sided(cac, fuel; side=:right)  # fuel heats the right face only
         pump = Pump(; ṁ0=ṁ)
         bc = HeatExchanger(T0)
-        inseries(pump, bc, osc.cac, pump)
+        pump --> bc --> osc.cac --> pump
         pump.inlet.p ~ 1.0e5
     end
     sol = solve_transient(ssys, range(0.0, 200.0; length=50);
@@ -830,7 +823,7 @@ end
                            ref_temp=Dict(rods.cac => fill(T0, n)))
         pump = Pump(; ṁ0=ṁ0)
         bc = HeatExchanger(T0)
-        inseries(pump, bc, rods.cac, pump)
+        pump --> bc --> rods.cac --> pump
         pump.inlet.p ~ 1.0e5
         rods.fuel.power ~ pk.P * 1.0e3
         temperature_feedback(pk, [rods.cac])

@@ -21,7 +21,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             )
             bc = HeatExchanger(T_inlet)
             wall = ConstantTemperature(T_wall; n=n)
-            inseries(pump, bc, cac, pump)
+            pump --> bc --> cac --> pump
             faces((wall, :thermal) => (cac, :thermal_outer))
             pump.inlet.p ~ 1.0e5
         end
@@ -48,7 +48,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             bc = HeatExchanger(T_inlet)
             ct_l = ConstantTemperature(T_wall; n=n)
             ct_r = ConstantTemperature(T_wall; n=n)
-            inseries(pump, bc, cac, pump)
+            pump --> bc --> cac --> pump
             faces(
                 (ct_l, :thermal) => (cac, :thermal_left),
                 (ct_r, :thermal) => (cac, :thermal_right),
@@ -112,7 +112,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             bc = HeatExchanger(T_inlet)
             ct_l = ConstantTemperature(T_wall; n=n)
             ct_r = ConstantTemperature(T_wall; n=n)
-            inseries(pump, bc, cac, pump)
+            pump --> bc --> cac --> pump
             faces((ct_l, :thermal) => (cac, :thermal_left), (ct_r, :thermal) => (cac, :thermal_right))
             pump.inlet.p ~ 1.0e5
         end

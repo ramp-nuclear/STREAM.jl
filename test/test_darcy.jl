@@ -135,7 +135,7 @@ end
             pump = Pump(dP)
             fr = FrictionResistor(; geometry=geom, darcy=darcy)
             hx = HeatExchanger(40.0)
-            inseries(pump, hx, fr, pump)
+            pump --> hx --> fr --> pump
             pump.inlet.p ~ 1.0e5
         end
         sol = solve_steady(ssys)
@@ -164,7 +164,7 @@ end
         @named hx = HeatExchanger(40.0)
         rs = [Resistor(R; name=Symbol(:r, i)) for (i, R) in enumerate(resistances)]
         @assembly ssys begin
-            inseries(pump, hx, rs..., pump)
+            pump --> hx --> rs... --> pump
             pump.inlet.p ~ 1.0e5
         end
         sol = solve_steady(ssys)
@@ -208,7 +208,7 @@ end
             L_comp = Inertia(L_arg)
             R_comp = Resistor(R_val)
             hx = HeatExchanger(26.85)
-            inseries(pump, L_comp, R_comp, hx, pump)
+            pump --> L_comp --> R_comp --> hx --> pump
             pump.inlet.p ~ 1.0e5
         end
         sol_ss = solve_steady(ssys)

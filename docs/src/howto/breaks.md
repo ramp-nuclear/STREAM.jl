@@ -13,7 +13,6 @@ with a few choices left open:
 ```@example breaks
 using STREAM
 using STREAM.Components: Tank, Orifice, Environment, Gravity, StateMachine, machine_callbacks
-using STREAM.Assemblies: inseries
 using STREAM.LocalLoss: discharge_cd
 using STREAM.Thresholds: cavitation
 
@@ -26,7 +25,7 @@ function siphon(; T_pool=30.0, breaker=nothing)
         climb = Gravity(5.0 - 1.5)
         fall = Gravity(-3.0 - 5.0)
         room = Environment(; T=T_pool)
-        inseries(pool.intake, climb, breach, fall, room.port)
+        pool.intake --> climb --> breach --> fall --> room.port
     end
     breaker === nothing || push!(line, (:OPEN => :SHUT, pool.L < breaker, "siphon breaker"))
     watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))

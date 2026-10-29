@@ -7,7 +7,7 @@ geometry and the equations, so each solve can give it a new value without rebuil
 ```@example knob
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
-using STREAM.Assemblies: inseries, symmetric_plate
+using STREAM.Assemblies: symmetric_plate
 nothing # hide
 ```
 
@@ -29,7 +29,7 @@ plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1),
     cell = symmetric_plate(ch, fuel)
     pump = Pump(2.0e4)
     hx = HeatExchanger(40.0)
-    inseries(pump, hx, cell.ch, pump)
+    pump --> hx --> cell.ch --> pump
     pump.inlet.p ~ 1.7e5
 end
 nothing # hide

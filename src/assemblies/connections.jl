@@ -122,6 +122,133 @@ function inparallel(upstream, branches, downstream)
 end
 
 """
+    @flowgraph a --> b --> c || (d --> e) --> a
+    @flowgraph begin ... end
+
+The connection equations of a flow path drawn with arrows: `-->` puts its two sides in
+series, and `||` puts them in parallel, as branches between the steps before and after it.
+`||` binds tighter than `-->`, so a branch of several components is written in parentheses.
+A `begin ... end` block holds several paths, one per line, and gives all their equations.
+
+A name in the path is a component, a `FlowPort`, or a path built outside: a tuple or vector of
+components in series, such as the one [`weighted`](@ref) returns. A branch is a component, a
+path built outside, or `(b --> c)`, and `paths... || d` adds every branch `paths` holds. A
+parallel block needs a component or port on each side, and a branch holds no parallel block
+of its own.
+
+The equations are the ones [`inseries`](@ref) and [`inparallel`](@ref) give: the path above
+is `inseries(a, b)`, `inparallel(b, [c, (d, e)], a)`. Inside
+[`@assembly`](@ref STREAM.@assembly) an arrow line needs no `@flowgraph`.
+
+# Returns
+`Vector{Equation}`.
+
+# Throws
+- `ArgumentError`: for a path of one component, a parallel block at either end of a path or
+  next to another, a parallel block inside a branch, or a bracketed list in a path
+
+# Example
+```julia
+hot = (hx_hot, riser)                     # a path built outside
+@flowgraph pump --> hot || bypass || (hx_cold --> downcomer) --> pump
+```
+"""
+macro flowgraph(ex)
+    Meta.isexpr(ex, :block) || return esc(_flow_expr(ex))
+    paths = [_flow_expr(line) for line in ex.args if !(line isa LineNumberNode)]
+    return esc(:($vcat($Equation[], $(paths...))))
+end
+
+"""
+    _flow_expr(ex) -> Expr
+
+The call that builds the equations of the arrow path `ex`, as [`@flowgraph`](@ref) and
+[`@assembly`](@ref) expand it.
+"""
+function _flow_expr(ex)
+    steps = map(_split(ex, :-->)) do step
+        Meta.isexpr(step, :vect) &&
+            throw(ArgumentError("write a parallel block as `a || b`, not as a list"))
+        Meta.isexpr(step, :||) || return step
+        return :($_Parallel(Any[$(map(_branch_expr, _split(step, :||))...)]))
+    end
+    return :($_flow($(steps...)))
+end
+
+"""
+    _split(ex, head) -> Vector
+
+The operands of a chain of the binary syntax `head`, `a --> b --> c` giving `[a, b, c]`.
+"""
+function _split(ex, head)
+    Meta.isexpr(ex, head) || return Any[ex]
+    return [_split(first(ex.args), head); _split(last(ex.args), head)]
+end
+
+"""
+    _branch_expr(ex)
+
+One branch of a parallel block: `b --> c` becomes a call making the path `(b, c)`, and any
+other expression is left as written.
+"""
+function _branch_expr(ex)
+    steps = _split(ex, :-->)
+    any(s -> Meta.isexpr(s, :||), steps) &&
+        throw(ArgumentError("a branch of a parallel block cannot hold a parallel block"))
+    return length(steps) == 1 ? ex : :($_path($(steps...)))
+end
+
+"""
+    _Parallel(branches)
+
+A parallel block in a flow path, between the steps on either side of it.
+"""
+struct _Parallel{T}
+    branches::T
+end
+
+"""
+    _steps(x) -> Vector
+
+The components `x` stands for in a path: the elements of a tuple or vector, or `x` itself.
+"""
+_steps(x::Union{Tuple,AbstractVector}) = collect(Any, x)
+_steps(x) = Any[x]
+
+"""
+    _path(steps...) -> Tuple
+
+A branch's components in series, with paths built outside spliced in.
+"""
+_path(steps...) = Tuple(mapreduce(_steps, vcat, steps))
+
+"""
+    _flow(steps...) -> Vector{Equation}
+
+The equations of a flow path: [`inseries`](@ref) along each stretch between parallel blocks,
+and [`inparallel`](@ref) across each block from the step before it to the step after it.
+"""
+function _flow(steps...)
+    stretches, blocks = [Any[]], _Parallel[]
+    for step in steps
+        if step isa _Parallel
+            push!(blocks, step)
+            push!(stretches, Any[])
+        else
+            append!(last(stretches), _steps(step))
+        end
+    end
+    any(isempty, stretches) &&
+        throw(ArgumentError("a parallel block needs a component on each side"))
+    isempty(blocks) && length(only(stretches)) < 2 &&
+        throw(ArgumentError("a flow path needs at least two components"))
+    series = [inseries(s...) for s in stretches if length(s) > 1]
+    parallel = [inparallel(last(stretches[i]), b.branches, first(stretches[i + 1]))
+                for (i, b) in enumerate(blocks)]
+    return reduce(vcat, [series; parallel]; init=Equation[])
+end
+
+"""
     _FlowWeight(k; name) -> System
 
 Scale the mass flow between two ports. [`weighted`](@ref) is the only caller, and places one

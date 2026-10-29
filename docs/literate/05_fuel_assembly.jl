@@ -20,7 +20,7 @@
 
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
-using STREAM.Assemblies: inseries, inparallel, fuel_assembly
+using STREAM.Assemblies: inparallel, fuel_assembly
 using STREAM.Utilities: cosine_shape, x_boundaries
 using ModelingToolkit: @named, unknowns
 using OrdinaryDiffEq: Rodas5P
@@ -90,7 +90,7 @@ cores = [getproperty(asm, Symbol(:c, i)) for i in 1:n_channels]
 @assembly sys begin
     pump = Pump(dp_pump)
     hx = HeatExchanger(T_in)
-    inseries(pump, hx)
+    pump --> hx
     inparallel(hx, cores, pump)
     pump.inlet.p ~ p_out
     asm  # the connections reach it only through its channels, so it is listed

@@ -63,7 +63,7 @@ Two plates between three channels, all three fed from one pump:
 ```@example fa
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion, Slab
-using STREAM.Assemblies: inseries, inparallel, fuel_assembly
+using STREAM.Assemblies: inparallel, fuel_assembly
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
 
@@ -81,7 +81,7 @@ channels = [asm.c1, asm.c2, asm.c3]
 @assembly sys begin
     pump = Pump(; ṁ0=1.2)
     hx = HeatExchanger(40.0)
-    inseries(pump, hx)
+    pump --> hx
     inparallel(hx, channels, pump)
     pump.outlet.p ~ 1.7e5
     asm  # the connections reach it only through its channels, so it is listed
