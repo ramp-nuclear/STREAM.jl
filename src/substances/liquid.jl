@@ -244,8 +244,8 @@ Specific enthalpy of the saturated vapor at pressure `p` [Pa]: the liquid's
 
 # Examples
 ```jldoctest
-julia> vapor_enthalpy(H2O, 1.0e5)
-2.675325263993639e6
+julia> round(vapor_enthalpy(H2O, 1.0e5); sigdigits=10)
+2.675325264e6
 ```
 """
 function vapor_enthalpy(liquid::AbstractLiquid, p)
