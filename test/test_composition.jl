@@ -638,6 +638,19 @@ end
     @test solve_steady(loops)[loops.pump2.inlet.ṁ] ≈ 1.0
 end
 
+@testset "@assembly composes the systems in a vector of paths" begin
+    paths = [weighted(2, Resistor(1.0e3; name=Symbol(:r, i)); name=Symbol(:w, i)) for i in 1:2]
+    @assembly loop begin
+        pump = Pump(1.0e4)
+        hx = HeatExchanger(40.0)
+        inseries(pump, hx)
+        inparallel(hx, paths, pump)
+        pump.inlet.p ~ 1.0e5
+    end
+    sol = solve_steady(loop)
+    @test sol[loop.pump.inlet.ṁ] ≈ 4 * sol[loop.r1.inlet.ṁ] rtol = 1e-8
+end
+
 @testset "@assembly composes a system listed on its own, and passes keywords on" begin
     @named lone = Inertia(1.0)   # connected to nothing, so the system is underdetermined
     @parameters k_extra = 2.0

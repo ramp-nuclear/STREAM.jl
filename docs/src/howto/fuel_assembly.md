@@ -84,6 +84,7 @@ channels = [asm.c1, asm.c2, asm.c3]
     inseries(pump, hx)
     inparallel(hx, channels, pump)
     pump.outlet.p ~ 1.7e5
+    asm  # the connections reach it only through its channels, so it is listed
 end
 sol = solve_steady(sys; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
 [round(sol[c.T_out]; digits=2) for c in channels]
