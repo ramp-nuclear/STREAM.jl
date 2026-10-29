@@ -643,7 +643,7 @@ end
     @assembly loop begin
         pump = Pump(1.0e4)
         hx = HeatExchanger(40.0)
-        inseries(pump, hx)
+        pump --> hx
         inparallel(hx, paths, pump)
         pump.inlet.p ~ 1.0e5
     end
