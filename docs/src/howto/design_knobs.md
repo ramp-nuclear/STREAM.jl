@@ -8,7 +8,6 @@ geometry and the equations, so each solve can give it a new value without rebuil
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, symmetric_plate
-using ModelingToolkit: @named, mtkcompile
 nothing # hide
 ```
 
@@ -24,14 +23,15 @@ geometry = Duct(0.6, Rectangular(0.067, gap); heated=0.063)
 n = 10
 plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
              material=Solid(2700.0, 900.0, 180.0))
-@named fuel = HeatDiffusion(plate; power=2.5e4)
-@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
-@named cell = symmetric_plate(ch, fuel)
-@named pump = Pump(2.0e4)
-@named hx = HeatExchanger(40.0)
-@named loop = assembly([inseries(pump, hx, cell.ch, pump), pump.inlet.p ~ 1.7e5],
-                       pump, hx, cell)
-sys = mtkcompile(loop)
+@assembly sys begin
+    fuel = HeatDiffusion(plate; power=2.5e4)
+    ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
+    cell = symmetric_plate(ch, fuel)
+    pump = Pump(2.0e4)
+    hx = HeatExchanger(40.0)
+    inseries(pump, hx, cell.ch, pump)
+    pump.inlet.p ~ 1.7e5
+end
 nothing # hide
 ```
 

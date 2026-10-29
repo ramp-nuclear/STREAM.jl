@@ -35,7 +35,7 @@ using STREAM.Components: Tank, Environment, Orifice, Pump, ChannelHeatFlux, Grav
                          reset!
 using STREAM.Assemblies: inseries, weighted
 using STREAM.LocalLoss: discharge_cd
-using ModelingToolkit: @named, @parameters, connect, mtkcompile, unknowns
+using ModelingToolkit: @named, @parameters, connect, unknowns
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
 
@@ -146,19 +146,15 @@ nothing #hide
 # [`inseries`](@ref STREAM.Assemblies.Connect.inseries) starts and ends at the tanks'
 # nozzles, and `connect` makes the junction:
 
-connections = [
-    inseries(pool.core, core..., down, down_loss),
-    connect(down_loss.outlet, tank_line.inlet, breach.inlet),
-    inseries(tank_line, tank_rise, tank_valve, dtank.inlet),
-    inseries(dtank.suction, pump, lift, return_line, return_valve, pool.ret),
-    inseries(breach, room.port),
-    ch.q_left .~ q_wall,
-    ch.q_right .~ q_wall,
-]
-@named plant = assembly(connections, pool, dtank, core..., down, down_loss, tank_line,
-                        tank_rise, tank_valve, pump, lift, return_line, return_valve, breach,
-                        room)
-sys = mtkcompile(plant)
+@assembly sys begin
+    inseries(pool.core, core..., down, down_loss)
+    connect(down_loss.outlet, tank_line.inlet, breach.inlet)
+    inseries(tank_line, tank_rise, tank_valve, dtank.inlet)
+    inseries(dtank.suction, pump, lift, return_line, return_valve, pool.ret)
+    inseries(breach, room.port)
+    ch.q_left .~ q_wall
+    ch.q_right .~ q_wall
+end
 foreach(println, unknowns(sys))
 
 # The levels of both tanks and the decay tank's temperature are among the unknowns. The

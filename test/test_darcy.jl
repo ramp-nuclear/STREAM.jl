@@ -131,11 +131,13 @@ end
     # A pump pushes through one resistor; the solved drop must match the closed form.
     function solve_drop(; darcy=Friction.Blasius(), dP=3.0e4)
         geom = Duct(2.0, Circular(0.05))
-        @named pump = Pump(dP)
-        @named fr = FrictionResistor(; geometry=geom, darcy=darcy)
-        @named hx = HeatExchanger(40.0)
-        conns = [inseries(pump, hx, fr, pump), pump.inlet.p ~ 1.0e5]
-        @mtkcompile ssys = assembly(conns, pump, fr, hx)
+        @assembly ssys begin
+            pump = Pump(dP)
+            fr = FrictionResistor(; geometry=geom, darcy=darcy)
+            hx = HeatExchanger(40.0)
+            inseries(pump, hx, fr, pump)
+            pump.inlet.p ~ 1.0e5
+        end
         sol = solve_steady(ssys)
         return ssys, sol
     end
@@ -161,11 +163,10 @@ end
         @named pump = Pump(1.0e4)
         @named hx = HeatExchanger(40.0)
         rs = [Resistor(R; name=Symbol(:r, i)) for (i, R) in enumerate(resistances)]
-        conns = [
-            inseries(pump, hx, rs..., pump),
-            pump.inlet.p ~ 1.0e5,
-        ]
-        @mtkcompile ssys = assembly(conns, pump, hx, rs...)
+        @assembly ssys begin
+            inseries(pump, hx, rs..., pump)
+            pump.inlet.p ~ 1.0e5
+        end
         sol = solve_steady(ssys)
         return sol[ssys.pump.inlet.ṁ]
     end
@@ -202,12 +203,14 @@ end
     # A pump holds the flow, then shuts off and the loop coasts. Starting the transient from
     # the solved steady state keeps the IC consistent whichever variables MTK keeps.
     function coast(L_arg; R_val=1.0, ṁ0=1.0, tmax=600.0)
-        @named pump = Pump(R_val * ṁ0)
-        @named L_comp = Inertia(L_arg)
-        @named R_comp = Resistor(R_val)
-        @named hx = HeatExchanger(26.85)
-        conns = [inseries(pump, L_comp, R_comp, hx, pump), pump.inlet.p ~ 1.0e5]
-        @mtkcompile ssys = assembly(conns, pump, L_comp, R_comp, hx)
+        @assembly ssys begin
+            pump = Pump(R_val * ṁ0)
+            L_comp = Inertia(L_arg)
+            R_comp = Resistor(R_val)
+            hx = HeatExchanger(26.85)
+            inseries(pump, L_comp, R_comp, hx, pump)
+            pump.inlet.p ~ 1.0e5
+        end
         sol_ss = solve_steady(ssys)
         sol = solve_transient(ssys, sol_ss, range(0.0, tmax; length=200);
                               overrides=[ssys.pump.dP_pump => 0.0])

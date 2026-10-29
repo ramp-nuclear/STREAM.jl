@@ -30,18 +30,18 @@ that sets the temperature arriving at its side of `hx`, and a unit resistor, so 
 `dPp` and `dPs` [kg/s].
 """
 function hx_loops(hx; dPp=2.0, dPs=4.0)
-    @named pp = Pump(dPp)
-    @named rp = Resistor(1.0)
-    @named hot = HeatExchanger(HX_T_HOT)
-    @named ps = Pump(dPs)
-    @named rs = Resistor(1.0)
-    @named cold = HeatExchanger(HX_T_COLD)
-    conns = [
-        inseries(pp, hot, hx.primary, rp, pp), pp.inlet.p ~ 1.0e5,
-        inseries(ps, cold, hx.secondary, rs, ps), ps.inlet.p ~ 2.0e5,
-    ]
-    @named sys = assembly(conns, pp, rp, hot, ps, rs, cold, hx)
-    return mtkcompile(sys)
+    @assembly sys begin
+        pp = Pump(dPp)
+        rp = Resistor(1.0)
+        hot = HeatExchanger(HX_T_HOT)
+        ps = Pump(dPs)
+        rs = Resistor(1.0)
+        cold = HeatExchanger(HX_T_COLD)
+        inseries(pp, hot, hx.primary, rp, pp)
+        pp.inlet.p ~ 1.0e5
+        inseries(ps, cold, hx.secondary, rs, ps)
+        ps.inlet.p ~ 2.0e5
+    end
 end
 
 """
@@ -139,11 +139,13 @@ end
 
 @testset "HeatExchanger to a fixed sink" begin
     function sink_loop(sink)
-        @named p = Pump(2.0)
-        @named r = Resistor(1.0)
-        @named hot = HeatExchanger(HX_T_HOT)
-        @mtkcompile ssys = assembly([inseries(p, hot, sink, r, p), p.inlet.p ~ 1.0e5],
-                                    p, r, hot, sink)
+        @assembly ssys begin
+            p = Pump(2.0)
+            r = Resistor(1.0)
+            hot = HeatExchanger(HX_T_HOT)
+            inseries(p, hot, sink, r, p)
+            p.inlet.p ~ 1.0e5
+        end
         return ssys, solve_steady(ssys)
     end
 

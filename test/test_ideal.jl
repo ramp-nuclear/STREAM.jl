@@ -28,15 +28,14 @@ end
     # transient from the full solved state with the pump head overridden to 0. Transplanting every
     # state from the solved point keeps the IC consistent no matter which variables MTK keeps as
     # states.
-    @named pump = Pump(R_val * ṁ0)   # head R·ṁ0 balances the linear drop R·ṁ at ṁ0
-    @named L_comp = Inertia(L_over_A)
-    @named R_comp = Resistor(R_val)
-    @named hx = HeatExchanger(26.85)
-    connections = [
-        inseries(pump, L_comp, R_comp, hx, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(connections, pump, L_comp, R_comp, hx)
+    @assembly ssys begin
+        pump = Pump(R_val * ṁ0)   # head R·ṁ0 balances the linear drop R·ṁ at ṁ0
+        L_comp = Inertia(L_over_A)
+        R_comp = Resistor(R_val)
+        hx = HeatExchanger(26.85)
+        inseries(pump, L_comp, R_comp, hx, pump)
+        pump.inlet.p ~ 1.0e5
+    end
 
     sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
@@ -62,12 +61,11 @@ end
 
     # Tie each port of the profile to its own sink so every port carries heat.
     sinks = [ConvectiveBoundary(; area=1.0, name=Symbol(:sink, i)) for i in 1:3]
-    conns = [
-        face(sinks, prof, :thermal),
-        [s.h for s in sinks] .~ 10.0,
-        [s.T_fluid for s in sinks] .~ 20.0,
-    ]
-    @mtkcompile ss = assembly(conns, prof, sinks...)
+    @assembly ss begin
+        face(sinks, prof, :thermal)
+        [s.h for s in sinks] .~ 10.0
+        [s.T_fluid for s in sinks] .~ 20.0
+    end
     sol = solve_transient(ss, [0.0, 1.0])
     @test sol[port(ss.prof, :thermal, :T)][end] == profile
     @test sol[port(ss.prof, :thermal, :Q)][end] ≈ -10.0 .* (profile .- 20.0)
@@ -86,14 +84,13 @@ end
     h_val = 5000.0
     T_wall = 76.85
     T_fluid = 40.0
-    @named cb = ConvectiveBoundary(; area=area)
-    @named wall = ConstantTemperature(T_wall)
-    conns = [
-        connect(cb.thermal, wall.thermal1),
-        cb.h ~ h_val,
-        cb.T_fluid ~ T_fluid,
-    ]
-    @mtkcompile ss = assembly(conns, cb, wall)
+    @assembly ss begin
+        cb = ConvectiveBoundary(; area=area)
+        wall = ConstantTemperature(T_wall)
+        connect(cb.thermal, wall.thermal1)
+        cb.h ~ h_val
+        cb.T_fluid ~ T_fluid
+    end
     sol = solve_transient(ss, [0.0, 1.0])
     @test sol[ss.cb.thermal.Q][end] ≈ h_val * area * (T_wall - T_fluid)
 end
@@ -102,10 +99,13 @@ end
     # Q into the element is positive (heat absorbed by the fluid) when the wall is
     # hotter than the fluid; the connected wall therefore sheds heat (one-way sink).
     area = 0.02
-    @named cb = ConvectiveBoundary(; area=area)
-    @named wall = ConstantTemperature(46.85)
-    conns = [connect(cb.thermal, wall.thermal1), cb.h ~ 4000.0, cb.T_fluid ~ 26.85]
-    @mtkcompile ss = assembly(conns, cb, wall)
+    @assembly ss begin
+        cb = ConvectiveBoundary(; area=area)
+        wall = ConstantTemperature(46.85)
+        connect(cb.thermal, wall.thermal1)
+        cb.h ~ 4000.0
+        cb.T_fluid ~ 26.85
+    end
     sol = solve_transient(ss, [0.0, 1.0])
     @test sol[ss.cb.thermal.Q][end] > 0.0
     @test sol[ss.wall.thermal1.Q][end] < 0.0

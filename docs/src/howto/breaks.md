@@ -16,24 +16,23 @@ using STREAM.Components: Tank, Orifice, Environment, Gravity, StateMachine, mach
 using STREAM.Assemblies: inseries
 using STREAM.LocalLoss: discharge_cd
 using STREAM.Thresholds: cavitation
-using ModelingToolkit: @named, mtkcompile
 
 function siphon(; T_pool=30.0, breaker=nothing)
-    @named pool = Tank(; area=2.0, L0=4.0, ports=(intake=1.5,), T0=T_pool)
     line = StateMachine(; initial_state=:OPEN, initial_time=0.0)       # the break, at t = 0
-    breaker === nothing || push!(line, (:OPEN => :SHUT, pool.L < breaker, "siphon breaker"))
     cd = discharge_cd(:sharp)
-    @named breach = Orifice(; area=5e-4, cd, cc=cd, dp_linear=1e-3, machine=line)
-    @named climb = Gravity(5.0 - 1.5)
-    @named fall = Gravity(-3.0 - 5.0)
-    @named room = Environment(; T=T_pool)
-    @named model = assembly(inseries(pool.intake, climb, breach, fall, room.port),
-                            pool, climb, breach, fall, room)
+    @assembly sys begin
+        pool = Tank(; area=2.0, L0=4.0, ports=(intake=1.5,), T0=T_pool)
+        breach = Orifice(; area=5e-4, cd, cc=cd, dp_linear=1e-3, machine=line)
+        climb = Gravity(5.0 - 1.5)
+        fall = Gravity(-3.0 - 5.0)
+        room = Environment(; T=T_pool)
+        inseries(pool.intake, climb, breach, fall, room.port)
+    end
+    breaker === nothing || push!(line, (:OPEN => :SHUT, pool.L < breaker, "siphon breaker"))
     watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))
     push!(watch, (:INTACT => :UNCOVERED, pool.L < 0.2, "pool empty"))
     throat = StateMachine(; initial_state=:LIQUID)
     push!(throat, (:LIQUID => :FLASHING, breach.subcooling < 0, "crest at saturation"))
-    sys = mtkcompile(model)
     sol = solve_transient(sys, solve_steady(sys), range(0.0, 3500.0; length=701);
                           overrides=[sys.pool.pinned => false],
                           callbacks=machine_callbacks(sys, line, watch, throat))

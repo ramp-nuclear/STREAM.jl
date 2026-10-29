@@ -13,20 +13,20 @@ using STREAM
 using STREAM.Thresholds
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, symmetric_plate
-using ModelingToolkit: @named, mtkcompile
 
 n = 10
 geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
              material=Solid(2700.0, 900.0, 180.0))
-@named fuel = HeatDiffusion(plate; power=3.0e4)
-@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
-@named cell = symmetric_plate(ch, fuel)
-@named pump = Pump(; ṁ0=0.4)
-@named hx = HeatExchanger(40.0)
-@named loop = assembly([inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ 1.7e5],
-                       pump, hx, cell)
-sys = mtkcompile(loop)
+@assembly sys begin
+    fuel = HeatDiffusion(plate; power=3.0e4)
+    ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
+    cell = symmetric_plate(ch, fuel)
+    pump = Pump(; ṁ0=0.4)
+    hx = HeatExchanger(40.0)
+    inseries(pump, hx, cell.ch, pump)
+    pump.outlet.p ~ 1.7e5
+end
 sol = solve_steady(sys)
 nothing # hide
 ```

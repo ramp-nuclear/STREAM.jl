@@ -64,7 +64,6 @@ Two plates between three channels, all three fed from one pump:
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion, Slab
 using STREAM.Assemblies: inseries, inparallel, fuel_assembly
-using ModelingToolkit: @named, mtkcompile
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
 
@@ -78,17 +77,17 @@ coolant_channel(name) = ChannelAndContacts(; name, n, geometry)
 asm = fuel_assembly([coolant_channel(:c1), coolant_channel(:c2), coolant_channel(:c3)],
                     [fuel_plate(:p1), fuel_plate(:p2)];
                     name=:asm)
-@named pump = Pump(; ṁ0=1.2)
-@named hx = HeatExchanger(40.0)
-connections = [
-    inseries(pump, hx),
-    inparallel(hx, [asm.c1, asm.c2, asm.c3], pump),
-    pump.outlet.p ~ 1.7e5,
-]
-@named loop = assembly(connections, pump, hx, asm)
-sys = mtkcompile(loop)
+channels = [asm.c1, asm.c2, asm.c3]
+@assembly sys begin
+    pump = Pump(; ṁ0=1.2)
+    hx = HeatExchanger(40.0)
+    inseries(pump, hx)
+    inparallel(hx, channels, pump)
+    pump.outlet.p ~ 1.7e5
+    asm  # the connections reach it only through its channels, so it is listed
+end
 sol = solve_steady(sys; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
-[round(sol[getproperty(sys.asm, c).T_out]; digits=2) for c in (:c1, :c2, :c3)]
+[round(sol[c.T_out]; digits=2) for c in channels]
 ```
 
 Parallel channels sharing a flow are the case [Get a steady solve to converge](steady_solve.md)
@@ -98,14 +97,14 @@ The middle channel is heated by both plates and runs hotter than the outer two, 
 by one. Each plate sends more of its heat to its outer, cooler channel than to the middle one:
 
 ```@example fa
-[(left=round(sum(sol[getproperty(sys.asm, c).q_wall_left])), right=round(sum(sol[getproperty(sys.asm, c).q_wall_right])))
- for c in (:c1, :c2, :c3)]
+[(left=round(sum(sol[c.q_wall_left])), right=round(sum(sol[c.q_wall_right])))
+ for c in channels]
 ```
 
 All of the plates' power reaches the coolant:
 
 ```@example fa
-Q = sum(sol[getproperty(sys.asm, c).Q_wall_total] for c in (:c1, :c2, :c3))
+Q = sum(sol[c.Q_wall_total] for c in channels)
 @assert isapprox(Q, 2P_plate; rtol=1e-6)
 Q
 ```

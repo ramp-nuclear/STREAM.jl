@@ -14,15 +14,15 @@
 # ## The thermal-hydraulic model
 #
 # The unit cell is the one from [A fuel plate between two channels](04_plate_and_channels.md):
-# a plate cooled on both faces by one channel, with the flow held fixed. A function builds it,
-# so it can be built twice.
+# a plate cooled on both faces by one channel, with the flow held fixed. A function builds the
+# plate and its channel, so they can be built twice.
 
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts,
                          PointKinetics
 using STREAM.Assemblies: inseries, symmetric_plate, temperature_feedback
 using STREAM.Utilities: cosine_shape
-using ModelingToolkit: @named, mtkcompile
+using ModelingToolkit: @named
 using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 
 L, n, nx = 0.6, 20, 4
@@ -35,18 +35,19 @@ function unit_cell(; power)
                  y=0.063, material=Solid(2700.0, 900.0, 180.0))
     @named fuel = HeatDiffusion(plate; power, power_shape=shape)
     @named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
-    @named cell = symmetric_plate(ch, fuel)
-    @named pump = Pump(; ṁ0=0.4)
-    @named hx = HeatExchanger(40.0)
-    return cell, pump, hx, [inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ 1.7e5]
+    return symmetric_plate(ch, fuel; name=:cell)
 end;
 
 # First, the plate at its rated power with no kinetics, to find the temperatures the
 # reactor runs at:
 
-cell, pump, hx, connections = unit_cell(; power=P_rated)
-@named loop = assembly(connections, cell, pump, hx)
-sys0 = mtkcompile(loop)
+cell = unit_cell(; power=P_rated)
+@assembly sys0 begin
+    pump = Pump(; ṁ0=0.4)
+    hx = HeatExchanger(40.0)
+    inseries(pump, hx, cell.ch, pump)
+    pump.outlet.p ~ 1.7e5
+end
 sol0 = solve_steady(sys0)
 T_fuel0 = [sol0[sys0.cell.fuel.T[i, j]] for i in 1:n, j in 1:nx]
 T_cool0 = sol0[sys0.cell.ch.T]
@@ -69,7 +70,7 @@ insertion(t) = t < 1.0 ? 0.0 : ρ_step;
 # The reference temperatures are the rated ones just solved, so the feedback is zero at the
 # start, and the reactor is exactly critical before the step.
 
-cell, pump, hx, connections = unit_cell(; power=nothing)
+cell = unit_cell(; power=nothing)
 fuel, ch = cell.fuel, cell.ch
 α_fuel = fill(-1.5e-4 / (n * nx), n, nx)
 α_cool = fill(-1.0e-4 / n, n)
@@ -86,13 +87,14 @@ fuel, ch = cell.fuel, cell.ch
 # ``P \times P_\text{rated}``. [`temperature_feedback`](@ref STREAM.Assemblies.Connect.temperature_feedback)
 # joins the kinetics to the temperatures it reads.
 
-connections = [
-    connections,
-    fuel.power ~ pk.P * P_rated,
-    temperature_feedback(pk, [fuel, ch]),
-]
-@named reactor = assembly(connections, cell, pump, hx, pk)
-sys = mtkcompile(reactor);
+@assembly sys begin
+    pump = Pump(; ṁ0=0.4)
+    hx = HeatExchanger(40.0)
+    inseries(pump, hx, cell.ch, pump)
+    pump.outlet.p ~ 1.7e5
+    fuel.power ~ pk.P * P_rated
+    temperature_feedback(pk, [fuel, ch])
+end;
 
 # ## The transient
 #

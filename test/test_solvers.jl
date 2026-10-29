@@ -94,15 +94,14 @@ using STREAM.Components
         r = 3.0
         L = 5.0
         ṁ0 = 1.0
-        @named pump = Pump(r * ṁ0)
-        @named ine = Inertia(L)
-        @named res = Resistor(r)
-        @named hx = HeatExchanger(26.85)
-        conns = [
-            inseries(pump, ine, res, hx, pump),
-            pump.inlet.p ~ 1.0e5,
-        ]
-        @mtkcompile ssys = assembly(conns, pump, ine, res, hx)
+        @assembly ssys begin
+            pump = Pump(r * ṁ0)
+            ine = Inertia(L)
+            res = Resistor(r)
+            hx = HeatExchanger(26.85)
+            inseries(pump, ine, res, hx, pump)
+            pump.inlet.p ~ 1.0e5
+        end
         sol_ss = solve_steady(ssys)
         @test sol_ss.retcode == ReturnCode.Success
 

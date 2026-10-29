@@ -112,20 +112,19 @@ T(x) = T_s + \frac{q'''}{2κ}\left(\frac{L_x^2}{4} - x^2\right),
 using STREAM, CairoMakie
 using STREAM.Components: HeatDiffusion, Slab, Cylinder, ConstantTemperature
 using STREAM.Assemblies: faces
-using ModelingToolkit: @named, mtkcompile
 
 Lx, Lz, y, κ, nx = 1.27e-3, 0.6, 0.063, 180.0, 10
 P = 2.0e4                                 # plate power [W]
 T_s = 60.0                                # both faces [°C]
 slab = Slab(; x=range(0.0, Lx; length=nx + 1), z=[0.0, Lz], y,
             material=Solid(2700.0, 900.0, κ))
-@named fuel = HeatDiffusion(slab; power=P)
-@named left = ConstantTemperature(T_s; n=1)
-@named right = ConstantTemperature(T_s; n=1)
-connections = faces((left, :thermal) => (fuel, :thermal_left),
-                    (right, :thermal) => (fuel, :thermal_right))
-@named held = assembly(connections, fuel, left, right)
-sys = mtkcompile(held)
+@assembly sys begin
+    fuel = HeatDiffusion(slab; power=P)
+    left = ConstantTemperature(T_s; n=1)
+    right = ConstantTemperature(T_s; n=1)
+    faces((left, :thermal) => (fuel, :thermal_left),
+          (right, :thermal) => (fuel, :thermal_right))
+end
 sol = solve_steady(sys)
 
 q3 = P / (Lx * Lz * y)
@@ -194,10 +193,11 @@ pellet_ring, clad_ring = Solid(10_400.0, 300.0, κ_p), Solid(6_500.0, 330.0, κ_
 rod = Cylinder(; r, z=[0.0, 1.0], material=ifelse.(pellet, pellet_ring, clad_ring),
                r_contacts=ifelse.(permutedims(r .== R_p), h_gap, Inf))
 shape = pellet .* permutedims(diff(r .^ 2))          # uniform in the pellet, none in the clad
-@named fuel = HeatDiffusion(rod; power=q3_rod * π * R_p^2, power_shape=shape ./ sum(shape))
-@named wall = ConstantTemperature(T_wall; n=1)
-@named held = assembly(faces((wall, :thermal) => (fuel, :thermal_right)), fuel, wall)
-sys = mtkcompile(held)
+@assembly sys begin
+    fuel = HeatDiffusion(rod; power=q3_rod * π * R_p^2, power_shape=shape ./ sum(shape))
+    wall = ConstantTemperature(T_wall; n=1)
+    faces((wall, :thermal) => (fuel, :thermal_right))
+end
 sol = solve_steady(sys)
 
 T_clad(r) = T_wall + q3_rod * R_p^2 / (2κ_c) * log(R_c / r)

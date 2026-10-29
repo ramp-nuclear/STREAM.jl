@@ -12,7 +12,7 @@ using STREAM.Components: HeatDiffusion, Slab, Cylinder, ChannelAndContacts, Pump
                          HeatExchanger, ConvectiveBoundary
 using STREAM.Assemblies: inseries, symmetric_plate, face
 using STREAM.Utilities: cosine_shape, x_boundaries
-using ModelingToolkit: @named, mtkcompile
+using ModelingToolkit: @named
 nothing # hide
 ```
 
@@ -58,13 +58,14 @@ The plate then joins a channel as any other does. Between two channels:
 
 ```@example hs
 geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
-@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
-@named cell = symmetric_plate(ch, fuel)
-@named pump = Pump(; ṁ0=0.4)
-@named hx = HeatExchanger(40.0)
-@named loop = assembly([inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ 1.7e5],
-                       pump, hx, cell)
-sys = mtkcompile(loop)
+@assembly sys begin
+    ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
+    cell = symmetric_plate(ch, fuel)
+    pump = Pump(; ṁ0=0.4)
+    hx = HeatExchanger(40.0)
+    inseries(pump, hx, cell.ch, pump)
+    pump.outlet.p ~ 1.7e5
+end
 sol = solve_steady(sys)
 T = [sol[sys.cell.fuel.T[i, j]] for i in 1:n, j in 1:nx]
 (hottest_meat=maximum(T[:, vec(in_meat)]), hottest_wall=maximum(sol[sys.cell.ch.T_wall_left]))
@@ -111,9 +112,11 @@ geometry whose heated perimeter is the rod's circumference.
 ```@example hs
 dz = 1.0 / n_rod
 films = [ConvectiveBoundary(; name=Symbol(:film, i), area=2π * R_c * dz) for i in 1:n_rod]
-cooling = [[f.h ~ 3.0e4 for f in films]; [f.T_fluid ~ 300.0 for f in films]]
-@named cooled = assembly([face(films, pin, :thermal_right); cooling], pin, films...)
-sys = mtkcompile(cooled)
+@assembly sys begin
+    face(films, pin, :thermal_right)
+    [f.h ~ 3.0e4 for f in films]
+    [f.T_fluid ~ 300.0 for f in films]
+end
 sol = solve_steady(sys)
 centre = [sol[sys.pin.T[i, 1]] for i in 1:n_rod]
 surface = [sol[sys.pin.T[i, length(r) - 1]] for i in 1:n_rod]
@@ -123,7 +126,7 @@ surface = [sol[sys.pin.T[i, length(r) - 1]] for i in 1:n_rod]
 All of the rod's power reaches the coolant:
 
 ```@example hs
-Q = sum(sol[f.thermal.Q] for f in (getproperty(sys, Symbol(:film, i)) for i in 1:n_rod))
+Q = sum(sol[f.thermal.Q] for f in films)
 @assert isapprox(Q, 2.0e4; rtol=1e-6)
 Q
 ```

@@ -33,14 +33,13 @@ using STREAM.Substances
     T = 26.85
     dp = 3.0e4
     r = 1.5e5
-    @named pump = Pump(dp)
-    @named hx = HeatExchanger(T)          # anchors the loop temperature (Python's Tin)
-    @named R = Resistor(r)
-    conns = [
-        inseries(pump, hx, R, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, R)
+    @assembly ssys begin
+        pump = Pump(dp)
+        hx = HeatExchanger(T)  # anchors the loop temperature (Python's Tin)
+        R = Resistor(r)
+        inseries(pump, hx, R, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.R.inlet.ṁ], dp / r; rtol=1e-8)              # ṁ = dp/r
@@ -54,16 +53,15 @@ end
     p = 2.0e4
     r1 = 1.0e5
     r2 = 3.0e5
-    @named pump = Pump(p)
-    @named hx = HeatExchanger(26.85)
-    @named R1 = Resistor(r1)
-    @named R2 = Resistor(r2)
-    conns = [
-        inseries(pump, hx),
-        inparallel(hx, (R1, R2), pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, R1, R2)
+    @assembly ssys begin
+        pump = Pump(p)
+        hx = HeatExchanger(26.85)
+        R1 = Resistor(r1)
+        R2 = Resistor(r2)
+        inseries(pump, hx)
+        inparallel(hx, (R1, R2), pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     total_R = (r1 * r2) / (r1 + r2)
@@ -74,18 +72,17 @@ end
 end
 
 @testset "parallel heat exchangers mix by mass flow, rcold = $rc" for rc in (1.0e3, 2.0e3)
-    @named pump = Pump(4.0e4)
-    @named hxcold = HeatExchanger(20.0)
-    @named hxhot = HeatExchanger(40.0)
-    @named rboth = Resistor(4.0e3)
-    @named rhot = Resistor(1.0e3)
-    @named rcold = Resistor(rc)
-    conns = [
-        inparallel(pump, [(hxcold, rcold), (hxhot, rhot)], rboth),
-        inseries(rboth, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile s = assembly(conns, pump, hxcold, hxhot, rcold, rhot, rboth)
+    @assembly s begin
+        pump = Pump(4.0e4)
+        hxcold = HeatExchanger(20.0)
+        hxhot = HeatExchanger(40.0)
+        rboth = Resistor(4.0e3)
+        rhot = Resistor(1.0e3)
+        rcold = Resistor(rc)
+        inparallel(pump, [(hxcold, rcold), (hxhot, rhot)], rboth)
+        inseries(rboth, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(s)
     @test sol.retcode == ReturnCode.Success
     ṁhot, ṁcold = sol[s.hxhot.inlet.ṁ], sol[s.hxcold.inlet.ṁ]
@@ -100,18 +97,16 @@ end
     pressure = 4.0e4
     total_r = 2.0e5
     r = total_r / N
-    @named pump = Pump(pressure)
-    @named hx = HeatExchanger(26.85)
-    Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
-    conns = [
-        inseries(pump, hx, Rs..., pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, Rs...)
+    @assembly ssys begin
+        pump = Pump(pressure)
+        hx = HeatExchanger(26.85)
+        Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
+        inseries(pump, hx, Rs..., pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
-    for i in 1:N
-        Ri = getproperty(ssys, Symbol(:R, i))
+    for Ri in Rs
         @test isapprox(sol[Ri.inlet.ṁ], pressure / total_r; rtol=1e-8)        # full flow
         @test isapprox(sol[Ri.inlet.p] - sol[Ri.outlet.p], pressure / N; rtol=1e-8)  # each drops p/N
         @test isapprox(sol[Ri.inlet.T], 26.85; rtol=1e-8)
@@ -123,14 +118,13 @@ end
     # A fixed-pressure pump and a fixed-flow pump in a loop: the current source sets ṁ.
     p = 1.5e4
     ṁ = 0.7
-    @named P1 = Pump(p)               # fixed-pressure
-    @named P2 = Pump(; ṁ0=ṁ)    # fixed-flow (current source)
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inseries(P1, hx, P2, P1),
-        P1.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, P1, P2, hx)
+    @assembly ssys begin
+        P1 = Pump(p)         # fixed-pressure
+        P2 = Pump(; ṁ0=ṁ)  # fixed-flow (current source)
+        hx = HeatExchanger(26.85)
+        inseries(P1, hx, P2, P1)
+        P1.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.P2.inlet.ṁ], ṁ; rtol=1e-8)              # current source wins
@@ -143,16 +137,14 @@ end
     # HX1's; reversed flow (pump flipped): it is HX2's.
     T1, T2 = 20.0, 60.0
     function build(dp)
-        @named pump = Pump(dp)
-        @named HX1 = HeatExchanger(T1)
-        @named HX2 = HeatExchanger(T2)
-        @named R = Resistor(1.0)
-        conns = [
-            inseries(pump, HX1, R, HX2, pump),
-            pump.inlet.p ~ 1.0e5,
-        ]
-        @named sys = assembly(conns, pump, HX1, HX2, R)
-        return mtkcompile(sys)
+        @assembly sys begin
+            pump = Pump(dp)
+            HX1 = HeatExchanger(T1)
+            HX2 = HeatExchanger(T2)
+            R = Resistor(1.0)
+            inseries(pump, HX1, R, HX2, pump)
+            pump.inlet.p ~ 1.0e5
+        end
     end
     fwd = build(1.0)
     sol_f = solve_steady(fwd)
@@ -177,15 +169,14 @@ end
     L = 5.0
     r = 3.0
     ṁ0 = 1.0
-    @named pump = Pump(r * ṁ0)        # linear drop r·ṁ ⇒ head r·ṁ0 holds ṁ0 at steady
-    @named L_el = Inertia(L)
-    @named R = Resistor(r)
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inseries(pump, L_el, R, hx, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, L_el, R, hx)
+    @assembly ssys begin
+        pump = Pump(r * ṁ0)  # linear drop r·ṁ ⇒ head r·ṁ0 holds ṁ0 at steady
+        L_el = Inertia(L)
+        R = Resistor(r)
+        hx = HeatExchanger(26.85)
+        inseries(pump, L_el, R, hx, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 1.0; length=5)   # exactly [0, 0.25, 0.5, 0.75, 1.0]
@@ -210,15 +201,14 @@ end
     ṁ0 = (2000.0 / 3600.0) * rho0
     K = dp0 / ṁ0^2
     alpha = K / inertia
-    @named pump = Pump(dp0)
-    @named L_el = Inertia(inertia)
-    @named R = VolumetricFlowResistor(; k=K, density=1.0)
-    @named hx = HeatExchanger(T)
-    conns = [
-        inseries(pump, L_el, R, hx, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, L_el, R, hx)
+    @assembly ssys begin
+        pump = Pump(dp0)
+        L_el = Inertia(inertia)
+        R = VolumetricFlowResistor(; k=K, density=1.0)
+        hx = HeatExchanger(T)
+        inseries(pump, L_el, R, hx, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts from it. Mirror
     # that: solve_steady with the pump on, then start the transient from the solved state with the
     # pump head overridden to 0 (a zero-head pump is a pass-through).
@@ -245,18 +235,17 @@ end
     k2 = 5.0
     total_k = k1 * k2 / (sqrt(k1) + sqrt(k2))^2
     alpha = total_k / inertia
-    @named pump = Pump(total_k * ṁ0^2)   # head that holds ṁ0 through the parallel block
-    @named L_el = Inertia(inertia)
-    @named R1 = VolumetricFlowResistor(; k=k1, density=1.0)
-    @named R2 = VolumetricFlowResistor(; k=k2, density=1.0)
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inseries(pump, L_el),
-        inparallel(L_el, (R1, R2), hx),
-        inseries(hx, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, L_el, R1, R2, hx)
+    @assembly ssys begin
+        pump = Pump(total_k * ṁ0^2)  # head that holds ṁ0 through the parallel block
+        L_el = Inertia(inertia)
+        R1 = VolumetricFlowResistor(; k=k1, density=1.0)
+        R2 = VolumetricFlowResistor(; k=k2, density=1.0)
+        hx = HeatExchanger(26.85)
+        inseries(pump, L_el)
+        inparallel(L_el, (R1, R2), hx)
+        inseries(hx, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts. Solve_steady
     # with the pump on, then start the transient from the solved state with the pump head
     # overridden to 0.
@@ -283,15 +272,14 @@ end
     r2 = 2.0e5
     p = 3.0e4
     s = 2.5
-    @named pump = Pump(p)
-    @named hx = HeatExchanger(26.85)
-    @named R1 = Resistor(r1 / s)     # bundle resistance (s parallel copies of r1)
-    @named R2 = Resistor(r2)
-    conns = [
-        inseries(pump, hx, R1, R2, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, R1, R2)
+    @assembly ssys begin
+        pump = Pump(p)
+        hx = HeatExchanger(26.85)
+        R1 = Resistor(r1 / s)  # bundle resistance (s parallel copies of r1)
+        R2 = Resistor(r2)
+        inseries(pump, hx, R1, R2, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     bundle = sol[ssys.R1.inlet.ṁ]      # = m2 = s·m1
@@ -309,21 +297,20 @@ end
     r2 = 2.0e5
     p = 3.0e4
     signify = 3
-    @named pump = Pump(p)
-    @named hx = HeatExchanger(26.85)
-    R1s = [Resistor(r1; name=Symbol(:R1_, i)) for i in 1:signify]
-    @named R2 = Resistor(r2)
-    conns = [
-        inseries(R2, pump, hx),
-        inparallel(hx, R1s, R2),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, R1s..., R2)
+    @assembly ssys begin
+        pump = Pump(p)
+        hx = HeatExchanger(26.85)
+        R1s = [Resistor(r1; name=Symbol(:R1_, i)) for i in 1:signify]
+        R2 = Resistor(r2)
+        inseries(R2, pump, hx)
+        inparallel(hx, R1s, R2)
+        pump.inlet.p ~ 1.0e5
+    end
     m1 = p / (r1 + signify * r2)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
-    for i in 1:signify
-        @test isapprox(sol[getproperty(ssys, Symbol(:R1_, i)).inlet.ṁ], m1; rtol=1e-8)
+    for R in R1s
+        @test isapprox(sol[R.inlet.ṁ], m1; rtol=1e-8)
     end
     @test isapprox(sol[ssys.R2.inlet.ṁ], signify * m1; rtol=1e-8)
 end
@@ -338,14 +325,13 @@ end
     # the MTK reading of Python's ṁ0(t)=3-t current source over the transient.
     A1, A2 = 1.0, 2.0
     Tin = 20.0
-    @named pump = Pump(; ṁ0=3.0)
-    @named hx = HeatExchanger(Tin)
-    @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
-    conns = [
-        inseries(pump, hx, lpd, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, hx, lpd)
+    @assembly ssys begin
+        pump = Pump(; ṁ0=3.0)
+        hx = HeatExchanger(Tin)
+        lpd = LocalPressureDrop(; A1=A1, A2=A2)
+        inseries(pump, hx, lpd, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     ṁ = Float64[]
     for tt in 0.0:1.0:6.0
         m = 3.0 - tt
@@ -367,19 +353,18 @@ end
     # at t_open = log(10). The flapper carries no flow before t_open and opens after.
     p = 1.0
     ṁ0 = 1.0
-    @named pump = Pump(tt -> p * exp(-tt))
-    @named R = Resistor(p / ṁ0)
     machine = StateMachine(; initial_state=:CLOSED)
-    @named flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0, machine=machine,
-                             liquid=Liquid())
+    @assembly ssys begin
+        pump = Pump(tt -> p * exp(-tt))
+        R = Resistor(p / ṁ0)
+        flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0, machine=machine,
+                          liquid=Liquid())
+        hx = HeatExchanger(26.85)
+        inparallel(pump, (R, flapper), hx)
+        inseries(hx, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     push!(machine, (:CLOSED => :OPEN, R.inlet.ṁ < 0.1 * ṁ0))
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inparallel(pump, (R, flapper), hx),
-        inseries(hx, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, R, flapper, hx)
     @test machine.state === :CLOSED   # starts closed (Python: isinf(F.t_open))
     # ref_ṁ is the resistor flow R.ṁ = pump_dP/r = p·exp(-t), which mtkcompile leaves
     # purely algebraic (no inertia ⇒ no state). The transition detects the crossing exactly
@@ -399,17 +384,16 @@ end
     # A pre-timed flapper (open at t=2.5) in series with a decaying pump: no flow until the flapper
     # opens, then the quadratic flapper conducts.
     t_open = 2.5
-    @named pump = Pump(tt -> exp(-tt))
-    # A machine already open at t_open is Python's F.open(2.5).
-    @named flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0,
-                             machine=StateMachine(; initial_state=:OPEN, initial_time=t_open),
-                             liquid=Liquid())
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inseries(pump, flapper, hx, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, flapper, hx)
+    @assembly ssys begin
+        pump = Pump(tt -> exp(-tt))
+        # A machine already open at t_open is Python's F.open(2.5).
+        flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0,
+                          machine=StateMachine(; initial_state=:OPEN, initial_time=t_open),
+                          liquid=Liquid())
+        hx = HeatExchanger(26.85)
+        inseries(pump, flapper, hx, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_transient(ssys, range(0.0, 5.0; length=500))
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(2.0; idxs=ssys.pump.inlet.ṁ), 0.0; atol=1e-8)   # closed ⇒ no flow
@@ -425,21 +409,20 @@ end
     # solved state, so the coastdown initial condition is consistent across MTK versions.
     k = 1.0
     ṁ0 = 1.0
-    @named pump = Pump(k * ṁ0^2)      # holds ṁ0 through R while the flapper is closed
-    @named ine = Inertia(1.0e3)
-    @named R = VolumetricFlowResistor(; k=k, density=1.0)
     machine = StateMachine(; initial_state=:CLOSED)
     # The loop settles at |Δp| ≈ 0.3 Pa across the flapper, inside the default 1 Pa band where
     # the flow law is rounded off, so the band is narrowed as Python's test narrows it.
-    @named flapper = Flapper(; f=2 * k, area=1.0, open_rate=1.0, machine=machine,
-                             dp_linear=1e-3, liquid=Liquid())
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inseries(hx, pump, ine),
-        inparallel(ine, (R, flapper), hx),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, ine, R, flapper, hx)
+    @assembly ssys begin
+        pump = Pump(k * ṁ0^2)  # holds ṁ0 through R while the flapper is closed
+        ine = Inertia(1.0e3)
+        R = VolumetricFlowResistor(; k=k, density=1.0)
+        flapper = Flapper(; f=2 * k, area=1.0, open_rate=1.0, machine=machine,
+                          dp_linear=1e-3, liquid=Liquid())
+        hx = HeatExchanger(26.85)
+        inseries(hx, pump, ine)
+        inparallel(ine, (R, flapper), hx)
+        pump.inlet.p ~ 1.0e5
+    end
     # The machine is :CLOSED for the steady solve; opening it at a time you already know is a
     # trip, the same idiom a fixed scram uses.
     sol_ss = solve_steady(ssys)
@@ -465,17 +448,16 @@ end
     t_final = 300.0
     kfn = (tt) -> tt <= t_open ? k2 : (k2 - k_final) * exp(-50 * (tt - t_open) / t_final) + k_final
     total_k0 = k1 * k2 / (sqrt(k1) + sqrt(k2))^2   # combined coeff at t=0 (transistor still stiff)
-    @named pump = Pump(total_k0)                    # holds ṁ0=1 through the parallel block
-    @named ine = Inertia(1.0e3)
-    @named R = VolumetricFlowResistor(; k=k1, density=1.0)
-    @named transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
-    @named hx = HeatExchanger(26.85)
-    conns = [
-        inseries(hx, pump, ine),
-        inparallel(ine, (R, transistor), hx),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, ine, R, transistor, hx)
+    @assembly ssys begin
+        pump = Pump(total_k0)  # holds ṁ0=1 through the parallel block
+        ine = Inertia(1.0e3)
+        R = VolumetricFlowResistor(; k=k1, density=1.0)
+        transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
+        hx = HeatExchanger(26.85)
+        inseries(hx, pump, ine)
+        inparallel(ine, (R, transistor), hx)
+        pump.inlet.p ~ 1.0e5
+    end
     # Python solves the driven steady state (transistor stiff, near-all flow through R), then
     # shuts the pump and coasts as the transistor collapses. Solve_steady on, then coast from it.
     sol_ss = solve_steady(ssys)
@@ -514,20 +496,19 @@ end
     high_T = 60.0   # Python 60 C
     low_T = 20.0    # Python 20 C
     g_acc = G_EARTH
-    @named pump = Pump(p0)              # fixed-pressure; dP_pump overridden per t (quasi-static)
-    @named HX_hot = HeatExchanger(high_T)
-    @named HX_cold = HeatExchanger(low_T)
     # Gravity must oppose the pumped flow so the decay reverses it. Julia's Gravity drop is
     # +ρgH along flow ("drop along flow"), the opposite reference to Python's "positive-down"
     # pressure_diff, so the hot leg takes H=-1 and the cold leg H=+1 (Python's g1=+1, g2=-1).
-    @named G1 = Gravity(-1.0)           # hot leg
-    @named G2 = Gravity(1.0)            # cold leg
-    @named R = Resistor(1.0e5)
-    conns = [
-        inseries(pump, HX_hot, G1, HX_cold, G2, R, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, HX_hot, HX_cold, G1, G2, R)
+    @assembly ssys begin
+        pump = Pump(p0)  # fixed-pressure; dP_pump overridden per t (quasi-static)
+        HX_hot = HeatExchanger(high_T)
+        HX_cold = HeatExchanger(low_T)
+        G1 = Gravity(-1.0)  # hot leg
+        G2 = Gravity(1.0)   # cold leg
+        R = Resistor(1.0e5)
+        inseries(pump, HX_hot, G1, HX_cold, G2, R, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     delta_rho = ρ(H2O, low_T) - ρ(H2O, high_T)   # = ρ(low_T) - ρ(high_T) > 0
     times = range(0.0, 10.0; length=10)
     ṁ = Float64[]
@@ -568,21 +549,19 @@ end
     # the earlier laminar-only surrogate (64/Re, friction vanishing as Re->0) let the reversed flow
     # run away to ~21x nominal, which this model does not.
     fric = Friction.RegimeDependent(; re_bounds=(2000.0, 5000.0), k_R=1.0)
-    @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, liquid=H2O, darcy=fric)
-    @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, liquid=H2O, darcy=fric)
     # Bracket each adiabatic channel with same-temperature HeatExchangers on BOTH ends so its
     # coolant stays pinned under reversal too (Python pins both Tin and Tin_minus per channel).
-    @named HXc1 = HeatExchanger(T_cold)
-    @named HXc2 = HeatExchanger(T_cold)
-    @named HXh1 = HeatExchanger(T_hot)
-    @named HXh2 = HeatExchanger(T_hot)
     function build_coastdown(pumpcomp)
-        conns = [
-            inseries(pumpcomp, HXc1, cold, HXc2, HXh1, hot, HXh2, pumpcomp),
-            pumpcomp.inlet.p ~ 1.0e5,
-        ]
-        return mtkcompile(
-            assembly(conns, pumpcomp, HXc1, HXc2, HXh1, HXh2, cold, hot, name=:coastdown))
+        @assembly coastdown begin
+            cold = Channel(; n=nz, geometry=geom, g=+g_acc, liquid=H2O, darcy=fric)
+            hot = Channel(; n=nz, geometry=geom, g=-g_acc, liquid=H2O, darcy=fric)
+            HXc1 = HeatExchanger(T_cold)
+            HXc2 = HeatExchanger(T_cold)
+            HXh1 = HeatExchanger(T_hot)
+            HXh2 = HeatExchanger(T_hot)
+            inseries(pumpcomp, HXc1, cold, HXc2, HXh1, hot, HXh2, pumpcomp)
+            pumpcomp.inlet.p ~ 1.0e5
+        end
     end
 
     # Forced-flow steady at ṁ0 → the pump head that holds it (Python's steady pump pressure).
@@ -690,19 +669,17 @@ end
     Lx = 1.0
     # Mock one-sided pipe (heated only on the right, area 1) + mock solid (all 1).
     geom = Duct(1.0, Effective(; area=1.0, wetted_perimeter=1.0); heated=(right=1.0,))
-    @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
-                                    htc=HTC.ConstantNusselt(; Nu=8.235))
     slab = Slab(; x=[0.0, Lx], z=range(0, 1.0, nz + 1), y=1.0, material=Solid(1.0, 1.0, k_s))
-    @named fuel = HeatDiffusion(slab; power=P, T0=T0)
-    osc = one_sided(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
-    @named pump = Pump(; ṁ0=ṁ)
-    @named bc = HeatExchanger(T0)
-    conns = [
-        inseries(pump, bc, osc.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, osc, pump, bc; name=:sys4)
-    ssys = mtkcompile(full)
+    @assembly ssys begin
+        cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
+                                 htc=HTC.ConstantNusselt(; Nu=8.235))
+        fuel = HeatDiffusion(slab; power=P, T0=T0)
+        osc = one_sided(cac, fuel; side=:right)  # fuel heats the right face only
+        pump = Pump(; ṁ0=ṁ)
+        bc = HeatExchanger(T0)
+        inseries(pump, bc, osc.cac, pump)
+        pump.inlet.p ~ 1.0e5
+    end
     sol = solve_transient(ssys, range(0.0, 200.0; length=50);
                           initializealg=BrownFullBasicInit(), maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success
@@ -766,17 +743,13 @@ end
     @named pk = PointKinetics(ctrl; temp_worth=temp_worth, ref_temp=ref_temp)
     fb = temperature_feedback(pk, vcat(rods_cacs, rods_fuels))
     power_scale = 1.0e3
-    conns = [
-        [
-            [
-                inseries(pumps[i], bcs[i], rods_cacs[i], pumps[i]),
-                pumps[i].inlet.p ~ 1.0e5,
-                rods_fuels[i].power ~ pk.P * power_scale,  # the shared reactor drives every plate
-            ] for i in 1:N
-        ],
-        fb,
-    ]
-    ssys = mtkcompile(assembly(conns, rodss..., pk, pumps..., bcs...; name=:sys5))
+    @assembly ssys begin
+        rodss  # the lines below reach the plates only through their channels and fuels
+        [inseries(pumps[i], bcs[i], rods_cacs[i], pumps[i]) for i in 1:N]
+        [pumps[i].inlet.p ~ 1.0e5 for i in 1:N]
+        [rods_fuels[i].power ~ pk.P * power_scale for i in 1:N]  # one reactor drives every plate
+        fb
+    end
 
     # Every temperature at ref_temp = T0, so the loop starts critical: the initial feedback
     # reactivity is exactly zero.
@@ -793,16 +766,15 @@ end
     @test sol[ssys.pk.P_neutron][end] > 0.0
     @test sol[ssys.pk.P_neutron][end] != sol[ssys.pk.P_neutron][1]
     # Each channel's coolant rises strictly and linearly at the settled state (Python's assertion).
-    cac_T(i) = (rods = getproperty(ssys, Symbol(:rods, i)); getproperty(rods, Symbol(:cac, i)).T)
     for i in 1:N
-        Tc = sol[cac_T(i), end]
+        Tc = sol[rods_cacs[i].T, end]
         @test all(diff(Tc) .> 0)                     # strictly increasing
         slope = diff(Tc)
         @test all(abs.(slope .- slope[1]) .< 1e-3 * slope[1])   # constant slope (linear profile)
     end
     # Distinct ṁs ⇒ distinct slopes off the shared reactor power: the channels couple
     # independently through the one PK.
-    rise(i) = sol[cac_T(i)[2], end] - sol[cac_T(i)[1], end]
+    rise(i) = sol[rods_cacs[i].T[2], end] - sol[rods_cacs[i].T[1], end]
     @test rise(1) < rise(2) < rise(3)                # smaller ṁ ⇒ steeper rise
 end
 
@@ -817,23 +789,20 @@ end
     nx = 2
     slab = Slab(; x=range(0, 0.005, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
                   material=Solid(3000.0, 800.0, 100.0))
-    @named fuel = HeatDiffusion(slab; T0=T0)
-    @named bathsL = ConstantTemperature(T0; n=nz)
-    @named bathsR = ConstantTemperature(T0; n=nz)
     ctrl = ReactivityController()
-    @named pk = PointKinetics(ctrl; temp_worth=Dict(fuel => fill(-0.1, nz, nx)),
-                              ref_temp=Dict(fuel => fill(T0, nz, nx)))
-    fb = temperature_feedback(pk, [fuel])
-    conns = [
-        fb,
-        fuel.power ~ pk.P * 1.0e3,
+    @assembly ssys begin
+        fuel = HeatDiffusion(slab; T0=T0)
+        bathsL = ConstantTemperature(T0; n=nz)
+        bathsR = ConstantTemperature(T0; n=nz)
+        pk = PointKinetics(ctrl; temp_worth=Dict(fuel => fill(-0.1, nz, nx)),
+                           ref_temp=Dict(fuel => fill(T0, nz, nx)))
+        temperature_feedback(pk, [fuel])
+        fuel.power ~ pk.P * 1.0e3
         faces(
             (bathsL, :thermal) => (fuel, :thermal_left),
             (bathsR, :thermal) => (fuel, :thermal_right),
-        ),
-    ]
-    full = assembly(conns, fuel, pk, bathsL, bathsR; name=:sys8)
-    ssys = mtkcompile(full)
+        )
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.pk.P_neutron] < 1e-3  # power → 0
@@ -849,26 +818,23 @@ end
     nz = 7
     nx = 1
     geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=(left=1.0, right=1.0))
-    @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
-                                    htc=HTC.ConstantNusselt(; Nu=8.235))
     slab = Slab(; x=[0.0, 1.0], z=range(0, 1.2, nz + 1), y=1.0, material=Solid(1.0, 1.0, 1.0))
-    @named fuel = HeatDiffusion(slab; T0=T0)
-    rods = symmetric_plate(cac, fuel; name=:rods)
     ctrl = ReactivityController()
-    @named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => fill(-0.1, n)),
-                              ref_temp=Dict(rods.cac => fill(T0, n)))
-    fb = temperature_feedback(pk, [rods.cac])
-    ṁ0 = 0.1
-    @named pump = Pump(; ṁ0=ṁ0)
-    @named bc = HeatExchanger(T0)
-    conns = [
-        inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-        rods.fuel.power ~ pk.P * 1.0e3,
-        fb,
-    ]
-    full = assembly(conns, rods, pk, pump, bc; name=:sys9)
-    ssys = mtkcompile(full)
+    ṁ0 = 0.1
+    @assembly ssys begin
+        cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
+                                 htc=HTC.ConstantNusselt(; Nu=8.235))
+        fuel = HeatDiffusion(slab; T0=T0)
+        rods = symmetric_plate(cac, fuel)
+        pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => fill(-0.1, n)),
+                           ref_temp=Dict(rods.cac => fill(T0, n)))
+        pump = Pump(; ṁ0=ṁ0)
+        bc = HeatExchanger(T0)
+        inseries(pump, bc, rods.cac, pump)
+        pump.inlet.p ~ 1.0e5
+        rods.fuel.power ~ pk.P * 1.0e3
+        temperature_feedback(pk, [rods.cac])
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.pk.P_neutron] < 1e-3  # power → 0

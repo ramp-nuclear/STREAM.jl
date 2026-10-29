@@ -22,7 +22,7 @@ using STREAM
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, inparallel, fuel_assembly
 using STREAM.Utilities: cosine_shape, x_boundaries
-using ModelingToolkit: @named, mtkcompile, unknowns
+using ModelingToolkit: @named, unknowns
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
 
@@ -86,16 +86,15 @@ channels = [ChannelAndContacts(; name=Symbol(:c, i), n, geometry, g=-G_EARTH)
 # channels is part of the answer. The pressure is fixed where the channels end, at the bottom
 # of the core, where the pool above sets it.
 
-channel(i) = getproperty(asm, Symbol(:c, i))
-@named pump = Pump(dp_pump)
-@named hx = HeatExchanger(T_in)
-connections = [
-    inseries(pump, hx),
-    inparallel(hx, [channel(i) for i in 1:n_channels], pump),
-    pump.inlet.p ~ p_out,
-]
-@named loop = assembly(connections, pump, hx, asm)
-sys = mtkcompile(loop)
+cores = [getproperty(asm, Symbol(:c, i)) for i in 1:n_channels]
+@assembly sys begin
+    pump = Pump(dp_pump)
+    hx = HeatExchanger(T_in)
+    inseries(pump, hx)
+    inparallel(hx, cores, pump)
+    pump.inlet.p ~ p_out
+    asm  # the connections reach it only through its channels, so it is listed
+end
 length(unknowns(sys))
 
 # ## The steady state

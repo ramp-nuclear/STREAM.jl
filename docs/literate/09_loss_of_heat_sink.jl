@@ -29,7 +29,7 @@ using STREAM
 using STREAM.Components: Tank, Pump, Inertia, HeatExchanger, ChannelHeatFlux, Gravity,
                          ResistorFromKnownPoint
 using STREAM.Assemblies: inseries, weighted
-using ModelingToolkit: @named, @parameters, mtkcompile
+using ModelingToolkit: @named, @parameters
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
 
@@ -95,22 +95,19 @@ T_tower = 25.0
 @named sec_loss = ResistorFromKnownPoint(; dp=-1.0e5, ṁ=ṁ_secondary, T=30.0)
 nothing #hide
 
-# Both sides of the exchanger go into the connection list as ordinary two-ports. The pool's
+# Both sides of the exchanger are connected as ordinary two-ports. The pool's
 # nozzles set the primary's pressures. The secondary is a closed loop with no tank, so one
 # pressure anchors it. The plant is built by a function of the exchanger, since later sections
 # swap it for another.
 
 function build_plant(hx)
-    connections = [
-        inseries(pool.core, core..., pump, hx.primary, lift, return_line, pool.ret),
-        inseries(spump, flywheel, hx.secondary, tower, sec_loss, spump),
-        spump.inlet.p ~ 2.0e5,
-        ch.q_left .~ q_wall,
-        ch.q_right .~ q_wall,
-    ]
-    @named plant = assembly(connections, pool, core..., pump, hx, lift, return_line, spump,
-                            flywheel, tower, sec_loss)
-    return mtkcompile(plant)
+    @assembly plant begin
+        inseries(pool.core, core..., pump, hx.primary, lift, return_line, pool.ret)
+        inseries(spump, flywheel, hx.secondary, tower, sec_loss, spump)
+        spump.inlet.p ~ 2.0e5
+        ch.q_left .~ q_wall
+        ch.q_right .~ q_wall
+    end
 end
 sys = build_plant(hx)
 nothing #hide

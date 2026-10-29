@@ -461,15 +461,14 @@ end
     # system", which does not tell you that the channel variant is the problem.
     n = 4
     geo = Duct(0.6, Circular(0.01))
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(20.0)
-    @named chf = ChannelHeatFlux(; n=n, geometry=geo)
-    conns = [
-        inseries(pump, bc, chf, pump),
-        pump.inlet.p ~ 1.0e5,
-        chf.q_outer .~ 1.0e4,
-    ]
-    @mtkcompile ssys = assembly(conns, pump, bc, chf)
+    @assembly ssys begin
+        pump = Pump(3.0e4)
+        bc = HeatExchanger(20.0)
+        chf = ChannelHeatFlux(; n=n, geometry=geo)
+        inseries(pump, bc, chf, pump)
+        pump.inlet.p ~ 1.0e5
+        chf.q_outer .~ 1.0e4
+    end
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
