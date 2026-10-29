@@ -65,7 +65,9 @@ Solve a transient simulation over a time array, starting from the operating poin
 - `op`: operating point, a `Vector{Pair}` (see [`solve_steady`](@ref)). A parameter in it
   takes that value for the whole run, including a callable one such as
   `ssys.pump.dP_pump_fn => f`. An unknown in it is its value at `t[1]`, used as given under
-  the default `NoInit`. Anything left out takes the value the model declares.
+  the default `NoInit`. Anything left out takes the value the model declares. Under `NoInit`
+  a variable `mtkcompile` made observed is ignored, so one whose value disagrees with the
+  start is an `ArgumentError`.
 - `t`: time array (e.g. `range(0, 100, length=1000)`); `tspan` derived as `(t[1], t[end])`
 - `solver`: ODE solver (default `Rodas5P()`)
 - `callbacks`: optional `CallbackSet` for user-supplied events (passed to DifferentialEquations
@@ -98,10 +100,34 @@ function solve_transient(
 )
     tspan = (Float64(t[1]), Float64(t[end]))
     init = build_initializeprob === nothing ? (;) : (; build_initializeprob)
-    op = [op; _unset_arrays(ssys)]
-    prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false, init...)
+    prob = ODEProblem(ssys, [op; _unset_arrays(ssys)], tspan; warn_initialize_determined=false,
+                      init...)
+    initializealg isa SciMLBase.NoInit && _check_start(prob, op)
     return solve(prob, solver; saveat=t, callback=callbacks, initializealg,
                  merge(values(kwargs), _saved_steps(prob, t, kwargs))...)
+end
+
+"""
+    _check_start(prob, op)
+
+Throw an `ArgumentError` if `op` gives a variable that `mtkcompile` made observed a value
+other than the one `prob` starts from.
+
+Under `NoInit` the problem's start holds only the unknowns, so such a value is dropped, and
+the unknown it is computed from starts from its declared value instead. A value that agrees
+with the start, such as one temperature given to every member of an alias set, passes.
+"""
+function _check_start(prob, op)
+    given = [k => v for (k, v) in op
+             if v isa Union{Number,AbstractArray{<:Number}} && is_observed(prob, k)]
+    isempty(given) && return
+    start = getsym(prob, first.(given))(prob)
+    for ((k, v), s) in zip(given, start)
+        isapprox(s, v) && continue
+        throw(ArgumentError("$k is observed in the compiled system, so a NoInit start " *
+                            "ignores its value $v and gives $s: set one of unknowns(ssys) " *
+                            "instead, or start from a steady solve"))
+    end
 end
 
 """
