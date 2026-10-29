@@ -56,7 +56,8 @@ Each line of the block is one of:
   after it.
 - a connection: an equation, a broadcast equation, a call that returns equations, such as
   `inseries(...)` or `pump.inlet.p ~ 1.0e5`, or a flow path drawn with arrows,
-  `pump --> hx --> a || b --> pump`, read as [`@flowgraph`](@ref) reads it.
+  `pump --> hx --> a || b --> pump`, read as
+  [`@flowgraph`](@ref STREAM.Assemblies.Connect.@flowgraph) reads it.
 - a system, or a vector or tuple of systems, on its own, to compose one no connection
   mentions.
 

@@ -387,8 +387,8 @@ using ..STREAM: assembly, @assembly, port, var_length
 
     The wiring verbs. Each takes components and returns the `Vector{Equation}` that joins them
     rather than a composed system, so results concatenate into one connection list.
-    [`@flowgraph`](@ref) draws a flow path with arrows and gives the equations
-    [`inseries`](@ref) and [`inparallel`](@ref) would.
+    [`@flowgraph`](@ref STREAM.Assemblies.Connect.@flowgraph) draws a flow path with arrows
+    and gives the equations [`inseries`](@ref) and [`inparallel`](@ref) would.
     """
 module Connect
 using ModelingToolkit

@@ -137,8 +137,8 @@ parallel block needs a component or port on each side, and a branch holds no par
 of its own.
 
 The equations are the ones [`inseries`](@ref) and [`inparallel`](@ref) give: the path above
-is `inseries(a, b)`, `inparallel(b, [c, (d, e)], a)`. Inside [`@assembly`](@ref) an arrow
-line needs no `@flowgraph`.
+is `inseries(a, b)`, `inparallel(b, [c, (d, e)], a)`. Inside
+[`@assembly`](@ref STREAM.@assembly) an arrow line needs no `@flowgraph`.
 
 # Returns
 `Vector{Equation}`.
