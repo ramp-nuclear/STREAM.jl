@@ -205,10 +205,11 @@ end
 """
     _systems(x) -> Vector
 
-The systems in `x`, a system or an array or tuple of them.
+The systems in `x`, a system or an array or tuple of them, nested to any depth, such as a
+vector of the paths [`weighted`](@ref STREAM.Assemblies.Connect.weighted) returns.
 """
 _systems(x::ModelingToolkit.AbstractSystem) = Any[x]
-_systems(xs) = collect(Any, xs)
+_systems(xs) = mapreduce(_systems, vcat, xs; init=Any[])
 
 """
     _holds_systems(x) -> Bool
