@@ -42,6 +42,7 @@ using OrdinaryDiffEq
 using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 using QuadGK
 using SteadyStateDiffEq
+using SymbolicIndexingInterface: getsym, is_observed
 
 include("constants.jl")
 

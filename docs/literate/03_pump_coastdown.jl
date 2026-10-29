@@ -93,7 +93,7 @@ fig = Figure(size=(650, 380))
 ax = Axis(fig[1, 1]; xlabel="time after the trip [s]", ylabel="mass flow [kg/s]")
 lines!(ax, sol.t, ṁ_exact.(sol.t); label="exact", linewidth=4, color=(:gray, 0.5))
 lines!(ax, sol.t, ṁ_sim; label="STREAM")
-axislegend(ax)
+leg = axislegend(ax)
 fig
 
 # Where does the pressure go? With the pump off, the water gives up its momentum to push
@@ -136,16 +136,19 @@ connections2 = [inseries(pump2, flywheel2, loss2, hx2, pump2), pump2.inlet.p ~ 1
 @named loop2 = assembly(connections2, pump2, flywheel2, loss2, hx2)
 sys2 = mtkcompile(loop2);
 
-# The function becomes a parameter of the model, `dP_pump_fn`, which the operating point
-# gives a value like any other. At ``t = 0`` the head is still the full 0.3 bar, so the loop
-# starts at the design flow, the one state the compiled system keeps:
+# The function becomes a parameter of the model, `dP_pump_fn`, whose value is `head` unless
+# an operating point replaces it. At ``t = 0`` the head is still the full 0.3 bar, so a steady
+# solve, which reads the head at ``t = 0``, finds the design flow, and the transient starts
+# there:
 
-sol2 = solve_transient(sys2, [sys2.loss2.inlet.ṁ => ṁ0, sys2.pump2.dP_pump_fn => head], times)
+sol2 = solve_transient(sys2, solve_steady(sys2), times)
+@assert sol2[sys2.flywheel2.inlet.ṁ, 1] ≈ ṁ0
 sol2.retcode
 
 #-
 
 lines!(ax, sol2.t, sol2[sys2.flywheel2.inlet.ṁ, :]; label="pump coasting down, τ = 5 s")
+delete!(leg)  # the legend drawn above, replaced by one listing all three curves
 axislegend(ax)
 fig
 

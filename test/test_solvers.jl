@@ -50,13 +50,9 @@ using STREAM.Components
         @test sol_ss.retcode == ReturnCode.Success
         @test sol_final.retcode == ReturnCode.Success
 
-        op_ic = Pair{Any,Any}[
-            ssys.ch.T => sol_ss[ssys.ch.T],
-            ssys.ch.inlet.ṁ => sol_ss[ssys.ch.inlet.ṁ],
-            ssys.T_wall_callable => wall(T_wall_0, T_wall_final, t_step),
-        ]
         t_arr = range(0.0, 30.0, length=300)
-        sol = solve_transient(ssys, op_ic, t_arr)
+        step = [ssys.T_wall_callable => wall(T_wall_0, T_wall_final, t_step)]
+        sol = solve_transient(ssys, sol_ss, t_arr; overrides=step)
         @test sol.retcode == ReturnCode.Success
         @test length(sol.t) > 2
         T_ts = sol[ssys.ch.T_out, :]
@@ -116,5 +112,22 @@ using STREAM.Components
             isapprox(ṁ[i], ṁ0 * exp(-(r / L) * tt); rtol=1e-3) for
             (i, tt) in enumerate(t_arr)
         )
+    end
+
+    @testset "solve_transient rejects a start value for an observed variable" begin
+        @named pump = Pump(3.0)
+        @named ine = Inertia(5.0)
+        @named res = Resistor(3.0)
+        @named hx = HeatExchanger(26.85)
+        @named sys = assembly([inseries(pump, ine, res, hx, pump), pump.inlet.p ~ 1.0e5],
+                              pump, ine, res, hx)
+        ssys = mtkcompile(sys)
+        flows = [ssys.pump.inlet.ṁ, ssys.ine.inlet.ṁ, ssys.res.inlet.ṁ, ssys.hx.inlet.ṁ]
+        kept = only(filter(f -> any(isequal(f), unknowns(ssys)), flows))
+        alias = first(filter(!isequal(kept), flows))
+        t_arr = range(0.0, 1.0; length=5)
+        @test_throws ArgumentError solve_transient(ssys, [alias => 1.0], t_arr)
+        @test solve_transient(ssys, [kept => 1.0], t_arr)[alias, 1] ≈ 1.0
+        @test solve_transient(ssys, [kept => 1.0, alias => 1.0], t_arr)[alias, 1] ≈ 1.0
     end
 end
