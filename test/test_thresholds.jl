@@ -224,6 +224,7 @@ end
         @test state.ṁ == 0.5
         @test state.gravity == 9.81
         @test state.duct === pipe
+        @test state.liquid === H2O   # built by hand, outside any @coolant block
     end
 
     @testset "bergles_rohsenow_t_onb on a ChannelState" begin
@@ -348,6 +349,18 @@ end
         # Factor 1.0 gives back the hotter face untouched.
         result_default = twall_limit(state)
         @test all(result_default .≈ 66.85)
+    end
+end
+
+@testset "a ChannelState carries its channel's coolant" begin
+    d2o = @coolant D2O build_loop(; n=5)
+    state = ChannelState(solve_steady(d2o), d2o.ch)
+    @test state.liquid === D2O
+    @testset "$(nameof(f)) defaults to the channel's coolant" for f in (
+        q_boiling_onset, q_CHF_sudo_kaminaga, q_OFI_whittle_forgan, q_OSV_saha_zuber,
+    )
+        @test f(state) == f(state; liquid=D2O)
+        @test f(state) != f(state; liquid=H2O)
     end
 end
 
