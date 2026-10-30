@@ -7,13 +7,13 @@ using ModelingToolkit: @named, mtkcompile, unknowns, equations
 
 @named hx = HeatExchanger(40.0);
 
-geometry = PipeGeometry_circular(0.6, 0.01)
-@named ch = Channel(; n=10, geometry, h_left=5000.0);
+geometry = Duct(0.6, Circular(0.01))
+@named ch = Channel(; n=10, geometry, h=5000.0);
 
 connections = [
     inseries(pump, hx, ch, pump),
     pump.inlet.p ~ 1.0e5,
-    ch.T_wall_left .~ 100.0,
+    ch.T_wall_outer .~ 100.0,
 ];
 
 @named loop = assembly(connections, pump, hx, ch)
@@ -22,7 +22,7 @@ length(equations(loop))
 sys = mtkcompile(loop)
 foreach(println, unknowns(sys))
 
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5]);
+sol = solve_steady(sys);
 
 ṁ = sol[sys.ch.inlet.ṁ]
 
@@ -41,7 +41,7 @@ T_in = 40.0
 Q_flow = ṁ * cₚ(H2O, (T_in + T_out) / 2) * (T_out - T_in)
 @assert isapprox(Q_wall, Q_flow; rtol=1e-6);
 
-sol2 = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5, sys.pump.dP_pump => 4.0e4])
+sol2 = solve_steady(sys, [sys.pump.dP_pump => 4.0e4])
 ṁ2 = sol2[sys.ch.inlet.ṁ]
 
 @assert isapprox(ṁ2 / ṁ, (4 / 3)^(1 / 1.75); rtol=5e-3)

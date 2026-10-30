@@ -4,11 +4,11 @@ using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndCon
 using STREAM.Assemblies: inseries, symmetric_plate, temperature_feedback
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
-using OrdinaryDiffEq: BrownFullBasicInit
+using OrdinaryDiffEqNonlinearSolve: BrownFullBasicInit
 
 L, n, nx = 0.6, 20, 4
 P_rated = 2.5e4                                       # plate power [W]
-geometry = PipeGeometry_rectangular(L, 0.067, 0.0024, 0.063)
+geometry = Duct(L, Rectangular(0.067, 0.0024); heated=0.063)
 shape = repeat(cosine_shape(range(0.0, L; length=n + 1), 1.4) ./ nx, 1, nx)
 
 function unit_cell(; power)
