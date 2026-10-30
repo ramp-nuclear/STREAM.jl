@@ -93,7 +93,7 @@ function q_boiling_onset(ṁ, T_sat, T_inlet, cp)
 end
 
 @doc raw"""
-    q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, duct; liquid=default_coolant()) -> Q [W]
+    q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, duct; liquid=coolant()) -> Q [W]
 
 Channel power at the onset of flow instability, from the Whittle-Forgan correlation
 [WhittleForgan1967](@cite) with Fabrèga's flow-dependent `η` [Fabrega1971](@cite):
@@ -110,8 +110,8 @@ correlation was fitted. See [Onset of flow instability](@ref) for the physics.
 - `T_sat`: saturation temperature [°C]
 - `T_inlet`: coolant inlet temperature [°C]
 - `duct`: the channel's [`Duct`](@ref)
-- `liquid`: the coolant whose `cₚ` is integrated (default [`default_coolant()`](@ref
-  STREAM.Substances.default_coolant))
+- `liquid`: the coolant whose `cₚ` is integrated (default [`coolant()`](@ref
+  STREAM.Substances.coolant))
 
 # Returns
 OFI limit power `Q_OFI` [W].
@@ -125,7 +125,7 @@ julia> round(Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, duct); sigdigits
 ```
 """
 function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, duct;
-                              liquid::AbstractLiquid=default_coolant())
+                              liquid::AbstractLiquid=coolant())
     G = abs(ṁ) / flow_area(duct)
     G_cgs = G / 10  # SI to CGS conversion (G must be in CGS per Whittle-Forgan)
     integral_cp, _ = quadgk(T -> cₚ(liquid, T), T_inlet, T_sat)

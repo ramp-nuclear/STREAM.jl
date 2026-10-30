@@ -1,8 +1,9 @@
 # Change the coolant
 
 A component takes its coolant as the `liquid` keyword, light water ([`H2O`](@ref)) by
-default. A model can instead name its coolant once with [`with_coolant`](@ref) and leave the
-keyword out. An explicit keyword wins over the block, and the block wins over the default.
+default. A model can instead name its coolant once with [`@coolant`](@ref) and leave the
+keyword out. An explicit keyword wins over a `@coolant` block, a block over the session's
+coolant, and that is `H2O` until `@coolant` sets it.
 
 ## Per component
 
@@ -29,29 +30,45 @@ passes them, so they need no change. The property functions take any liquid:
 
 ## Once for a whole model
 
-Build the components inside a `with_coolant` block, and every `liquid` keyword left out
-takes the block's coolant:
+Build the components inside a `@coolant` block, and every `liquid` keyword left out takes the
+block's coolant:
 
 ```@example coolant
 using STREAM.Components: HeatExchanger, Pump
 using STREAM.Assemblies: inseries
 
-model = with_coolant(D2O) do
+@coolant D2O begin
     @named pump = Pump(3.0e4)
     @named hx = HeatExchanger(40.0)
     @named core = ChannelAndContacts(; n=10, geometry=geom)
-    assembly([inseries(pump, hx, core, pump), pump.inlet.p ~ ATM], pump, hx, core; name=:model)
 end
+@named model = assembly([inseries(pump, hx, core, pump), pump.inlet.p ~ ATM], pump, hx, core)
 @assert Substances.coolant(model.core) === D2O   # the channel keeps the block's coolant
-Substances.default_coolant()
+Substances.coolant()
 ```
 
-The block returns its last expression, here the model, and `Substances.default_coolant()` is
-back to `H2O` outside it.
+The components assigned inside the block stay defined after it, and `Substances.coolant()` is
+back to `H2O` outside it. Every channel records the coolant it was built with, so a
+`ChannelState` reads the right one after the block ends. `steady_state_guess` runs before any
+model exists, so it reads the coolant in effect when it is called: call it inside the block, or
+pass `liquid=`.
 
-Every channel records the coolant it was built with, so a `ChannelState` reads the right one
-after the block ends. `steady_state_guess` runs before any model exists, so it reads the default
-when it is called: call it inside the block, or pass `liquid=`.
+Without a block, `@coolant` sets the coolant for the rest of the session, until the next
+`@coolant`:
+
+```@example coolant
+@coolant D2O
+Substances.coolant()
+```
+
+```@example coolant
+@coolant H2O
+nothing # hide
+```
+
+A two-stream [`HeatExchanger`](@ref STREAM.Components.HeatExchanger) takes the coolant in
+effect on its primary side only. Its secondary is another loop and stays `H2O` unless given
+`secondary_liquid`.
 
 ## Properties frozen at one state
 

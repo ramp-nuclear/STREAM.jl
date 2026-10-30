@@ -50,7 +50,8 @@ Coolants and the property correlations behind them.
 
 A coolant is a singleton type such as `LightWater` (aliased [`H2O`](@ref)) answering nine
 property queries. Components take one as a keyword argument, or a model names its coolant
-once with [`with_coolant`](@ref) and leaves the keyword out.
+once with [`@coolant`](@ref) and leaves the keyword out. [`coolant`](@ref) returns the
+coolant in effect, or the one a channel was built with.
 [`Liquid`](@ref) holds fixed property values and is itself an `AbstractLiquid`, for a coolant
 frozen at one state point.
 
@@ -68,10 +69,10 @@ using ..STREAM: ATM
 include("substances/liquid.jl")
 include("substances/light_water.jl")
 include("substances/heavy_water.jl")
-include("substances/coolant.jl")
+include("substances/coolant_scope.jl")
 include("substances/solid.jl")
 export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, Solid
-export coolant, default_coolant, with_coolant
+export coolant, @coolant
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
@@ -219,7 +220,7 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 module Thresholds
 using ModelingToolkit
 using QuadGK
-using ..STREAM: AbstractLiquid, Liquid, G_EARTH, coolant, default_coolant
+using ..STREAM: AbstractLiquid, Liquid, G_EARTH, coolant
 using ..STREAM: Duct, Rectangular, Circular, Annular, flow_area, hydraulic_diameter
 using ..STREAM: heated_perimeter, duct
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
@@ -275,7 +276,7 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
-using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM, default_coolant
+using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM, H2O, coolant
 using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter, _DuctKey
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
@@ -442,7 +443,7 @@ export Assemblies, Utilities
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
-export H2O, D2O, Solid, with_coolant
+export H2O, D2O, Solid, @coolant
 
 # Dimensionless numbers
 export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend

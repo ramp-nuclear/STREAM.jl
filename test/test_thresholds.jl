@@ -216,7 +216,6 @@ end
         duct=pipe,
         gravity=9.81,
     )
-    @test state.liquid === H2O   # built by hand, outside any with_coolant block
 
     @testset "ChannelState construction" begin
         @test state.n == n
@@ -225,6 +224,7 @@ end
         @test state.ṁ == 0.5
         @test state.gravity == 9.81
         @test state.duct === pipe
+        @test state.liquid === H2O   # built by hand, outside any @coolant block
     end
 
     @testset "bergles_rohsenow_t_onb on a ChannelState" begin
@@ -352,13 +352,16 @@ end
     end
 end
 
-@testset "a ChannelState carries its channel's coolant, and the correlations read it" begin
-    d2o = with_coolant(() -> build_loop(; n=5), D2O)
+@testset "a ChannelState carries its channel's coolant" begin
+    d2o = @coolant D2O build_loop(; n=5)
     state = ChannelState(solve_steady(d2o), d2o.ch)
     @test state.liquid === D2O
-    correlations = (q_boiling_onset, q_CHF_sudo_kaminaga, q_OFI_whittle_forgan, q_OSV_saha_zuber)
-    @test all(f(state) == f(state; liquid=D2O) for f in correlations)
-    @test all(f(state) != f(state; liquid=H2O) for f in correlations)
+    @testset "$(nameof(f)) defaults to the channel's coolant" for f in (
+        q_boiling_onset, q_CHF_sudo_kaminaga, q_OFI_whittle_forgan, q_OSV_saha_zuber,
+    )
+        @test f(state) == f(state; liquid=D2O)
+        @test f(state) != f(state; liquid=H2O)
+    end
 end
 
 @testset "ChannelState from a solved channel" begin
