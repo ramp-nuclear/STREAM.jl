@@ -155,24 +155,26 @@ end
                                 expected_wet_perim, expected_heated_parts;
                                 rtol=1e-12)
 
-Assert PipeGeometry fields match Python EffectivePipe at the same dimensions.
+Assert a Duct matches Python's EffectivePipe at the same dimensions.
 Caller passes expected values as hardcoded numbers (computed in the Python
-generator and pasted into the parity testset).
+generator and pasted into the parity testset). Python lists a zero-width part for
+an unheated face, which a Duct leaves out, so only the nonzero parts are compared,
+in order, against the duct's heated faces.
 
 """
 function assert_equivalence_geometry(geom, expected_Dh, expected_A,
                                      expected_wet_perim, expected_heated_parts;
                                      rtol::Float64=1e-12)
-    isapprox(geom.Dh, expected_Dh; rtol=rtol) || error(
-        "EQUIVALENCE FAIL: Dh: Julia=$(geom.Dh), Expected=$expected_Dh")
-    isapprox(geom.A, expected_A; rtol=rtol) || error(
-        "EQUIVALENCE FAIL: A: Julia=$(geom.A), Expected=$expected_A")
-    isapprox(geom.wet_perimeter, expected_wet_perim; rtol=rtol) || error(
+    isapprox(hydraulic_diameter(geom), expected_Dh; rtol=rtol) || error(
+        "EQUIVALENCE FAIL: Dh: Julia=$(hydraulic_diameter(geom)), Expected=$expected_Dh")
+    isapprox(flow_area(geom), expected_A; rtol=rtol) || error(
+        "EQUIVALENCE FAIL: A: Julia=$(flow_area(geom)), Expected=$expected_A")
+    isapprox(wetted_perimeter(geom), expected_wet_perim; rtol=rtol) || error(
         "EQUIVALENCE FAIL: wet_perimeter")
-    isapprox(geom.heated_parts[1], expected_heated_parts[1]; rtol=rtol) || error(
-        "EQUIVALENCE FAIL: heated_parts[1] (left)")
-    isapprox(geom.heated_parts[2], expected_heated_parts[2]; rtol=rtol) || error(
-        "EQUIVALENCE FAIL: heated_parts[2] (right)")
+    expected = filter(!iszero, collect(expected_heated_parts))
+    actual = collect(values(geom.heated))
+    (length(actual) == length(expected) && all(isapprox.(actual, expected; rtol=rtol))) ||
+        error("EQUIVALENCE FAIL: heated faces: Julia=$(geom.heated), Expected=$expected")
     @info "Equivalence checklist: geometry matches"
 end
 

@@ -57,7 +57,7 @@ nothing # hide
 The plate then joins a channel as any other does. Between two channels:
 
 ```@example hs
-geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 @named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
 @named cell = symmetric_plate(ch, fuel)
 @named pump = Pump(; ṁ0=0.4)

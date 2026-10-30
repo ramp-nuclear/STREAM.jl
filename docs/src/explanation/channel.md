@@ -10,10 +10,12 @@ share one set of equations. They differ only in how heat reaches the coolant:
 | [`ChannelHeatFlux`](@ref STREAM.Components.ChannelHeatFlux) | ``q''\,P\,\Delta z``, with ``q''`` bound in the connection list | the heat flux is known |
 | [`ChannelAndContacts`](@ref STREAM.Components.ChannelAndContacts) | ``h\,P\,\Delta z\,(T_w - T)``, with ``h`` from a heat transfer model and ``T_w`` from a thermal port | the channel cools a fuel plate |
 
-Here ``P`` is the heated perimeter of one face and ``\Delta z = L/n``. Each has a left and a
-right face, so a channel between two plates is heated from both sides. For a plate-fuel
-channel, [`PipeGeometry_rectangular`](@ref) takes the two edges of the cross-section and the
-heated width of each face:
+Here ``P`` is the heated perimeter of one face and ``\Delta z = L/n``. A channel has one face
+per heated wall of its [`Duct`](@ref), each with its own wall temperature and heat flow, and
+named after the wall: `left` and `right` for the two long walls of a [`Rectangular`](@ref)
+gap, so a channel between two plates is heated from both sides; `outer` for a
+[`Circular`](@ref) pipe; `inner` and `outer` for an [`Annular`](@ref) one around a rod. For a
+plate-fuel channel the duct takes the two edges and the heated width of each face:
 
 ![Cross-section of a plate-fuel coolant channel: the gap between two fuel plates, with the width, gap and heated width marked](../assets/rect_channel.svg)
 
@@ -130,13 +132,13 @@ using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
 
 n = 20
-geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
+geometry = Duct(0.6, Rectangular(0.067, 0.0024))
 shape = cosine_shape(range(0.0, geometry.L; length=n + 1))
 T_wall = 60.0 .+ 60.0 .* shape ./ maximum(shape)   # 60 °C at the ends, 120 °C mid-height
 
 @named pump = Pump(2.0e4)
 @named hx = HeatExchanger(40.0)
-@named ch = Channel(; n, geometry, g=-G_EARTH, h_left=2.0e4, h_right=2.0e4)
+@named ch = Channel(; n, geometry, g=-G_EARTH, h=2.0e4)
 connections = [
     inseries(pump, hx, ch, pump),
     pump.inlet.p ~ 1.7e5,
@@ -145,7 +147,7 @@ connections = [
 ]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol = solve_steady(sys)
 
 z = ((1:n) .- 0.5) .* geometry.L ./ n
 fig = Figure(size=(700, 420))

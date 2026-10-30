@@ -19,7 +19,7 @@ Here the knob is the channel gap, and the plate keeps its thickness:
 
 ```@example knob
 gap = @design_knob gap = 0.0024
-geometry = PipeGeometry_rectangular(0.6, 0.067, gap, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, gap); heated=0.063)
 
 n = 10
 plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
@@ -35,8 +35,8 @@ sys = mtkcompile(loop)
 nothing # hide
 ```
 
-[`PipeGeometry_rectangular`](@ref) and [`PipeGeometry_circular`](@ref) accept a knob for any
-length, and the area, hydraulic diameter and perimeters follow it. A knob used in several
+A [`Duct`](@ref) and its shape accept a knob for any length, and the area, hydraulic diameter
+and perimeters follow it. A knob used in several
 components is one parameter: changing it moves all of them.
 
 ## Solve at each value
@@ -45,7 +45,7 @@ Give the knob's value in the operating point. [`knob_defaults`](@ref) collects t
 for a solve at the declared design:
 
 ```@example knob
-base = [knob_defaults([gap]); sys.cell.ch.inlet.ṁ => 0.4]
+base = knob_defaults([gap])
 sol = solve_steady(sys, base)
 sol[sys.cell.ch.inlet.ṁ]
 ```
@@ -55,7 +55,7 @@ and a scan sets it explicitly, compiling nothing:
 ```@example knob
 gaps = [0.0018, 0.0021, 0.0024, 0.0027, 0.0030]
 results = map(gaps) do g
-    s = solve_steady(sys, [gap => g, sys.cell.ch.inlet.ṁ => 0.4])
+    s = solve_steady(sys, [gap => g])
     (gap_mm=1e3g, ṁ=round(s[sys.cell.ch.inlet.ṁ]; digits=3), T_out=round(s[sys.cell.ch.T_out]; digits=2))
 end
 ```

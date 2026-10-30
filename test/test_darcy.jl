@@ -7,25 +7,25 @@ using STREAM.Assemblies
 using STREAM.Components
 
 # MTR-like channel: aspect ratio 0.01814, which is where k_R departs from 1 the most.
-const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
+const GEOM_F = Duct(0.6, Rectangular(0.07, 0.07 * 0.01814))
 
 @testset "Friction.AbstractDarcyFactor models" begin
-    A, Dh = GEOM_F.A, GEOM_F.Dh
+    A, Dh = flow_area(GEOM_F), hydraulic_diameter(GEOM_F)
     T_bulk, T_wall = 40.0, 90.0
     re_of(ṁ) = Re(H2O, T_bulk, ṁ, A, Dh)
     ṁ_at(target) = target * μ(H2O, T_bulk) * A / Dh
 
     @testset "Friction.FromReynolds closes a bare correlation at the bulk" begin
         ṁ = 0.25
-        @test Friction.Blasius()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ Friction.blasius(re_of(ṁ))
-        @test Friction.Laminar()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ Friction.laminar(re_of(ṁ))
-        @test Friction.Turbulent()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ Friction.turbulent(re_of(ṁ))
-        @test Friction.Turbulent(; epsilon=0.1)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
+        @test Friction.Blasius()(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈ Friction.blasius(re_of(ṁ))
+        @test Friction.Laminar()(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈ Friction.laminar(re_of(ṁ))
+        @test Friction.Turbulent()(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈ Friction.turbulent(re_of(ṁ))
+        @test Friction.Turbulent(; epsilon=0.1)(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈
               Friction.turbulent(re_of(ṁ), 0.1)
 
         # The wall temperature is accepted and ignored by a model that has no use for it.
-        @test Friction.Blasius()(T_bulk, 500.0, ṁ, H2O, GEOM_F) ==
-              Friction.Blasius()(T_bulk, T_wall, ṁ, H2O, GEOM_F)
+        @test Friction.Blasius()(500.0, T_bulk, ṁ, H2O, GEOM_F) ==
+              Friction.Blasius()(T_wall, T_bulk, ṁ, H2O, GEOM_F)
         # And the short form drops it entirely.
         @test Friction.Blasius()(T_bulk, ṁ, H2O, GEOM_F) ==
               Friction.Blasius()(T_bulk, T_bulk, ṁ, H2O, GEOM_F)
@@ -33,13 +33,34 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
 
     @testset "k_R scales the Reynolds fed to the correlation" begin
         ṁ = 0.25
-        @test Friction.Laminar(; k_R=0.5)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
-              Friction.laminar(re_of(ṁ) * 0.5)
-        # The rectangular constructor is the aspect-ratio k_R spelled out.
-        k_R = Friction.rectangular_correction(GEOM_F.depth / GEOM_F.width)
-        @test Friction.RectangularLaminar(GEOM_F)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
-              64.0 / (re_of(ṁ) * k_R)
-        @test !isapprox(k_R, 1.0; rtol=1e-3)   # or the test proves nothing
+        k_R = Friction.rectangular_correction(aspect_ratio(GEOM_F))
+        @test !isapprox(k_R, 1.0; rtol=1e-3)   # or the tests below prove nothing
+
+        @testset "a number k_R" begin
+            @test Friction.Laminar(; k_R=0.5)(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈
+                  Friction.laminar(re_of(ṁ) * 0.5)
+        end
+
+        @testset "RectangularLaminar is the aspect-ratio k_R spelled out" begin
+            @test Friction.RectangularLaminar()(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈
+                  64.0 / (re_of(ṁ) * k_R)
+        end
+
+        @testset "a circular duct gets the Hagen-Poiseuille 64/Re" begin
+            pipe = Duct(0.6, Circular(0.01))
+            @test Friction.RectangularLaminar()(T_wall, T_bulk, ṁ, H2O, pipe) ≈
+                  Friction.Laminar()(T_wall, T_bulk, ṁ, H2O, pipe)
+        end
+
+        @testset "a k_R function of the duct reaches a regime-dependent model" begin
+            rd = Friction.RegimeDependent(; k_R=Friction.rectangular_correction)
+            @test rd(T_wall, T_bulk, ṁ_at(500.0), H2O, GEOM_F) ≈ 64.0 / (500.0 * k_R)
+        end
+
+        @testset "a k_R function prints as the function it is" begin
+            @test sprint(show, MIME("text/plain"), Friction.RectangularLaminar()) ==
+                  "Friction.FromReynolds(laminar), Re scaled by k_R from rectangular_correction"
+        end
     end
 
     @testset "Friction.RegimeDependent blends and guards no-flow" begin
@@ -47,19 +68,19 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
         for target in (500.0, 8000.0)
             m = ṁ_at(target)
             branch = target < 2000 ? Friction.laminar : Friction.turbulent
-            @test rd(T_bulk, T_wall, m, H2O, GEOM_F) ≈ branch(re_of(m))
+            @test rd(T_wall, T_bulk, m, H2O, GEOM_F) ≈ branch(re_of(m))
         end
         # A quarter into the band.
         m_band = ṁ_at(2750.0)
         f_lam = Friction.laminar(re_of(m_band))
         f_turb = Friction.turbulent(re_of(m_band))
-        @test rd(T_bulk, T_wall, m_band, H2O, GEOM_F) ≈ f_lam + 0.25 * (f_turb - f_lam)
+        @test rd(T_wall, T_bulk, m_band, H2O, GEOM_F) ≈ f_lam + 0.25 * (f_turb - f_lam)
 
         # The no-flow guard: the bare 64/Re would be Inf here.
-        @test rd(T_bulk, T_wall, 0.0, H2O, GEOM_F) == 0.0
-        @test isfinite(rd(T_bulk, T_wall, 0.0, H2O, GEOM_F))
+        @test rd(T_wall, T_bulk, 0.0, H2O, GEOM_F) == 0.0
+        @test isfinite(rd(T_wall, T_bulk, 0.0, H2O, GEOM_F))
         # Reversed flow uses |ṁ| for Re, so it mirrors forward flow.
-        @test rd(T_bulk, T_wall, -0.25, H2O, GEOM_F) ≈ rd(T_bulk, T_wall, 0.25, H2O, GEOM_F)
+        @test rd(T_wall, T_bulk, -0.25, H2O, GEOM_F) ≈ rd(T_wall, T_bulk, 0.25, H2O, GEOM_F)
     end
 
     @testset "the viscosity correction reaches the wall" begin
@@ -70,14 +91,14 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
         ṁ = 0.25
 
         # Opt-in: without it nothing moves.
-        @test plain(T_bulk, T_wall, ṁ, H2O, GEOM_F) ==
-              plain(T_bulk, 500.0, ṁ, H2O, GEOM_F)
+        @test plain(T_wall, T_bulk, ṁ, H2O, GEOM_F) ==
+              plain(500.0, T_bulk, ṁ, H2O, GEOM_F)
 
-        f_plain = plain(T_bulk, T_wall, ṁ, H2O, GEOM_F)
-        f_corr = corrected(T_bulk, T_wall, ṁ, H2O, GEOM_F)
+        f_plain = plain(T_wall, T_bulk, ṁ, H2O, GEOM_F)
+        f_corr = corrected(T_wall, T_bulk, ṁ, H2O, GEOM_F)
         ratio = μ(H2O, T_wall) / μ(H2O, T_bulk)
         expected = f_plain * Friction.viscosity_correction(
-            GEOM_F.heated_perimeter / GEOM_F.wet_perimeter, ratio
+            heated_perimeter(GEOM_F) / wetted_perimeter(GEOM_F), ratio
         )
         @test f_corr ≈ expected
         # A hotter wall thins the liquid there, so the correction is below 1 and the
@@ -91,32 +112,32 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
     end
 
     @testset "user-defined factors" begin
-        mine = Friction.FromFunction((Tb, Tw, m, liq, pipe) -> 0.042)
-        @test mine(T_bulk, T_wall, 0.25, H2O, GEOM_F) == 0.042
+        mine = Friction.FromFunction((Tw, Tb, m, liq, duct) -> 0.042)
+        @test mine(T_wall, T_bulk, 0.25, H2O, GEOM_F) == 0.042
         @test mine(T_bulk, 0.25, H2O, GEOM_F) == 0.042
         # Any callable works as a FromReynolds correlation.
-        @test Friction.FromReynolds(Re -> 1 / Re)(T_bulk, T_wall, 0.25, H2O, GEOM_F) ≈
+        @test Friction.FromReynolds(Re -> 1 / Re)(T_wall, T_bulk, 0.25, H2O, GEOM_F) ≈
               1 / re_of(0.25)
     end
 end
 
 @testset "Friction resistor" begin
     @testset "geometry is required" begin
-        # The whole PipeGeometry is the only accepted form: the viscosity correction needs the
+        # The whole Duct is the only accepted form: the viscosity correction needs the
         # heated and wet perimeters, which an L/D/A triple cannot supply.
         @test_throws UndefKeywordError FrictionResistor(; name=:bad)
     end
 
     # A pump pushes through one resistor; the solved drop must match the closed form.
     function solve_drop(; darcy=Friction.Blasius(), dP=3.0e4)
-        geom = PipeGeometry_circular(2.0, 0.05)
+        geom = Duct(2.0, Circular(0.05))
         @named pump = Pump(dP)
         @named fr = FrictionResistor(; geometry=geom, darcy=darcy)
         @named hx = HeatExchanger(40.0)
         conns = [inseries(pump, hx, fr, pump), pump.inlet.p ~ 1.0e5]
         @named sys = assembly(conns, pump, fr, hx)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.fr.inlet.ṁ => 1.0])
+        sol = solve_steady(ssys)
         return ssys, sol
     end
 
@@ -127,7 +148,7 @@ end
         # The factor the component reports is the one the model gives at the solved Re.
         Re_sol = sol[ssys.fr.Re]
         @test sol[ssys.fr.f] ≈ rd(40.0, 40.0, sol[ssys.fr.inlet.ṁ], H2O,
-                                  PipeGeometry_circular(2.0, 0.05))
+                                  Duct(2.0, Circular(0.05)))
         @test Re_sol > 5000.0     # this operating point is turbulent
         @test sol[ssys.fr.f] ≈ Friction.turbulent(Re_sol)
     end
@@ -147,7 +168,7 @@ end
         ]
         @named sys = assembly(conns, pump, hx, rs...)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.pump.inlet.ṁ => 0.5])
+        sol = solve_steady(ssys)
         return sol[ssys.pump.inlet.ṁ]
     end
     m_one = loop_flow([2.0e4])
@@ -192,7 +213,7 @@ end
         ssys = mtkcompile(sys)
         # The callable form's extra L_eff variable changes what MTK tears, which surfaces
         # the dummy derivative; seed it so both forms initialise the same way.
-        op = Pair{Any,Any}[ssys.L_comp.inlet.ṁ => ṁ0]
+        op = Pair{Any,Any}[]
         if any(contains("ṁˍt"), string.(unknowns(ssys)))
             push!(op, Differential(t)(ssys.L_comp.inlet.ṁ) => 0.0)
         end

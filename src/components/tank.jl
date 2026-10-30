@@ -1,5 +1,5 @@
 @doc raw"""
-    Tank(; name, area, L0, ports, liquid=default_coolant(), p_surface=ATM, T0=T_ROOM,
+    Tank(; name, area, L0, ports, liquid=coolant(), p_surface=ATM, T0=T_ROOM,
          fixed_temperature=true, volume=nothing, Q_ext=0.0, g=G_EARTH) -> System
 
 A body of liquid with a free surface: a pool, or a tank with a cover gas. It holds an inventory
@@ -67,8 +67,8 @@ among the machine's `abort_states` to stop the run there.
 - `L0`: initial level, and the level held while pinned [m]
 - `ports`: connection elevations [m], in the datum of `L`, as a `NamedTuple` such as
   `(suction=0.0, return=0.5)`. Each becomes a `FlowPort` of that name.
-- `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`default_coolant()`](@ref
-  STREAM.Substances.default_coolant)
+- `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`coolant()`](@ref
+  STREAM.Substances.coolant)
 - `p_surface`: pressure above the liquid [Pa] (default [`ATM`](@ref))
 - `T0`: the held temperature, or the initial one with `fixed_temperature=false` [°C]
 - `fixed_temperature`: hold `T` at `T0` (default `true`). `false` makes `T` follow the energy
@@ -91,7 +91,7 @@ and the parameter `pinned`.
 # Throws
 - `ArgumentError`: for a tank with no ports, or a level-dependent `area` with no `volume`
 """
-function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=default_coolant(),
+function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=coolant(),
               p_surface=ATM, T0=T_ROOM, fixed_temperature::Bool=true, volume=nothing,
               Q_ext=0.0, g=G_EARTH)
     isempty(ports) && throw(ArgumentError("a Tank needs at least one port"))
@@ -180,8 +180,7 @@ inseries(pool.bottom, breach, ambient.port)
 Uncompiled `System`.
 """
 function Environment(; name, p=ATM, T=T_ROOM)
-    pars = @parameters p_env = p T_env = T
+    @parameters p_env = p T_env = T
     @named port = FlowPort()
-    eqs = Equation[port.p ~ p_env, port.T ~ T_env]
-    return compose(System(eqs, t, [], pars; name=name), port)
+    return assembly([port.p ~ p_env, port.T ~ T_env], port; name)
 end

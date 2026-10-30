@@ -70,6 +70,12 @@ function __init__()
     return nothing
 end
 
+"""
+    _tag(standard) -> String, _table_path(dir, standard, source) -> String
+
+How a standard is spelled in the name of its table file, and where in `dir` the table for one
+fissioning source is.
+"""
 _tag(standard::Standard) = lowercase(string(standard))
 
 _table_path(dir, standard::Standard, source::Source) =

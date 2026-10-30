@@ -1,5 +1,3 @@
-# test/runtests.jl — thin orchestrator
-
 include("preamble.jl")
 
 include("test_doctests.jl")
@@ -7,6 +5,7 @@ include("test_geometry.jl")
 include("test_knobs.jl")
 include("test_connectors.jl")
 include("test_substances.jl")
+include("test_coolant_scope.jl")
 include("test_channels.jl")
 include("test_pump.jl")
 include("test_valves.jl")

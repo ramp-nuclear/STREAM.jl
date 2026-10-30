@@ -47,9 +47,13 @@ laminar(Re) = 64.0 / Re
 
 """
     rectangular_correction(aspect_ratio) -> K_R
+    rectangular_correction(duct::Duct) -> K_R
 
 Geometric correction ``K_R`` to the laminar friction factor of a rectangular duct,
 `f = 64 / (Re · K_R)`, from the fit in [KAERI2014](@cite) also used by the TERMIC code.
+
+Given a duct, it reads the aspect ratio off a rectangular one, and is 1 for a circular one.
+In that form it can be passed as the `k_R` of a friction model.
 
 # Arguments
 - `aspect_ratio`: `depth / width`, in [0, 1]. 0 is the gap between infinite parallel
@@ -76,36 +80,32 @@ function rectangular_correction(aspect_ratio::Real)
     )^(-1)
 end
 
+rectangular_correction(duct::Duct{<:Rectangular}) = rectangular_correction(aspect_ratio(duct))
+rectangular_correction(::Duct{<:Circular}) = 1.0
+
 """
-    rectangular_laminar(geom::PipeGeometry) -> (Re) -> f_darcy
+    rectangular_laminar(Re, aspect_ratio) -> f_darcy
 
 Laminar Darcy friction factor for a rectangular duct, `f = 64 / (Re · K_R)`, with ``K_R``
-from [`rectangular_correction`](@ref) at the duct's `depth / width`.
+from [`rectangular_correction`](@ref).
 
 This is the rectangular companion to [`laminar`](@ref). Like it, it has no guard at
 `Re = 0`, so a loop whose flow reverses should use [`RegimeDependent`](@ref) instead.
-A circular `PipeGeometry` has `depth == width`, so it gets the square-duct factor
-(`f ≈ 56.9/Re`), not `64/Re`.
 
 # Arguments
-- `geom`: the duct
+- `Re`: Reynolds number
+- `aspect_ratio`: `depth / width`, in [0, 1]
 
 # Returns
-A function `Re -> f`. Wrap it in [`FromReynolds`](@ref) to hand it to a channel.
+Darcy friction factor (dimensionless).
 
 # Examples
 ```jldoctest
-julia> f = Friction.rectangular_laminar(PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07));
-
-julia> f(100.0)
+julia> Friction.rectangular_laminar(100.0, 0.01814)
 0.9337140113944999
 ```
 """
-function rectangular_laminar(geom::PipeGeometry)
-    aspect_ratio = geom.depth / geom.width
-    k_R = rectangular_correction(aspect_ratio)
-    return (Re) -> 64.0 / (Re * k_R)
-end
+rectangular_laminar(Re, aspect_ratio) = 64.0 / (Re * rectangular_correction(aspect_ratio))
 
 @doc raw"""
     turbulent(Re, epsilon=0) -> f_darcy
@@ -146,7 +146,7 @@ function turbulent(Re, epsilon=0)
     inlog = log10(epsilon + 21.25 / Re_safe^0.9)
     outlog = log10(epsilon / 3.7 + (2.51 / Re_safe) * (1.14 - 2 * inlog))
     f = (-2 * outlog)^(-2)
-    return Base.ifelse(Re < 10, zero(f), f)
+    return ifelse(Re < 10, zero(f), f)
 end
 
 """
@@ -181,7 +181,7 @@ end
 
 @doc raw"""
     darcy_weisbach_dp(ṁ, rho, f, L, Dh, A) -> Pa
-    darcy_weisbach_dp(ṁ, rho, f, geom::PipeGeometry) -> Pa
+    darcy_weisbach_dp(ṁ, rho, f, duct::Duct) -> Pa
 
 Distributed friction pressure drop over a length of duct:
 
@@ -192,8 +192,8 @@ Distributed friction pressure drop over a length of duct:
 `ṁ|ṁ|` rather than `ṁ^2` so the drop reverses sign with the flow. Positive `ṁ`
 gives a positive drop.
 
-The `PipeGeometry` form takes `L`, `Dh` and `A` from the geometry. Pass `L` explicitly for a
-single cell of a discretised channel, where the length is `geom.L / n` rather than `geom.L`.
+The `Duct` form takes `L`, `Dh` and `A` from the duct. Pass `L` explicitly for a single cell
+of a discretised channel, where the length is `L / n`.
 
 # Arguments
 - `ṁ`: mass flow rate [kg/s]
@@ -208,5 +208,5 @@ Pressure drop [Pa].
 """
 darcy_weisbach_dp(ṁ, rho, f, L, Dh, A) = f * (ṁ * abs(ṁ) / (2 * rho * A^2)) * (L / Dh)
 
-darcy_weisbach_dp(ṁ, rho, f, geom::PipeGeometry) =
-    darcy_weisbach_dp(ṁ, rho, f, geom.L, geom.Dh, geom.A)
+darcy_weisbach_dp(ṁ, rho, f, duct::Duct) =
+    darcy_weisbach_dp(ṁ, rho, f, duct.L, hydraulic_diameter(duct), flow_area(duct))

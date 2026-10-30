@@ -104,7 +104,7 @@ saturation, and the OFI power from the Whittle-Forgan correlation.
 ```@example limits_overview
 using STREAM, STREAM.Thresholds, CairoMakie
 
-pipe = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
+pipe = Duct(0.6, Rectangular(0.067, 0.0024))
 T_in, p = 40.0, 1.7e5
 T_sat = Tsat(H2O, p)
 

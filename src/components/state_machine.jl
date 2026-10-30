@@ -99,8 +99,8 @@ Print each entry of `log` on its own line, as `t = <time> s  <state>  <cause>`, 
 columns aligned.
 """
 function _show_entries(io::IO, log, indent)
-    times = [_format_time(entry.t) for entry in log]
-    states = [string(entry.state) for entry in log]
+    times = _format_time.(getproperty.(log, :t))
+    states = string.(getproperty.(log, :state))
     wt, ws = maximum(length, times), maximum(length, states)
     for (time, state, entry) in zip(times, states, log)
         print(io, "\n", indent, "t = ", lpad(time, wt), " s   ", rpad(state, ws), "   ",
@@ -514,6 +514,12 @@ function machine_callbacks(ssys, machines::StateMachine...)
     return length(cbs) == 1 ? only(cbs) : CallbackSet(cbs...)
 end
 
+"""
+    _callbacks(ssys, machine) -> Vector{ContinuousCallback}
+
+One callback per transition of `machine`, for [`machine_callbacks`](@ref). The first also
+settles the machine at the start of the run.
+"""
 function _callbacks(ssys, machine::StateMachine)
     edges = map(machine.transitions) do tr
         gap, both_edges = _gap(ssys, machine, tr.condition)

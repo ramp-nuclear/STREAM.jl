@@ -207,7 +207,7 @@ end
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts from it. Mirror
     # that: solve_steady with the pump on, then start the transient from the solved state with the
     # pump head overridden to 0 (a zero-head pump is a pass-through).
-    sol_ss = solve_steady(ssys, [ssys.L_el.inlet.ṁ => ṁ0, ssys.R.inlet.ṁ => ṁ0])
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 300.0; length=7)   # includes 0, 50, 150, 300
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0],
@@ -244,15 +244,9 @@ end
     @named sys = assembly(conns, pump, L_el, R1, R2, hx)
     ssys = mtkcompile(sys)
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts. Solve_steady
-    # with the pump on (the branch guesses seed the split m1/m2 = √(k2/k1)), then start the
-    # transient from the solved state with the pump head overridden to 0.
-    sol_ss = solve_steady(ssys,
-        [
-            ssys.L_el.inlet.ṁ => ṁ0,
-            ssys.R1.inlet.ṁ => ṁ0 / (1 + sqrt(k1 / k2)),
-            ssys.R2.inlet.ṁ => ṁ0 / (1 + sqrt(k2 / k1)),
-        ],
-    )
+    # with the pump on, then start the transient from the solved state with the pump head
+    # overridden to 0.
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 100.0; length=6)   # includes 0, 20, 60, 100
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0],
@@ -344,10 +338,7 @@ end
     ṁ = Float64[]
     for tt in 0.0:1.0:6.0
         m = 3.0 - tt
-        sol = solve_steady(
-            ssys,
-            [ssys.pump.ṁ0 => m, ssys.lpd.inlet.ṁ => m],
-        )
+        sol = solve_steady(ssys, [ssys.pump.ṁ0 => m])
         @test sol.retcode == ReturnCode.Success
         push!(ṁ, sol[ssys.lpd.inlet.ṁ])
     end
@@ -381,7 +372,6 @@ end
     @named sys = assembly(conns, pump, R, flapper, hx)
     ssys = mtkcompile(sys)
     op = [
-        ssys.R.inlet.ṁ => 1.0,
         ssys.pump.dP_pump_fn => dp_fn,
     ]   # the machine starts :CLOSED (flapper shut until the transition fires)
     @test machine.state === :CLOSED   # starts closed (Python: isinf(F.t_open))
@@ -451,7 +441,7 @@ end
     ssys = mtkcompile(sys)
     # The machine is :CLOSED for the steady solve; opening it at a time you already know is a
     # trip, the same idiom a fixed scram uses.
-    sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0, ssys.R.inlet.ṁ => ṁ0])
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     trip!(machine, 100.0; state=:OPEN)
     sol = solve_transient(ssys, sol_ss, range(0.0, 150.0; length=300);
@@ -486,15 +476,9 @@ end
     ]
     @named sys = assembly(conns, pump, ine, R, transistor, hx)
     ssys = mtkcompile(sys)
-    sr(a, b) = 1 + sqrt(a / b)
     # Python solves the driven steady state (transistor stiff, near-all flow through R), then
     # shuts the pump and coasts as the transistor collapses. Solve_steady on, then coast from it.
-    sol_ss = solve_steady(ssys, [
-            ssys.ine.inlet.ṁ => 1.0,
-            ssys.R.inlet.ṁ => 1.0 / sr(k1, k2),
-            ssys.transistor.inlet.ṁ => 1.0 / sr(k2, k1),
-        ssys.transistor.k_fn => kfn,
-    ])
+    sol_ss = solve_steady(ssys, [ssys.transistor.k_fn => kfn])
     @test sol_ss.retcode == ReturnCode.Success
     sol = solve_transient(ssys, sol_ss, range(0.0, t_final; length=302);
                           overrides=[ssys.pump.dP_pump => 0.0, ssys.transistor.k_fn => kfn],
@@ -573,7 +557,7 @@ end
     T_cold = 20.0
     T_hot = 80.0    # Python 80 C
     g_acc = G_EARTH
-    geom = PipeGeometry_circular(1.0, D_pipe)
+    geom = Duct(1.0, Circular(D_pipe))
     nz = 9            # Python z_boundaries = linspace(0, L, 10) -> 9 cells
     # Friction model: the faithful Python correlation,
     # friction_factor("regime_dependent", re_bounds=(2000,5000), k_R=1.0) — laminar 64/Re below
@@ -606,7 +590,6 @@ end
     @named pump = Pump(; ṁ0=ṁ0)
     ssys = build_coastdown(pump)
     guess = [
-        ssys.cold.inlet.ṁ => ṁ0,
         ssys.cold.T => fill(T_cold, nz),
         ssys.hot.T => fill(T_hot, nz),
     ]
@@ -621,8 +604,8 @@ end
     # against the two channels' friction in series; the steady balance grav_dp = Σ f·|m|·m/(2ρA²)·(L/Dh)
     # fixes a finite |ṁ| ceiling. Any point in the window has driving head ≤ grav_dp, so the
     # reversed flow can never exceed this ceiling. The runaway surrogate had no such ceiling.
-    A = geom.A
-    Dh = geom.Dh
+    A = flow_area(geom)
+    Dh = hydraulic_diameter(geom)
     L_ch = geom.L
     # Friction head of the two channels in series at flow m.
     loop_friction(m) = sum(
@@ -649,14 +632,9 @@ end
     # Quasi-static per-point steady (Python #16 is a nonlinear root-solve, not a transient). Each
     # solve is seeded from the previous converged full state, so it starts near-steady and converges
     # in a couple of Newton steps. The reversal emerges from the decaying head, not the seed.
-    #
-    # Seed BOTH channels forward (ṁ0/2): mtkcompile keeps one channel ṁ as the state and which
-    # one varies by Julia version, so seeding both lands the kept state in the forward basin either
-    # way (otherwise it sits at 0 and the laminar 64/Re friction divides by zero). SSRootfind is a
-    # direct root-find with no time step, so it cannot underflow dt at the stiff near-reversal point.
+    # SSRootfind is a direct root-find with no time step, so it cannot underflow dt at the
+    # stiff near-reversal point.
     carry = [
-        ssys2.hot.inlet.ṁ => ṁ0 / 2,
-        ssys2.cold.inlet.ṁ => ṁ0 / 2,
         Dt(ssys2.cold.inlet.ṁ) => 0.0,
         Dt(ssys2.hot.inlet.ṁ) => 0.0,
         ssys2.cold.T => fill(T_cold, nz),
@@ -714,8 +692,8 @@ end
     nx = 1
     k_s = 1.0
     Lx = 1.0
-    # Mock one-sided pipe (heated_parts = (0, 1), area 1) + mock solid (all 1).
-    geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
+    # Mock one-sided pipe (heated only on the right, area 1) + mock solid (all 1).
+    geom = Duct(1.0, Effective(; area=1.0, wetted_perimeter=1.0); heated=(right=1.0,))
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
     slab = Slab(; x=[0.0, Lx], z=range(0, 1.0, nz + 1), y=1.0, material=Solid(1.0, 1.0, k_s))
@@ -726,14 +704,10 @@ end
     conns = [
         inseries(pump, bc, osc.cac, pump),
         pump.inlet.p ~ 1.0e5,
-        # Unheated left face (heated_parts[1]=0 ⇒ Q=0) has a floating wall T; pin it to the
-        # coolant temp (an insulated wall carries no heat, so this is just a closure).
-        port(osc.cac, :thermal_left, :T) .~ osc.cac.T,
     ]
     full = assembly(conns, osc, pump, bc; name=:sys4)
     ssys = mtkcompile(full)
-    ic = [ssys.osc.cac.inlet.ṁ => ṁ]
-    sol = solve_transient(ssys, ic, range(0.0, 200.0; length=50);
+    sol = solve_transient(ssys, range(0.0, 200.0; length=50);
                           initializealg=BrownFullBasicInit(), maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success
     Tc = sol[ssys.osc.cac.T, end]
@@ -766,7 +740,7 @@ end
     nx = 1
     ṁs = [1.0, 0.7, 0.4]        # distinct ṁs ⇒ distinct slopes off the shared power
     N = length(ṁs)
-    geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
+    geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=(left=1.0, right=1.0))
     # Distinct names per channel/fuel so the shared PK gets a distinct T_source_<name> feedback
     # group for each component (temperature_feedback keys off nameof).
     cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
@@ -904,7 +878,7 @@ end
     n = 7
     nz = 7
     nx = 1
-    geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
+    geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=(left=1.0, right=1.0))
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
     slab = Slab(; x=[0.0, 1.0], z=range(0, 1.2, nz + 1), y=1.0, material=Solid(1.0, 1.0, 1.0))

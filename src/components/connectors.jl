@@ -1,5 +1,14 @@
 """
-    FlowPort(; name, p=1.0e5, ṁ=0.0, T=T_ROOM)
+    FLOW_START
+
+The flow [kg/s] a port starts from when the operating point does not give one. Small and
+nonzero, since a quadratic pressure law has no slope at zero flow and a steady solve started
+there cannot leave.
+"""
+const FLOW_START = 0.1
+
+"""
+    FlowPort(; name, p=1.0e5, ṁ=FLOW_START, T=T_ROOM)
 
 Acausal hydraulic connector. `p` is the across (potential) variable, `ṁ` is the flow
 variable (sums to zero at a junction), and `T` is a stream variable carried with the flow.
@@ -17,10 +26,11 @@ be built already seeded.
   pressures at a junction therefore carry Bernoulli's drop into a narrower part, and a local
   loss is a loss of total pressure. Saturation depends on the static pressure, which a
   channel works out for itself.
-- `ṁ`: mass flow rate [kg/s]; positive points into the port.
+- `ṁ`: mass flow rate [kg/s]; positive points into the port. A component builds a port
+  its flow normally leaves by with `-FLOW_START`.
 - `T`: temperature [°C].
 """
-@connector function FlowPort(; name, p=1.0e5, ṁ=0.0, T=T_ROOM)
+@connector function FlowPort(; name, p=1.0e5, ṁ=FLOW_START, T=T_ROOM)
     sts = @variables begin
         p(t) = p, [description = "Pressure (Pa), across variable"]
         ṁ(t) = ṁ,

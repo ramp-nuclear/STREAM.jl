@@ -16,7 +16,7 @@ using STREAM.Assemblies: inseries, symmetric_plate
 using ModelingToolkit: @named, mtkcompile
 
 n = 10
-geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
              material=Solid(2700.0, 900.0, 180.0))
 @named fuel = HeatDiffusion(plate; power=3.0e4)
@@ -38,7 +38,7 @@ Name each margin you want and give the function that computes it from a
 correlations take one directly. Arrange each so that larger is safer:
 
 ```@example mg
-m = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
+m = threshold_analysis(sol, sys.cell.ch;
     onb = s -> bergles_rohsenow_t_onb(s) .- s.T_wall,      # K to the onset of boiling
     chfr = chfr(q_CHF_sudo_kaminaga),                     # CHF over the local flux
     ofi = s -> q_OFI_whittle_forgan(s) / 3.0e4,           # OFI power over channel power
@@ -47,20 +47,20 @@ m = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
 worst_case(m.chfr)
 ```
 
-Pass `pipe`, the channel's geometry: the heat fluxes and the geometric correlations need it.
+The heat fluxes and the geometric correlations read the channel's own [`duct`](@ref).
 Per-cell margins come back as vectors and channel-wide ones, like the OFI ratio, as numbers.
 [`worst_case`](@ref STREAM.Thresholds.worst_case) gives the smallest value and its cell.
 
 ## Choose the face
 
 A channel between two plates has a heat flux on each face. [`chfr`](@ref STREAM.Thresholds.chfr)
-and the flux-based correlations take a `direction`: `:left`, `:right`, or `:max`, the larger of
-the two and the default. Face-by-face margins:
+and the flux-based correlations take a `face`: one of the channel's faces, `:left` or
+`:right` here, or `:max`, the larger flux and the default. Face-by-face margins:
 
 ```@example mg
-m = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
-    left = chfr(q_CHF_mirshak; direction=:left),
-    right = chfr(q_CHF_mirshak; direction=:right))
+m = threshold_analysis(sol, sys.cell.ch;
+    left = chfr(q_CHF_mirshak; face=:left),
+    right = chfr(q_CHF_mirshak; face=:right))
 (minimum(m.left), minimum(m.right))
 ```
 
@@ -71,7 +71,7 @@ margin becomes a matrix, cells by times, and `worst_case` with the times finds w
 
 ```@example mg
 sol_tr = solve_transient(sys, sol, 0.0:0.1:5.0; overrides=[sys.cell.fuel.power => 4.5e4])
-m = threshold_analysis(sol_tr, sys.cell.ch; pipe=geometry, chfr=chfr(q_CHF_sudo_kaminaga))
+m = threshold_analysis(sol_tr, sys.cell.ch; chfr=chfr(q_CHF_sudo_kaminaga))
 size(m.chfr), worst_case(m.chfr; times=sol_tr.t)
 ```
 

@@ -18,7 +18,7 @@ solve, so each solver here says what it does with one. The full rules are in
 - `ssys`: compiled system from `mtkcompile`
 - `op`: operating point, a `Vector{Pair}`. A parameter in it takes that value. An unknown in it
   is where the solver starts: the first guess of a root finder, or the state `DynamicSS`
-  integrates from. Anything left out takes the value the model declares.
+  integrates from. An unknown left out starts from the value the model declares.
 - `solver`: steady-state solver to use, or `nothing` to let the stack choose (default `nothing`)
 - `abstol`: absolute tolerance (default 1e-8)
 - `reltol`: relative tolerance (default 1e-6)
@@ -33,17 +33,11 @@ integration runs without dense output.
 function solve_steady(
     ssys, op=Pair[]; solver=nothing, abstol=1e-8, reltol=1e-6, build_initializeprob=false
 )
-    prob = SteadyStateProblem(
-        ssys,
-        op;
-        warn_initialize_determined=false,
-        build_initializeprob=build_initializeprob,
-    )
+    prob = SteadyStateProblem(ssys, op; warn_initialize_determined=false, build_initializeprob)
     # Dense output would only feed interpolation, which DynamicSS never reads, and with it
     # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
     inner = solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
-    sol = solve(prob, solver; abstol=abstol, reltol=reltol, inner...)
-    return sol
+    return solve(prob, solver; abstol, reltol, inner...)
 end
 
 """
@@ -87,19 +81,10 @@ function solve_transient(
     initializealg=SciMLBase.NoInit(), build_initializeprob=nothing, kwargs...,
 )
     tspan = (Float64(t[1]), Float64(t[end]))
-    prob = build_initializeprob === nothing ?
-        ODEProblem(ssys, op, tspan; warn_initialize_determined=false) :
-        ODEProblem(ssys, op, tspan; warn_initialize_determined=false,
-                   build_initializeprob=build_initializeprob)
-    sol = solve(
-        prob,
-        solver;
-        saveat=t,
-        callback=callbacks,
-        initializealg=initializealg,
-        merge(values(kwargs), _saved_steps(prob, t, kwargs))...,
-    )
-    return sol
+    init = build_initializeprob === nothing ? (;) : (; build_initializeprob)
+    prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false, init...)
+    return solve(prob, solver; saveat=t, callback=callbacks, initializealg,
+                 merge(values(kwargs), _saved_steps(prob, t, kwargs))...)
 end
 
 """
