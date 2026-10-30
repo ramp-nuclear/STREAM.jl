@@ -110,7 +110,7 @@ correlation was fitted. See [Onset of flow instability](@ref) for the physics.
 - `T_sat`: saturation temperature [°C]
 - `T_inlet`: coolant inlet temperature [°C]
 - `duct`: the channel's [`Duct`](@ref)
-- `liquid`: the coolant whose `cₚ` is integrated (default [`coolant()`](@ref
+- `liquid`: the coolant whose enthalpy rise sets the power (default [`coolant()`](@ref
   STREAM.Substances.coolant))
 
 # Returns
@@ -128,8 +128,8 @@ function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, duct;
                               liquid::AbstractLiquid=coolant())
     G = abs(ṁ) / flow_area(duct)
     G_cgs = G / 10  # SI to CGS conversion (G must be in CGS per Whittle-Forgan)
-    integral_cp, _ = quadgk(T -> cₚ(liquid, T), T_inlet, T_sat)
-    return abs(ṁ) * integral_cp / (1.0 + 3.15 * (hydraulic_diameter(duct) / duct.L) * (1.08 * G_cgs)^0.29)
+    Δh = enthalpy(liquid, T_sat) - enthalpy(liquid, T_inlet)
+    return abs(ṁ) * Δh / (1.0 + 3.15 * (hydraulic_diameter(duct) / duct.L) * (1.08 * G_cgs)^0.29)
 end
 
 @doc raw"""

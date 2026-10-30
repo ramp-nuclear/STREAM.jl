@@ -118,3 +118,14 @@ methods as plain arithmetic, since a channel evaluates them on symbolic temperat
 
 Components call the two-argument forms, at atmospheric pressure. A coolant whose properties
 depend on pressure can define its own two-argument method to choose a different one.
+
+The enthalpy and its inverse come from the nine as well. [`enthalpy`](@ref) integrates the
+specific heat from 0 °C, and [`temperature`](@ref) inverts it with a polynomial fitted
+between 0 and 300 °C and continued linearly beyond:
+
+```@example coolant
+(enthalpy(LinearLiquid(), 50.0), temperature(LinearLiquid(), 4180.0 * 50.0))
+```
+
+A coolant used well outside 0 to 300 °C, such as a molten salt, defines its own `temperature`
+method.
