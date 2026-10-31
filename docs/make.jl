@@ -73,6 +73,7 @@ reference = [
     "Assemblies" => "reference/assemblies.md",
     "Solvers" => "reference/solvers.md",
     "Utilities" => "reference/utilities.md",
+    "UQ" => "reference/uq.md",
 ]
 
 # A page listed here that does not exist yet is skipped, so the navigation can be written
@@ -94,6 +95,7 @@ howto = keep([
     "Trip a reactor or open a valve" => "howto/events.md",
     "Add decay heat to a transient" => "howto/decay_heat.md",
     "Compute safety margins" => "howto/margins.md",
+    "Propagate input uncertainties" => "howto/uncertainty.md",
     "Scan a design parameter" => "howto/design_knobs.md",
     "Drive an input from a function of time" => "howto/time_inputs.md",
     "Move a profile between meshes" => "howto/rebin.md",
@@ -128,6 +130,7 @@ explanation = keep([
     "Decay heat" => "explanation/decay_heat.md",
     "Loss of coolant" => "explanation/loca.md",
     "Events and control" => "explanation/events.md",
+    "Uncertainty quantification" => "explanation/uncertainty.md",
     "Relation to Python STREAM" => "explanation/python.md",
 ])
 isempty(mtk) || insert!(explanation, 3, "ModelingToolkit in brief" => mtk)

@@ -117,4 +117,26 @@ using STREAM.Components
             (i, tt) in enumerate(t_arr)
         )
     end
+    @testset "solve_transient from a steady state starts on it and stays" begin
+        # A plate between two channels. Nothing is overridden, so the run has nowhere to go:
+        # every state starts at the steady value and keeps it. MTK's initialization once
+        # moved a plate temperature here by 0.46 K when the problem was built.
+        n = 5
+        geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
+        slab = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1),
+                    y=0.063, material=Solid(2700.0, 900.0, 180.0))
+        @named fuel = HeatDiffusion(slab; power=2.5e4)
+        @named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
+        @named cell = symmetric_plate(ch, fuel)
+        @named pump = Pump(2.0e4)
+        @named hx = HeatExchanger(40.0)
+        @named loop = assembly([inseries(pump, hx, cell.ch, pump), pump.inlet.p ~ 1.7e5],
+                               pump, hx, cell)
+        ssys = mtkcompile(loop)
+        settled = solve_steady(ssys, [ssys.cell.ch.inlet.ṁ => 0.4]; abstol=1e-12, reltol=1e-12)
+        run = solve_transient(ssys, settled, [0.0, 0.5]; abstol=1e-10, reltol=1e-10)
+        states = unknowns(ssys)
+        @test run.u[1] ≈ settled[states] rtol=1e-9
+        @test run.u[end] ≈ settled[states] rtol=1e-6
+    end
 end

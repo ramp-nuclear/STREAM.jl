@@ -178,3 +178,21 @@ end
           [0.0, 0.0002, 0.0004, 0.0005666666666666667, 0.0007333333333333333, 0.0009, 0.0011, 0.0013]
     @test x_boundaries(0, 4, 1.0, 2.0) ≈ 0:0.5:2
 end
+
+@testset "local_power_shift (Python STREAM's power_perturbations tests)" begin
+    shapes = [rand(4, 3) .+ 0.1 for _ in 1:20]
+    for (shape, shift) in zip(shapes, range(0.0, 0.99; length=20))
+        shifted = local_power_shift(shape, 1 + shift)
+        @test sum(shifted) ≈ sum(shape)
+        # Nothing to shift against, so nothing moves.
+        @test local_power_shift(shape, 1 + shift, 0) == shape
+        # At the 100th percentile only the hottest row is raised, by exactly the shift.
+        hottest = maximum(sum(shape; dims=2))
+        @test maximum(sum(local_power_shift(shape, 1 + shift, 100); dims=2)) ≈ hottest * (1 + shift)
+    end
+    @test local_power_shift(fill(3.0, 5, 1), 1.5, 40) == fill(3.0, 5, 1)
+
+    # A vector is one column over z.
+    axial = [1.0, 2.0, 3.0, 2.0]
+    @test local_power_shift(axial, 1.1, 60) == vec(local_power_shift(reshape(axial, :, 1), 1.1, 60))
+end

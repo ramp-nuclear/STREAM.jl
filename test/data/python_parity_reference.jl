@@ -709,3 +709,17 @@ const PARITY_MTR_CLAD_T_PLATE = Float64[
     51.0871802419 51.1824183372 51.3232913530 51.3854606652 51.3232913530 51.1824183372 51.0871802419;  # row z=10
 ]  # size (10, 7)
 
+
+# Block: first-order UQ of two threshold correlations (Python commit 407fb4a)
+# stream.analysis.UQ.UQModel, forward differences, on
+#   pipe = EffectivePipe.rectangular(0.6, 0.0671, 0.0024, 0.0671)
+#   outputs = [Mirshak_CHF(tbulk, tsat, pressure, v)..., Whittle_Forgan_OFI(mdot, tsat, tin, pipe, cp)]
+#   with tsat = sat_temperature(pressure), v = mdot / (density(tbulk) * pipe.area)
+# at mdot=0.5, tin=35.0, tbulk=[40, 50, 60], pressure=1.7e5, and
+#   mdot:     Uncertainty(statistical_relative=0.05)
+#   tin:      Uncertainty(systematic_absolute=1.0, statistical_absolute=0.5)
+#   tbulk:    Uncertainty(systematic_relative=0.02, statistical_absolute=[0.5, 1.0, 1.5])
+#   pressure: Uncertainty(statistical_relative=0.01)
+const PARITY_UQ_NOMINAL = [4636054.22590032, 4389892.814473483, 4143802.1801272, 148863.4920593363]
+const PARITY_UQ_SYS = [19698.369867378762, 24610.955260213243, 29530.598587849505, 1846.528711490729]
+const PARITY_UQ_STAT = [67186.81504908834, 67483.73350699665, 70129.59870043099, 7274.413555012172]

@@ -48,12 +48,24 @@ function solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, relto
         mass_matrix=ModelingToolkit.calculate_massmatrix(ssys), sys=steady,
     )
     prob = SteadyStateProblem(f, residual.u0, residual.p)
-    # Dense output would only feed interpolation, which DynamicSS never reads, and with it on
-    # OrdinaryDiffEq warns about interpolation on a loop with no differential states.
-    inner = solver isa DynamicSS ?
-        (; odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol))) : (;)
-    return solve(prob, solver; abstol, reltol, inner...)
+    return solve(prob, solver; abstol, reltol, _dynamic_kwargs(solver, abstol)...)
 end
+
+"""
+    _dynamic_kwargs(solver, abstol) -> NamedTuple
+
+The keywords a steady solve passes to `solver`: for `DynamicSS`, the integration's, and none
+for a root finder.
+
+The integration starts from `BrownFullBasicInit`, so a guess off the algebraic equations is made
+consistent rather than rejected. It keeps no dense output, which only feeds interpolation that
+`DynamicSS` never reads, and with which OrdinaryDiffEq warns on a loop with no differential
+states.
+"""
+function _dynamic_kwargs(::DynamicSS, abstol)
+    return (; odesolve_kwargs=(; dense=false, initializealg=BrownFullBasicInit(; abstol)))
+end
+_dynamic_kwargs(_, _) = (;)
 
 """
     solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...) -> SciMLSolution
@@ -176,7 +188,7 @@ _state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
 
 """
     solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(),
-                    kwargs...)
+                    build_initializeprob=false, kwargs...)
 
 Start a transient from an already-solved state.
 
@@ -204,6 +216,8 @@ symbol means the result does not depend on which variables MTK chose as states.
   `BrownFullBasicInit()`, with its `abstol` of 1e-10). A model whose algebraic residuals cannot
   get that small, such as a large heat balance in watts, needs a looser one, as
   `BrownFullBasicInit(; abstol=1e-8)`.
+- `build_initializeprob`: build MTK's initialization problem (default `false`, so the run starts
+  from the state of `sol_ss` and `initializealg` alone makes it consistent)
 - `kwargs...`: forwarded to the lower-level `solve_transient`
 
 # Returns
@@ -211,8 +225,11 @@ symbol means the result does not depend on which variables MTK chose as states.
 """
 function solve_transient(
     ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
-    overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...,
+    overrides=Pair[], initializealg=BrownFullBasicInit(), build_initializeprob=false,
+    kwargs...,
 )
+    # MTK's initialization, solved when the problem is built, can move a differential state off
+    # the solution: on a plate loop it shifted one plate temperature by 0.46 K.
     op = Pair{Any,Any}[_state_snapshot(ssys, sol_ss); overrides]
-    return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)
+    return solve_transient(ssys, op, t; initializealg, build_initializeprob, kwargs...)
 end

@@ -26,6 +26,8 @@ choosing them implies for a result. They are for reading, not for following step
 - [Decay heat](decay_heat.md): the power that remains after shutdown
 - [Loss of coolant](loca.md): tanks, breaks and the steady state of a free surface
 - [Events and control](events.md): trips and state machines
+- [Uncertainty quantification](uncertainty.md): how uncertain inputs reach the outputs, and
+  where the derivatives come from
 
 **Thermal-hydraulic limits**
 
