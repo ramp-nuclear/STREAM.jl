@@ -142,8 +142,7 @@ end
         @named wide = Tank(; area=A_wide, L0=L_wide, ports=(bottom=0.0,), T0=T_POOL)
         @named narrow = Tank(; area=A_narrow, L0=L_narrow, ports=(bottom=0.0,), T0=T_POOL)
         @named pipe = Resistor(R)
-        @named sys = assembly(inseries(wide.bottom, pipe, narrow.bottom), wide, pipe, narrow)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(inseries(wide.bottom, pipe, narrow.bottom), wide, pipe, narrow)
         sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 1000.0; length=201);
                               overrides=[ssys.wide.pinned => false, ssys.narrow.pinned => false])
         L_w, L_n = sol[ssys.wide.L], sol[ssys.narrow.L]
@@ -176,8 +175,7 @@ end
             inseries(supply.port, feed, heater, pool.feed),
             inseries(pool.bottom, drain, ambient.port),
         ]
-        @named sys = assembly(conns, pool, supply, feed, heater, drain, ambient)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pool, supply, feed, heater, drain, ambient)
         # The pinned pool settles at the feed temperature. The run turns the heater up.
         sol_ss = solve_steady(ssys)
         @test sol_ss[ssys.pool.T] ≈ T_POOL

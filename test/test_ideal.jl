@@ -36,8 +36,7 @@ end
         inseries(pump, L_comp, R_comp, hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(connections, pump, L_comp, R_comp, hx)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(connections, pump, L_comp, R_comp, hx)
 
     sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
@@ -68,8 +67,7 @@ end
         [s.h for s in sinks] .~ 10.0,
         [s.T_fluid for s in sinks] .~ 20.0,
     ]
-    @named s = assembly(conns, prof, sinks...)
-    ss = mtkcompile(s)
+    @mtkcompile ss = assembly(conns, prof, sinks...)
     sol = solve_transient(ss, [0.0, 1.0])
     @test sol[port(ss.prof, :thermal, :T)][end] == profile
     @test sol[port(ss.prof, :thermal, :Q)][end] ≈ -10.0 .* (profile .- 20.0)
@@ -95,8 +93,7 @@ end
         cb.h ~ h_val,
         cb.T_fluid ~ T_fluid,
     ]
-    @named s = assembly(conns, cb, wall)
-    ss = mtkcompile(s)
+    @mtkcompile ss = assembly(conns, cb, wall)
     sol = solve_transient(ss, [0.0, 1.0])
     @test sol[ss.cb.thermal.Q][end] ≈ h_val * area * (T_wall - T_fluid)
 end
@@ -108,8 +105,7 @@ end
     @named cb = ConvectiveBoundary(; area=area)
     @named wall = ConstantTemperature(46.85)
     conns = [connect(cb.thermal, wall.thermal1), cb.h ~ 4000.0, cb.T_fluid ~ 26.85]
-    @named s = assembly(conns, cb, wall)
-    ss = mtkcompile(s)
+    @mtkcompile ss = assembly(conns, cb, wall)
     sol = solve_transient(ss, [0.0, 1.0])
     @test sol[ss.cb.thermal.Q][end] > 0.0
     @test sol[ss.wall.thermal1.Q][end] < 0.0

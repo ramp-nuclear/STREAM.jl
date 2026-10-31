@@ -27,12 +27,16 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 - `duct::Union{Duct, Nothing}`: the channel's [`Duct`](@ref) in numbers, its design knobs at
   their solved values, or `nothing` for a state built by hand without one
 - `gravity::T`: gravitational acceleration [m/s²]
+- `liquid::L`: the channel's coolant, which the correlations on a `ChannelState` read by
+  default. Built by hand it is [`coolant()`](@ref STREAM.Substances.coolant) unless given.
 
 `T` is the one number type of every field, `Float64` for a solved state and a ForwardDiff dual
 for one read under [`UQ.local_sensitivities`](@ref STREAM.UQ.local_sensitivities). A state built
 by hand takes the promotion of the numbers it is given.
 """
-struct ChannelState{T<:Real,W<:NamedTuple,Q<:NamedTuple,G<:Union{Duct,Nothing}}
+struct ChannelState{
+    T<:Real,W<:NamedTuple,Q<:NamedTuple,G<:Union{Duct,Nothing},L<:AbstractLiquid,
+}
     n::Int
     T_bulk::Vector{T}
     T_wall::Vector{T}
@@ -47,6 +51,7 @@ struct ChannelState{T<:Real,W<:NamedTuple,Q<:NamedTuple,G<:Union{Duct,Nothing}}
     velocity::Vector{T}
     duct::G
     gravity::T
+    liquid::L
 end
 
 function ChannelState(;
@@ -64,12 +69,13 @@ function ChannelState(;
     velocity,
     duct=nothing,
     gravity,
+    liquid=coolant(),
 )
     T = promote_type(eltype.((T_bulk, T_wall, T_sat, T_ONB, T_inlet, P, q_flux, ṁ, velocity,
                               gravity))...)
-    return ChannelState{T,typeof(T_walls),typeof(q_fluxes),typeof(duct)}(
+    return ChannelState{T,typeof(T_walls),typeof(q_fluxes),typeof(duct),typeof(liquid)}(
         n, T_bulk, T_wall, T_walls, T_sat, T_ONB, T_inlet, P, q_flux, q_fluxes, ṁ, velocity,
-        duct, gravity,
+        duct, gravity, liquid,
     )
 end
 
@@ -111,7 +117,8 @@ The face fluxes divide each face's heat flow by its area, read off the channel's
 [`duct`](@ref): `q_fluxes.left[i] = q_wall_left[i] / (heated.left * dz)`. A duct built from
 design knobs takes the values the solution was solved at, so the geometry follows the knobs
 and, under [`UQ.local_sensitivities`](@ref STREAM.UQ.local_sensitivities), carries their
-derivatives.
+derivatives. `liquid` is the coolant the channel
+was built with.
 
 `channel_sys` must expose a wall temperature, so `Channel` or `ChannelAndContacts`.
 `ChannelHeatFlux` prescribes its flux and leaves its wall temperatures unconstrained for
@@ -191,6 +198,7 @@ function ChannelState(sol, channel_sys; gravity=G_EARTH, index=nothing)
         velocity=velocity,
         duct=geometry,
         gravity=gravity,
+        liquid=coolant(channel_sys),
     )
 end
 
@@ -354,12 +362,12 @@ end
 """
     bergles_rohsenow_t_onb(state::ChannelState; face=:max, onb_factor=1.0,
                            inhomogeneity_factor=1.0)
-    q_boiling_onset(state::ChannelState; liquid=H2O)
+    q_boiling_onset(state::ChannelState; liquid=state.liquid)
     q_CHF_mirshak(state::ChannelState)
     q_CHF_fabrega(state::ChannelState)
-    q_CHF_sudo_kaminaga(state::ChannelState; liquid=H2O)
-    q_OFI_whittle_forgan(state::ChannelState; liquid=H2O)
-    q_OSV_saha_zuber(state::ChannelState; face=:max, liquid=H2O, inhomogeneity_factor=1.0)
+    q_CHF_sudo_kaminaga(state::ChannelState; liquid=state.liquid)
+    q_OFI_whittle_forgan(state::ChannelState; liquid=state.liquid)
+    q_OSV_saha_zuber(state::ChannelState; face=:max, liquid=state.liquid, inhomogeneity_factor=1.0)
     twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
 
 Every threshold correlation also accepts a solved channel, taking its arguments out of the
@@ -396,7 +404,7 @@ function bergles_rohsenow_t_onb(
     return ifelse.(q .> 0, T_ONB, Inf)
 end
 
-function q_boiling_onset(s::ChannelState; liquid::AbstractLiquid=H2O)
+function q_boiling_onset(s::ChannelState; liquid::AbstractLiquid=s.liquid)
     return q_boiling_onset.(s.ṁ, s.T_sat, s.T_inlet, cₚ(liquid, s.T_inlet))
 end
 
@@ -407,23 +415,23 @@ q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, s.duct)
 
 # The correlation needs saturated-coolant properties, and this is where the coolant is
 # known, so the snapshot is built here: one entry per cell at that cell's saturation state.
-function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=H2O)
+function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=s.liquid)
     return q_CHF_sudo_kaminaga(s.T_bulk, s.ṁ, s.duct, s.gravity, liquid(s.T_sat, s.P))
 end
 
 # Flow instability is judged at the outlet, where the coolant is hottest and nearest boiling:
 # the last cell in forward flow and the first in reversed flow.
-function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
+function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=s.liquid)
     T_sat_out = s.ṁ >= 0 ? last(s.T_sat) : first(s.T_sat)
     return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.duct; liquid=liquid)
 end
 
 function q_OSV_saha_zuber(
-    s::ChannelState; face=:max, liquid::AbstractLiquid=H2O, inhomogeneity_factor=1.0
+    s::ChannelState; face=:max, liquid::AbstractLiquid=s.liquid, inhomogeneity_factor=1.0
 )
-    coolant = liquid(s.T_bulk, s.P)
+    props = liquid(s.T_bulk, s.P)
     return q_OSV_saha_zuber(
-        s.T_inlet, s.ṁ, s.duct, coolant;
+        s.T_inlet, s.ṁ, s.duct, props;
         flux_shape=_face_flux(s, face), dz=fill(s.duct.L / s.n, s.n),
         inhomogeneity_factor,
     )

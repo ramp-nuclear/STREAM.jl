@@ -52,9 +52,11 @@ include("constants.jl")
 Coolants and the property correlations behind them.
 
 A coolant is a singleton type such as `LightWater` (aliased [`H2O`](@ref)) answering nine
-property queries. Components take one as a keyword argument, so swapping coolants is a matter of
-passing a different value. [`Liquid`](@ref) holds fixed property values and is itself an
-`AbstractLiquid`, for a coolant frozen at one state point.
+property queries. Components take one as a keyword argument, or a model names its coolant
+once with [`@coolant`](@ref) and leaves the keyword out. [`coolant`](@ref) returns the
+coolant in effect, or the one a channel was built with.
+[`Liquid`](@ref) holds fixed property values and is itself an `AbstractLiquid`, for a coolant
+frozen at one state point.
 
 Each property has an alias naming the same function, so `ρ === density`.
 
@@ -65,12 +67,15 @@ A new coolant implements the nine [`AbstractLiquid`](@ref) methods.
 """
 module Substances
 using ModelingToolkit
+using Base: ScopedValues
 using ..STREAM: ATM
 include("substances/liquid.jl")
 include("substances/light_water.jl")
 include("substances/heavy_water.jl")
+include("substances/coolant_scope.jl")
 include("substances/solid.jl")
 export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, Solid
+export coolant, @coolant
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
@@ -219,7 +224,7 @@ module Thresholds
 using ModelingToolkit
 using QuadGK
 using ForwardDiff: ForwardDiff
-using ..STREAM: AbstractLiquid, Liquid, H2O, G_EARTH
+using ..STREAM: AbstractLiquid, Liquid, G_EARTH, coolant
 using ..STREAM: Duct, Rectangular, Circular, Annular, flow_area, hydraulic_diameter
 using ..STREAM: heated_perimeter, duct, _map_lengths
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
@@ -275,11 +280,12 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using LinearAlgebra: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
-using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM
-using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter, _with_duct
+using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM, H2O, coolant
+using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter, _DuctKey
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..STREAM: assembly, port, _flat
+using ..Substances: _CoolantKey
 using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
@@ -339,7 +345,7 @@ module DecayHeat
 using DelimitedFiles
 using ModelingToolkit
 using OrdinaryDiffEq
-using ..Components: PointKinetics, point_kinetics_steady_state, ReactivityController
+using ..Components: PointKinetics, ReactivityController
 using ..Components: StateMachine, _entry_at   # the log lookup, private to Components
 using ..Components: U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 using ..STREAM
@@ -487,7 +493,7 @@ export Assemblies, Utilities, UQ
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
-export H2O, D2O, Solid
+export H2O, D2O, Solid, @coolant
 
 # Dimensionless numbers
 export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend

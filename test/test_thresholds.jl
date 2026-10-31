@@ -224,6 +224,7 @@ end
         @test state.ṁ == 0.5
         @test state.gravity == 9.81
         @test state.duct === pipe
+        @test state.liquid === H2O   # built by hand, outside any @coolant block
     end
 
     @testset "bergles_rohsenow_t_onb on a ChannelState" begin
@@ -369,6 +370,24 @@ end
     end
 end
 
+@testset "a ChannelState carries its channel's coolant" begin
+    d2o = @coolant D2O build_loop(; n=5)
+    state = ChannelState(solve_steady(d2o), d2o.ch)
+    @test state.liquid === D2O
+    @testset "$(nameof(f)) defaults to the channel's coolant" for f in (
+        q_boiling_onset, q_CHF_sudo_kaminaga, q_OFI_whittle_forgan, q_OSV_saha_zuber,
+    )
+        @test f(state) == f(state; liquid=D2O)
+        @test f(state) != f(state; liquid=H2O)
+    end
+    @testset "the coolant holds under local_sensitivities" begin
+        ofi(sol) = [q_OFI_whittle_forgan(ChannelState(sol, d2o.ch))]
+        s = UQ.local_sensitivities(UQ.SteadyUQ(d2o, [], [d2o.bc.T_bc]; output=ofi))
+        @test only(s.nominal) ≈ q_OFI_whittle_forgan(state; liquid=D2O)
+        @test !(only(s.nominal) ≈ q_OFI_whittle_forgan(state; liquid=H2O))
+    end
+end
+
 @testset "ChannelState from a solved channel" begin
     # Built from a solution rather than by hand, which is what exercises the extraction.
     geo = Duct(0.6, Circular(0.01))
@@ -487,8 +506,7 @@ end
         pump.inlet.p ~ 1.0e5,
         chf.q_outer .~ 1.0e4,
     ]
-    @named sys = assembly(conns, pump, bc, chf)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, bc, chf)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
