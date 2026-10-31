@@ -36,6 +36,7 @@ using STREAM.UQ
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, symmetric_plate
 using ModelingToolkit: @named, mtkcompile
+using DataFrames: DataFrame
 
 gap = @design_knob gap = 0.0024
 geometry = Duct(0.6, Rectangular(0.067, gap); heated=0.063)
@@ -102,7 +103,13 @@ uncertainties = (
     gap => Uncertainty(statistical_absolute=1.0e-4),               # gap tolerance, m
 )
 result = uq(s, uncertainties...)
+DataFrame(table(result))
 ```
+
+`result` has the shape of the outputs, so a value is `result.chfr.stat`.
+[`table`](@ref STREAM.UQ.table) lays it out as rows, one per entry of the outputs with each
+naming its output, which DataFrames.jl reads as they are, as does anything else that takes
+Tables.jl rows.
 
 An input left out has no uncertainty, and nothing is solved again, so `uq` can be called on
 the same `s` with as many sets of uncertainties as needed. The systematic parts add up
@@ -122,7 +129,7 @@ to the output, with its sign, and `stat` the standard deviation it causes:
 
 ```@example uq
 c = contributions(s, uncertainties...)
-c.chfr
+DataFrame(input=collect(string.(c.chfr.inputs)), sys=c.chfr.sys, stat=c.chfr.stat)
 ```
 
 Taken as absolute values the `sys` entries add up to `uq`'s `sys`, and the `stat` entries add
@@ -223,7 +230,8 @@ to linear over the spread, and part from them where it curves:
 
 ```@example uq
 sampled = monte_carlo(prob, uncertainties...; n=1000)
-map((f, m) -> (first_order=f.stat, sampled=m.std), result, sampled)
+DataFrame(output=collect(keys(result)), first_order=[limit.stat for limit in result],
+          sampled=[limit.std for limit in sampled])
 ```
 
 The samples are the distribution of each output. The systematic part moves every sample the
@@ -346,22 +354,6 @@ r = monte_carlo(ofi, :T_in => Uniform(38.0, 42.0); n=2000)
 
 A vector input takes a multivariate distribution of its length, and an `MvNormal` with a full
 covariance carries correlations between its entries, which an `Uncertainty` cannot.
-
-## Get a table
-
-[`table`](@ref STREAM.UQ.table) turns the result of `uq` into rows, one per entry of the
-outputs, with each row naming its output. DataFrames.jl reads them as they are, and so does
-anything else that takes Tables.jl rows:
-
-```@example uq
-using DataFrames: DataFrame
-
-margin_table = DataFrame(table(result))
-```
-
-```@example uq
-@assert margin_table.output == ["chfr", "onb"]
-```
 
 ## Get the outputs as Measurements
 
