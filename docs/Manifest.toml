@@ -2,7 +2,7 @@
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "be0feed344ef0e4e680a3e6e87b6f53ce6f87df3"
+project_hash = "9f8a1c56af6ffbf2977777f451018edf31afeb99"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -378,6 +378,13 @@ git-tree-sha1 = "0cfb779e24fdced77a05df1dbe99200821a9f563"
 registries = "General"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.18.8+1"
+
+[[deps.Calculus]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "9cb23bbb1127eefb022b022481466c0f1127d430"
+registries = "General"
+uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
+version = "0.5.2"
 
 [[deps.ChainRulesCore]]
 deps = ["LinearAlgebra"]
@@ -1906,6 +1913,29 @@ weakdeps = ["SparseArrays"]
     [deps.MaybeInplace.extensions]
     MaybeInplaceSparseArraysExt = "SparseArrays"
 
+[[deps.Measurements]]
+deps = ["Calculus", "LinearAlgebra", "Printf"]
+git-tree-sha1 = "cb47f69a1cab9dcec7ff4a5d6e163410d6905866"
+registries = "General"
+uuid = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+version = "2.14.1"
+
+    [deps.Measurements.extensions]
+    MeasurementsBaseTypeExt = "BaseType"
+    MeasurementsJunoExt = "Juno"
+    MeasurementsMakieExt = "Makie"
+    MeasurementsRecipesBaseExt = "RecipesBase"
+    MeasurementsSpecialFunctionsExt = "SpecialFunctions"
+    MeasurementsUnitfulExt = "Unitful"
+
+    [deps.Measurements.weakdeps]
+    BaseType = "7fbed51b-1ef5-4d67-9085-a4a9b26f478c"
+    Juno = "e5e0dc1b-0480-54bc-9374-aad01c23163d"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+    SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
 [[deps.Missings]]
 deps = ["DataAPI"]
 git-tree-sha1 = "ec4f7fbeab05d7747bdf98eb74d130a2a2ed298d"
@@ -2725,10 +2755,15 @@ uuid = "fdea26ae-647d-5447-a871-4b548cad5224"
 version = "3.8.1"
 
 [[deps.STREAM]]
-deps = ["DelimitedFiles", "LinearAlgebra", "ModelingToolkit", "OrdinaryDiffEq", "OrdinaryDiffEqNonlinearSolve", "QuadGK", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
+deps = ["DelimitedFiles", "ForwardDiff", "LinearAlgebra", "ModelingToolkit", "OrdinaryDiffEq", "OrdinaryDiffEqNonlinearSolve", "QuadGK", "Random", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
 path = ".."
 uuid = "49562357-9609-405b-b96f-716d2939d241"
 version = "0.1.0"
+weakdeps = ["Distributions", "Measurements"]
+
+    [deps.STREAM.extensions]
+    STREAMDistributionsExt = "Distributions"
+    STREAMMeasurementsExt = "Measurements"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FindFirstFunctions", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "LoggingExtras", "Markdown", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "Random", "RecipesBase", "RecursiveArrayTools", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLPublic", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]

@@ -2,7 +2,7 @@
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "06932582aed7e3ad9b0cc9d235f23141b20cc1f5"
+project_hash = "61f33d2925c7f12cf8712f7975dfe443dff0b35c"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -1604,10 +1604,18 @@ uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 version = "1.0.0"
 
 [[deps.STREAM]]
-deps = ["DelimitedFiles", "LinearAlgebra", "ModelingToolkit", "OrdinaryDiffEq", "OrdinaryDiffEqNonlinearSolve", "QuadGK", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
+deps = ["DelimitedFiles", "ForwardDiff", "LinearAlgebra", "ModelingToolkit", "OrdinaryDiffEq", "OrdinaryDiffEqNonlinearSolve", "QuadGK", "Random", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
 path = "."
 uuid = "49562357-9609-405b-b96f-716d2939d241"
 version = "0.1.0"
+
+    [deps.STREAM.extensions]
+    STREAMDistributionsExt = "Distributions"
+    STREAMMeasurementsExt = "Measurements"
+
+    [deps.STREAM.weakdeps]
+    Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FindFirstFunctions", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "LoggingExtras", "Markdown", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "Random", "RecipesBase", "RecursiveArrayTools", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLPublic", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]

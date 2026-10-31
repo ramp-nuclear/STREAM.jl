@@ -26,3 +26,4 @@ as the [Tutorials](../tutorials/index.md) teach, and shows the shortest route to
 **Reading the results**
 
 - [Compute safety margins](margins.md)
+- [Propagate input uncertainties](uncertainty.md)
