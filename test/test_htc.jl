@@ -223,8 +223,7 @@ end
         faces((wall, :thermal) => (cac_u, :thermal_outer)),
         pump_u.inlet.p ~ 1.0e5,
     ]
-    @named sys_u = assembly(conns, pump_u, bc_u, cac_u, wall)
-    ssys_u = mtkcompile(sys_u)
+    @mtkcompile ssys_u = assembly(conns, pump_u, bc_u, cac_u, wall)
     sol_u = solve_steady(ssys_u)
 
     @test sol_u.retcode == ReturnCode.Success

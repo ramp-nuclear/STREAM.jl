@@ -142,9 +142,8 @@ end
         @named p = Pump(2.0)
         @named r = Resistor(1.0)
         @named hot = HeatExchanger(HX_T_HOT)
-        @named sys = assembly([inseries(p, hot, sink, r, p), p.inlet.p ~ 1.0e5],
-                              p, r, hot, sink)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly([inseries(p, hot, sink, r, p), p.inlet.p ~ 1.0e5],
+                                    p, r, hot, sink)
         return ssys, solve_steady(ssys)
     end
 

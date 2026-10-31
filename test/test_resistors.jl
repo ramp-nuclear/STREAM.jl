@@ -18,8 +18,7 @@ using STREAM.Components
         (k == 0 ? [pump.outlet] : [])..., (k == 7 ? [pump.inlet] : [])...,
         (r[e].outlet for e in edges if e[2] == k)..., (r[e].inlet for e in edges if e[1] == k)...,
     )
-    @named sys = assembly([corner.(0:7); pump.inlet.p ~ 1.0e5], pump, values(r)...)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly([corner.(0:7); pump.inlet.p ~ 1.0e5], pump, values(r)...)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
@@ -39,8 +38,7 @@ end
         inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, vfr)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, vfr)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     ṁ = sol[ssys.vfr.inlet.ṁ]
@@ -62,8 +60,7 @@ end
         inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, vfr)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, vfr)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     q = sol[ssys.vfr.inlet.ṁ]                         # rho=1 ⇒ Q = ṁ
@@ -98,8 +95,7 @@ end
         inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, vfr)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, vfr)
 
     # The loop is purely algebraic in flow (no inertia), so the flow tracks the instantaneous
     # k(t): at each t, k(t)*Q*|Q| = dP_head. Solve the steady balance at t=0, then integrate
@@ -146,8 +142,7 @@ end
         inseries(pump, hx, lpd, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, lpd)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, lpd)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     A = min(A1, A2)
@@ -165,8 +160,7 @@ end
         @named hx = HeatExchanger(T)
         r = make_resistor(:r)
         conns = [inseries(pump, hx, r, pump), pump.inlet.p ~ 1.0e5]
-        @named sys = assembly(conns, pump, hx, r)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, hx, r)
         sol = solve_steady(ssys)
         @test sol.retcode == ReturnCode.Success
         return sol[ssys.r.inlet.ṁ]

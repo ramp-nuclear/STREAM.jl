@@ -27,8 +27,7 @@ end
         inseries(p_real, hx_real, res_real, p_real),
         p_real.inlet.p ~ 1.0e5,
     ]
-    @named sys_real = assembly(conns_real, p_real, hx_real, res_real)
-    ssys_real = mtkcompile(sys_real)
+    @mtkcompile ssys_real = assembly(conns_real, p_real, hx_real, res_real)
     sol_real = solve_steady(ssys_real)
     @test sol_real.retcode == ReturnCode.Success
     # Defining relation of scalar mode: the head equals the prescribed dP (rtol=1e-8, the
@@ -46,8 +45,8 @@ end
     @test sol_real[ssys_real.res_real.ṁ] ≈ sol_real[ssys_real.res_real.inlet.ṁ]
 
     # --- Callable fixed-pressure mode: the head follows the callable at the solve time. ---
-    # A steady solve relaxes in real time to t where dP_pump_fn(t) is read; with a constant
-    # callable the head must equal that constant value, distinct from the scalar case above.
+    # A steady solve reads the callable at t = 0; a constant callable's head is its value,
+    # distinct from the scalar case above.
     dP_call_val = 8.0e4
     dP_call = (_tt) -> dP_call_val
     @named p_fn = Pump(dP_call)
@@ -58,9 +57,8 @@ end
         inseries(p_fn, hx_fn, res_fn, p_fn),
         p_fn.inlet.p ~ 1.0e5,
     ]
-    @named sys_fn = assembly(conns_fn, p_fn, hx_fn, res_fn)
-    ssys_fn = mtkcompile(sys_fn)
-    sol_fn = solve_steady(ssys_fn, [ssys_fn.p_fn.dP_pump_fn => dP_call])
+    @mtkcompile ssys_fn = assembly(conns_fn, p_fn, hx_fn, res_fn)
+    sol_fn = solve_steady(ssys_fn)
     @test sol_fn.retcode == ReturnCode.Success
     # Defining relation of callable mode: the head equals the callable's value (rtol=1e-8,
     # exact algebraic head). Confirms the callable, not a frozen constant, drove the solve.
@@ -122,8 +120,7 @@ end
         inseries(pump, ine, res, hx, pump),
         pump.inlet.p ~ 1e5,       # pressure anchor
     ]
-    @named sys = assembly(conns, pump, ine, res, hx)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, ine, res, hx)
 
     ṁ_0 = dP0 / R_val
 

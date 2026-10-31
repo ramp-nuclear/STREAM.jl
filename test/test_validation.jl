@@ -134,8 +134,7 @@ end
         pump.inlet.p ~ 1.0e5,
         faces((wall, :thermal) => (cac, :thermal_outer)),
     ]
-    @named sys = assembly(conns, pump, hx, cac, wall)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, cac, wall)
 
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
@@ -227,8 +226,7 @@ end
             (hd, :thermal_right) => (cac_r, :thermal_left),
         ),
     ]
-    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
 
     rows = ParityRow[]
     sol = solve_steady(ssys)
@@ -354,8 +352,7 @@ end
             (hd, :thermal_right) => (cac_r, :thermal_left),
         ),
     ]
-    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
@@ -421,8 +418,7 @@ end
             (hd, :thermal_right) => (cac_r, :thermal_left),
         ),
     ]
-    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
 
     op = [ssys.hd.T[i, nx] => 95.0 for i in 1:nz]
     rows = ParityRow[]
@@ -556,8 +552,7 @@ end
         inseries(pump_l, hx_l, cac, pump_l),
         pump_l.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump_l, hx_l, scc)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump_l, hx_l, scc)
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
@@ -684,8 +679,7 @@ end  # @testset "parity harness"
             (ct_r, :thermal) => (hd_v01, :thermal_right),
         ),
     ]
-    @named sys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
-    ssys_v01 = mtkcompile(sys_v01)
+    @mtkcompile ssys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
 
     op_ic_v01 = [ssys_v01.hd_v01.T => fill(T0, nz_v01, nx_v01)]
 
@@ -743,8 +737,7 @@ end
             (hd2, :thermal_left) => (cac_v02, :thermal_right),
         ),
     ]
-    @named sys_v02 = assembly(conns_v02, pump_v02, hx_v02, cac_v02, hd1, hd2)
-    ssys_v02 = mtkcompile(sys_v02)
+    @mtkcompile ssys_v02 = assembly(conns_v02, pump_v02, hx_v02, cac_v02, hd1, hd2)
 
     # Initial guess: ṁ +0.250 (rectangular MTR at 30 kPa)
     sol_v02 = solve_steady(ssys_v02)

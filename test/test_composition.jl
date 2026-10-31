@@ -82,8 +82,7 @@ end
         inseries(pump, bc, rods.cac, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named full = assembly(conns, rods, pump, bc)
-    ssys = mtkcompile(full)
+    @mtkcompile ssys = assembly(conns, rods, pump, bc)
     @test ssys isa ModelingToolkit.AbstractSystem
     # Solve briefly to verify composition produces meaningful steady state
     sol = solve_transient(ssys, range(0.0, 0.5, length=10))
@@ -441,9 +440,6 @@ function _fa_hd(prefix::Symbol; nz=4, nx=2, power=1.0e3)
     return HeatDiffusion(slab; name=prefix, power=power)
 end
 
-# Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).
-const _fa_Dt = Differential(t)
-
 """
     _fa_connections(sys) -> Set{String}
 
@@ -482,12 +478,8 @@ _fa_pair(left, right) = (left, :thermal_right) => (right, :thermal_left)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump), pump.inlet.p ~ 1.0e5]
-    @named full = assembly(conns, asm, pump, bc)
-    ssys = mtkcompile(full; build_initializeprob=false)
-    # A Dt(...) => 0.0 guess for every channel's inlet flow: mtkcompile keeps only one of
-    # them as a differential state and which one is not known ahead of time.
-    ic = [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)]
-    sol = solve_steady(ssys, ic)
+    @mtkcompile ssys = assembly(conns, asm, pump, bc)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 end
 
@@ -521,11 +513,8 @@ end
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump), pump.inlet.p ~ 1.0e5]
-    @named full = assembly(conns, asm, pump, bc)
-    ssys = mtkcompile(full; build_initializeprob=false)
-    channels = (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)
-    ic = [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in channels]
-    sol = solve_steady(ssys, ic)
+    @mtkcompile ssys = assembly(conns, asm, pump, bc)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 end
 
@@ -589,8 +578,7 @@ end
             ch.T_wall_outer .~ 100.0,
         ]
         # The tuple weighted returns is both the path to wire and the systems to compose.
-        @named sys = assembly(conns, pump, hx, branch...)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, hx, branch...)
         sol = solve_steady(ssys)
         @test sol.retcode == ReturnCode.Success
         return ssys, sol

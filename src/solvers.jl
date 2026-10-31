@@ -23,7 +23,8 @@ An operating point is ModelingToolkit's single map over both unknowns and parame
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
 - `op`: operating point, a `Vector{Pair}`. A parameter in it takes that value. An unknown in it
-  is where the solve starts. An unknown left out starts from the value the model declares.
+  is where the solve starts. An unknown left out starts from the value the model declares,
+  and a derivative `mtkcompile` made an unknown, such as `L₊inlet₊ṁˍt`, from zero.
 - `t`: the time the forcings are evaluated at (default 0.0)
 - `solver`: `nothing` for NonlinearSolve's default, a NonlinearSolve algorithm, or
   `DynamicSS(alg)`
@@ -38,7 +39,8 @@ function solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, relto
     steady = ModelingToolkit.NonlinearSystem(ssys; bind_iv=false)
     # Without initialization: for a system whose unknowns are all observed, MTK's
     # initialization refers to variables it does not define.
-    op = Dict{Any,Any}([op; ModelingToolkit.get_iv(ssys) => t])
+    iv = ModelingToolkit.get_iv(ssys)
+    op = Dict{Any,Any}([_dummy_derivatives(ssys) .=> 0.0; op; iv => t])
     residual = NonlinearProblem(steady, op; build_initializeprob=false)
     # The steady residual as an ODE in a pseudo-time, with the mass matrix of `ssys`: a root
     # finder solves it and `DynamicSS` integrates it, and either solution is indexed through
@@ -49,6 +51,30 @@ function solve_steady(ssys, op=Pair[]; t=0.0, solver=nothing, abstol=1e-8, relto
     )
     prob = SteadyStateProblem(f, residual.u0, residual.p)
     return solve(prob, solver; abstol, reltol, _dynamic_kwargs(solver, abstol)...)
+end
+
+"""
+    _dummy_derivatives(ssys) -> Vector
+
+The unknowns of `ssys` that are derivatives of other variables.
+
+Index reduction can turn a derivative into an algebraic unknown, a dummy derivative, which
+`mtkcompile` names by appending `ˍt` to the variable's name. Nothing declares a value for it,
+and at a steady state it is zero.
+"""
+_dummy_derivatives(ssys) =
+    filter(u -> endswith(string(ModelingToolkit.getname(u)), "ˍt"), unknowns(ssys))
+
+"""
+    _stateless(ssys) -> Bool
+
+Whether `ssys` has no differential state: it has no unknowns, or every row of its mass
+matrix is zero.
+"""
+function _stateless(ssys)
+    isempty(unknowns(ssys)) && return true
+    M = ModelingToolkit.calculate_massmatrix(ssys)
+    return M isa AbstractMatrix && all(iszero, M)
 end
 
 """
@@ -89,11 +115,10 @@ Solve a transient simulation over a time array, starting from the operating poin
   needed when `op` is an approximate or transplanted IC that does not exactly satisfy the
   algebraic equations, where `NoInit` + a stiff solver can abort at `t=0` (`dt` driven below
   floating-point epsilon, `NaN` error estimate).
-- `build_initializeprob`: leave at the default `nothing` for almost everything (MTK chooses). Pass
-  `false` only for a loop that `mtkcompile` reduces to no differential states (a purely algebraic
-  system, such as a flapper and pump with no inertia), where MTK would otherwise build an
-  initialization problem that aborts at `t=0`. A stateless system has nothing to make consistent, so
-  skipping it is correct.
+- `build_initializeprob`: whether MTK builds an initialization problem. The default `nothing`
+  lets MTK choose, except for a loop `mtkcompile` reduces to no differential states, such as a
+  flapper and pump with no inertia, which gets `false`: it has nothing to make consistent, and
+  the initialization problem MTK would build for it fails at `t[1]`.
 - `kwargs...`: additional keyword arguments forwarded to `solve`
 
 The solver steps onto every time in `t`, so each saved value is a step's own result rather
@@ -109,7 +134,8 @@ function solve_transient(
     initializealg=SciMLBase.NoInit(), build_initializeprob=nothing, kwargs...,
 )
     tspan = (Float64(t[1]), Float64(t[end]))
-    init = build_initializeprob === nothing ? (;) : (; build_initializeprob)
+    isnothing(build_initializeprob) && _stateless(ssys) && (build_initializeprob = false)
+    init = isnothing(build_initializeprob) ? (;) : (; build_initializeprob)
     op = [op; _unset_arrays(ssys)]
     prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false, init...)
     return solve(prob, solver; saveat=t, callback=callbacks, initializealg,
