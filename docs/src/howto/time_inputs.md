@@ -48,7 +48,7 @@ head(t) = 3.0e4 * exp(-t / 5)               # coasting down with a 5 s time cons
 @named loop = assembly([inseries(pump, flywheel, loss, hx, pump), pump.inlet.p ~ 1.5e5],
                        pump, flywheel, loss, hx)
 sys = mtkcompile(loop)
-sol = solve_transient(sys, [sys.loss.inlet.ṁ => 50.0], 0.0:1.0:30.0)
+sol = solve_transient(sys, solve_steady(sys), 0.0:1.0:30.0)
 sol[sys.loss.inlet.ṁ, end]
 ```
 
@@ -70,8 +70,8 @@ coastdown(τ) = t -> 3.0e4 * exp(-t / τ)       # every τ gives a function of t
                        pump, flywheel, loss, hx)
 sys = mtkcompile(loop)
 map((2.0, 5.0, 20.0)) do τ
-    sol = solve_transient(sys, [sys.loss.inlet.ṁ => 50.0, sys.pump.dP_pump_fn => coastdown(τ)],
-                          0.0:1.0:30.0)
+    sol = solve_transient(sys, solve_steady(sys), 0.0:1.0:30.0;
+                          overrides=[sys.pump.dP_pump_fn => coastdown(τ)])
     sol[sys.loss.inlet.ṁ, end]
 end
 ```
