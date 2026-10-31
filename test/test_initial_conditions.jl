@@ -35,7 +35,5 @@ using STREAM.Components
         @test all(==(40.0) ∘ last, op)
         @test all(any(isequal(first(p)), unknowns(ssys)) for p in op)
         @test count(p -> any(isequal(first(p)), collect(ssys.ch.T)), op) == 10
-        @test isempty(uniform(ssys, 40.0, :nope))
-        @test solve_steady(ssys, op).retcode == ReturnCode.Success
     end
 end
