@@ -5,6 +5,27 @@ outputs, to first order: how far the CHF ratio moves when the power is known to 
 gap to a tenth of a millimetre. [Uncertainty quantification](../explanation/uncertainty.md)
 explains what the numbers mean and when first order is enough.
 
+There are three kinds of problem, and each can be taken down two routes:
+
+```text
+prob = SteadyUQ(sys, op, inputs; output)         the steady state of a system
+       TransientUQ(sys, op, inputs, t; output)   a transient of one
+       FunctionUQ(f, parameters)                 any function of named inputs
+ ├─ s = local_sensitivities(prob)
+ │    ├─ uq(s, unc...)              → nominal, sys, stat
+ │    ├─ contributions(s, unc...)   → inputs, and sys, stat per input
+ │    ├─ jacobian(s)                → the derivatives
+ │    └─ measurements(s, unc...)    → value ± σ
+ └─ monte_carlo(prob, unc...; n)    → nominal, samples, mean, std, failed
+```
+
+First order splits the work. `local_sensitivities` does the expensive part once, the solve and
+its derivatives, and the uncertainties come in afterwards, where each set costs a few matrix
+products. Monte Carlo has nothing to split, since every sample is a full solve, so the
+uncertainties go straight into the call. `monte_carlo` does not call `uq`: the two are
+independent, which is what makes one a check on the other. The exception is a `TransientUQ`
+that trips a `StateMachine`, whose derivatives cannot be taken, so it has only the second route.
+
 The example is the plate of [Compute safety margins](margins.md), with its channel gap a
 [design knob](design_knobs.md) so that the gap can be one of the inputs:
 
@@ -15,6 +36,7 @@ using STREAM.UQ
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, symmetric_plate
 using ModelingToolkit: @named, mtkcompile
+using DataFrames: DataFrame
 
 gap = @design_knob gap = 0.0024
 geometry = Duct(0.6, Rectangular(0.067, gap); heated=0.063)
@@ -36,27 +58,36 @@ nothing # hide
 
 A [`SteadyUQ`](@ref STREAM.UQ.SteadyUQ) names the inputs that carry an uncertainty, and the
 outputs to carry it to. The inputs are parameters of the compiled system, here the knob and
-three component parameters. The outputs come from a function of the solution, written as for
+three component parameters. The outputs come from a function of the solution, here the
+smallest CHF ratio in the channel and the fewest kelvin to the onset of boiling, with the limits
+preset once and handed to
 [`threshold_analysis`](@ref STREAM.Thresholds.threshold_analysis). Defining the problem
 computes nothing; [`local_sensitivities`](@ref STREAM.UQ.local_sensitivities) does, solving
 the steady state once and differentiating the outputs there:
 
 ```@example uq
-function margins(sol)
-    state = ChannelState(sol, sys.cell.ch)
-    return [minimum(chfr(q_CHF_sudo_kaminaga)(state)),            # smallest CHF ratio
-            minimum(bergles_rohsenow_t_onb(state) .- state.T_wall)] # K to the onset of boiling
-end
+limits = (chfr=chfr(q_CHF_sudo_kaminaga),
+          onb=state -> bergles_rohsenow_t_onb(state) .- state.T_wall)
+smallest(sol, channel) = map(minimum, threshold_analysis(sol, channel; limits...))
+margins(sol) = smallest(sol, sys.cell.ch)
 
 inputs = [sys.cell.fuel.power, sys.pump.ṁ0, sys.hx.T_bc, gap]
 prob = SteadyUQ(sys, knob_defaults([gap]), inputs; output=margins)
 s = local_sensitivities(prob)
-s.nominal
+s.output
 ```
 
-`ChannelState` reads the channel's duct at the gap the solution was solved at, as it reads
-the temperatures. Under `local_sensitivities` that gap carries its derivative, and the duct
-passes it on to the correlations.
+`threshold_analysis` reads the channel's duct at the gap the solution was solved at, as it
+reads the temperatures. Under `local_sensitivities` that gap carries its derivative, and the
+duct passes it on to the correlations.
+
+An output can be a number, an array, or a `NamedTuple` of these, nested as deep as it needs,
+and every result below comes back in the same shape. A model with several channels names each
+one, and its limits are then `result.hot.chfr`, `result.cold.onb` and so on:
+
+```julia
+margins(sol) = (hot=smallest(sol, sys.hot.ch), cold=smallest(sol, sys.cold.ch))
+```
 
 ## Give each input its uncertainty
 
@@ -72,7 +103,13 @@ uncertainties = (
     gap => Uncertainty(statistical_absolute=1.0e-4),               # gap tolerance, m
 )
 result = uq(s, uncertainties...)
+DataFrame(table(result))
 ```
+
+`result` has the shape of the outputs, so a value is `result.chfr.stat`.
+[`table`](@ref STREAM.UQ.table) lays it out as rows, one per entry of the outputs with each
+naming its output, which DataFrames.jl reads as they are, as does anything else that takes
+Tables.jl rows.
 
 An input left out has no uncertainty, and nothing is solved again, so `uq` can be called on
 the same `s` with as many sets of uncertainties as needed. The systematic parts add up
@@ -81,22 +118,33 @@ statistical ones in quadrature, so a margin with both is commonly checked as
 `nominal - sys - k * stat` for a coverage factor `k`:
 
 ```@example uq
-result.nominal .- result.sys .- 2 .* result.stat
+map(limit -> limit.nominal - limit.sys - 2limit.stat, result)
 ```
 
 ## See which input matters
 
-[`jacobian`](@ref STREAM.UQ.jacobian) gives the derivatives behind the result, a row per output
-and a column per input:
+[`contributions`](@ref STREAM.UQ.contributions) takes the same uncertainties and splits the
+result by input, one entry per input in the order given. `sys` is what each input's bias does
+to the output, with its sign, and `stat` the standard deviation it causes:
+
+```@example uq
+c = contributions(s, uncertainties...)
+DataFrame(input=collect(string.(c.chfr.inputs)), sys=c.chfr.sys, stat=c.chfr.stat)
+```
+
+Taken as absolute values the `sys` entries add up to `uq`'s `sys`, and the `stat` entries add
+in quadrature to its `stat`:
+
+```@example uq
+@assert sum(abs, c.chfr.sys) ≈ result.chfr.sys
+@assert hypot(c.chfr.stat...) ≈ result.chfr.stat
+```
+
+[`jacobian`](@ref STREAM.UQ.jacobian) gives the derivatives behind them, per unit of each
+input, a row per flat output and a column per input:
 
 ```@example uq
 J = jacobian(s)
-```
-
-Multiplied by each input's uncertainty, a column shows what that input contributes:
-
-```@example uq
-J .* [0.05 * 3.0e4  0.03 * 0.4  1.0  1.0e-4]
 ```
 
 More power takes margin away from both limits, and more flow gives it back:
@@ -182,21 +230,22 @@ to linear over the spread, and part from them where it curves:
 
 ```@example uq
 sampled = monte_carlo(prob, uncertainties...; n=1000)
-(first_order=result.stat, sampled=sampled.std)
+DataFrame(output=collect(keys(result)), first_order=[limit.stat for limit in result],
+          sampled=[limit.std for limit in sampled])
 ```
 
 The samples are the distribution of each output. The systematic part moves every sample the
-same way, so the first-order normal to set beside them sits at the nominal value plus
-``J s``, with its sign, and has the width of the statistical part:
+same way, so the first-order normal to set beside them sits at the nominal value plus the
+sum of the signed `sys` contributions, and has the width of the statistical part:
 
 ```@example uq
-shift = J[:, 1] .* (0.05 * 3.0e4)   # the power bias, through the power's column of J
+labels = (chfr="smallest CHF ratio", onb="K to the onset of boiling")
 fig = Figure(size=(760, 340))
-for (k, label) in enumerate(("smallest CHF ratio", "K to the onset of boiling"))
-    ax = Axis(fig[1, k]; xlabel=label, ylabel=k == 1 ? "probability density" : "")
-    hist!(ax, sampled.samples[k, :]; bins=40, normalization=:pdf,
+for (k, limit) in enumerate(keys(labels))
+    ax = Axis(fig[1, k]; xlabel=labels[limit], ylabel=k == 1 ? "probability density" : "")
+    hist!(ax, sampled[limit].samples; bins=40, normalization=:pdf,
           color=("#eb6834", 0.6), strokewidth=1, strokecolor=:white, label="sampled")
-    μ, σ = result.nominal[k] + shift[k], result.stat[k]
+    μ, σ = result[limit].nominal + sum(c[limit].sys), result[limit].stat
     xs = range(μ - 4σ, μ + 4σ; length=200)
     lines!(ax, xs, @. exp(-(xs - μ)^2 / (2σ^2)) / (σ * sqrt(2π)); color="#2a78d6",
            linewidth=2, label="first order")

@@ -25,14 +25,61 @@ _readout(output) = output
 """
     _outputs(y) -> AbstractVector
 
-A model's result as the flat vector of outputs ForwardDiff differentiates.
+A model's result as the flat vector of outputs ForwardDiff differentiates, the entries of a
+`NamedTuple` one after the other.
 
 # Throws
-- `ArgumentError`: for anything but a number or an array
+- `ArgumentError`: for anything but a number, an array or a `NamedTuple` of these
 """
 _outputs(y::Number) = [y]
 _outputs(y::AbstractArray) = vec(y)
-_outputs(y) = throw(ArgumentError("a model returns a number or an array, not a $(typeof(y))"))
+_outputs(y::NamedTuple) = mapreduce(_outputs, vcat, values(y))
+_outputs(y) = throw(ArgumentError(
+    "a model returns a number, an array or a NamedTuple of these, not a $(typeof(y))"
+))
+
+"""
+    _mirror(r::NamedTuple, output) -> NamedTuple
+
+The results `r` over the flat outputs, in the shape of a model's `output`. A `NamedTuple`
+output gives its keys and nesting, with `r`'s fields at each leaf holding that leaf's part in
+its shape. Any other output keeps `r` flat.
+"""
+_mirror(r, output) = r
+function _mirror(r, output::NamedTuple)
+    slices = NamedTuple{keys(output)}(_slices(_outputs.(Tuple(output))))
+    return map((y, s) -> _leaf(map(x -> _take(x, s), r), y), output, slices)
+end
+
+"""
+    _leaf(r, y) -> NamedTuple
+
+The part `r` of the results at the entry `y` of a named output: shaped like `y`, or mirrored
+further when `y` is a `NamedTuple` itself.
+"""
+_leaf(r, y) = map(x -> _shape(x, y), r)
+_leaf(r, y::NamedTuple) = _mirror(r, y)
+
+"""
+    _take(x, slice)
+
+The outputs at `slice` of one field of a result: entries of a vector, rows of a matrix. A
+field that is not per output, such as a count, stays as it is.
+"""
+_take(x, _) = x
+_take(x::AbstractVector, slice) = x[slice]
+_take(x::AbstractMatrix, slice) = x[slice, :]
+
+"""
+    _shape(x, y)
+
+One field of a result in the shape of the output `y`: a number for a number, and an array of
+`y`'s size otherwise, with the columns of a matrix field as a last dimension.
+"""
+_shape(x, _) = x
+_shape(x::AbstractVector, ::Number) = only(x)
+_shape(x::AbstractVector, y) = reshape(x, size(y))
+_shape(x::AbstractMatrix, y) = reshape(x, size(y)..., :)
 
 """
     _position(parameters, parameter) -> Int
