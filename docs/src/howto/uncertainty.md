@@ -5,10 +5,12 @@ outputs, to first order: how far the CHF ratio moves when the power is known to 
 gap to a tenth of a millimetre. [Uncertainty quantification](../explanation/uncertainty.md)
 explains what the numbers mean and when first order is enough.
 
-A problem can be taken down two routes:
+There are three kinds of problem, and each can be taken down two routes:
 
 ```text
-prob = SteadyUQ(sys, op, inputs; output)
+prob = SteadyUQ(sys, op, inputs; output)         the steady state of a system
+       TransientUQ(sys, op, inputs, t; output)   a transient of one
+       FunctionUQ(f, parameters)                 any function of named inputs
  ├─ s = local_sensitivities(prob)
  │    ├─ uq(s, unc...)              → nominal, sys, stat
  │    ├─ contributions(s, unc...)   → inputs, and sys, stat per input
@@ -21,7 +23,8 @@ First order splits the work. `local_sensitivities` does the expensive part once,
 its derivatives, and the uncertainties come in afterwards, where each set costs a few matrix
 products. Monte Carlo has nothing to split, since every sample is a full solve, so the
 uncertainties go straight into the call. `monte_carlo` does not call `uq`: the two are
-independent, which is what makes one a check on the other.
+independent, which is what makes one a check on the other. The exception is a `TransientUQ`
+that trips a `StateMachine`, whose derivatives cannot be taken, so it has only the second route.
 
 The example is the plate of [Compute safety margins](margins.md), with its channel gap a
 [design knob](design_knobs.md) so that the gap can be one of the inputs:
