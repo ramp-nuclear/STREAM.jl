@@ -40,8 +40,7 @@ using STREAM.Substances
         inseries(pump, hx, R, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, R)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, R)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.R.inlet.ṁ], dp / r; rtol=1e-8)              # ṁ = dp/r
@@ -64,8 +63,7 @@ end
         inparallel(hx, (R1, R2), pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, R1, R2)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, R1, R2)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     total_R = (r1 * r2) / (r1 + r2)
@@ -87,8 +85,7 @@ end
         inseries(rboth, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hxcold, hxhot, rcold, rhot, rboth)
-    s = mtkcompile(sys)
+    @mtkcompile s = assembly(conns, pump, hxcold, hxhot, rcold, rhot, rboth)
     sol = solve_steady(s)
     @test sol.retcode == ReturnCode.Success
     ṁhot, ṁcold = sol[s.hxhot.inlet.ṁ], sol[s.hxcold.inlet.ṁ]
@@ -110,8 +107,7 @@ end
         inseries(pump, hx, Rs..., pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, Rs...)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, Rs...)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     for i in 1:N
@@ -134,8 +130,7 @@ end
         inseries(P1, hx, P2, P1),
         P1.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, P1, P2, hx)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, P1, P2, hx)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.P2.inlet.ṁ], ṁ; rtol=1e-8)              # current source wins
@@ -190,8 +185,7 @@ end
         inseries(pump, L_el, R, hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, L_el, R, hx)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, L_el, R, hx)
     sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 1.0; length=5)   # exactly [0, 0.25, 0.5, 0.75, 1.0]
@@ -224,8 +218,7 @@ end
         inseries(pump, L_el, R, hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, L_el, R, hx)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, L_el, R, hx)
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts from it. Mirror
     # that: solve_steady with the pump on, then start the transient from the solved state with the
     # pump head overridden to 0 (a zero-head pump is a pass-through).
@@ -263,8 +256,7 @@ end
         inseries(hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, L_el, R1, R2, hx)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, L_el, R1, R2, hx)
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts. Solve_steady
     # with the pump on, then start the transient from the solved state with the pump head
     # overridden to 0.
@@ -299,8 +291,7 @@ end
         inseries(pump, hx, R1, R2, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, R1, R2)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, R1, R2)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     bundle = sol[ssys.R1.inlet.ṁ]      # = m2 = s·m1
@@ -327,8 +318,7 @@ end
         inparallel(hx, R1s, R2),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, R1s..., R2)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, R1s..., R2)
     m1 = p / (r1 + signify * r2)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
@@ -355,8 +345,7 @@ end
         inseries(pump, hx, lpd, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, hx, lpd)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, hx, lpd)
     ṁ = Float64[]
     for tt in 0.0:1.0:6.0
         m = 3.0 - tt
@@ -378,8 +367,7 @@ end
     # at t_open = log(10). The flapper carries no flow before t_open and opens after.
     p = 1.0
     ṁ0 = 1.0
-    dp_fn = (tt) -> p * exp(-tt)   # one function object: passed to Pump AND the op (same type)
-    @named pump = Pump(dp_fn)
+    @named pump = Pump(tt -> p * exp(-tt))
     @named R = Resistor(p / ṁ0)
     machine = StateMachine(; initial_state=:CLOSED)
     @named flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0, machine=machine,
@@ -391,11 +379,7 @@ end
         inseries(hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, R, flapper, hx)
-    ssys = mtkcompile(sys)
-    op = [
-        ssys.pump.dP_pump_fn => dp_fn,
-    ]   # the machine starts :CLOSED (flapper shut until the transition fires)
+    @mtkcompile ssys = assembly(conns, pump, R, flapper, hx)
     @test machine.state === :CLOSED   # starts closed (Python: isinf(F.t_open))
     # ref_ṁ is the resistor flow R.ṁ = pump_dP/r = p·exp(-t), which mtkcompile leaves
     # purely algebraic (no inertia ⇒ no state). The transition detects the crossing exactly
@@ -403,7 +387,7 @@ end
     # the valve opens when the REAL wired flow reaches the threshold — no hardcoded analytic.
     cb = machine_callbacks(ssys, machine)
     t_arr = range(0.0, 5.0; length=500)
-    sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+    sol = solve_transient(ssys, t_arr; callbacks=cb)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(machine.t_state, log(10.0); rtol=1e-3)   # detected open time = log(10)
     @test isapprox(sol(1.0; idxs=ssys.flapper.inlet.ṁ), 0.0; atol=1e-8)  # closed before
@@ -413,11 +397,9 @@ end
 @testset "flapper and pump" begin
     # Python: test_flapper_and_pump
     # A pre-timed flapper (open at t=2.5) in series with a decaying pump: no flow until the flapper
-    # opens, then the quadratic flapper conducts. With no inertia, mtkcompile leaves zero
-    # differential states, so pass build_initializeprob=false (no state to make consistent).
+    # opens, then the quadratic flapper conducts.
     t_open = 2.5
-    dp_fn = (tt) -> exp(-tt)   # one function object for Pump + op
-    @named pump = Pump(dp_fn)
+    @named pump = Pump(tt -> exp(-tt))
     # A machine already open at t_open is Python's F.open(2.5).
     @named flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0,
                              machine=StateMachine(; initial_state=:OPEN, initial_time=t_open),
@@ -427,10 +409,8 @@ end
         inseries(pump, flapper, hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, flapper, hx)
-    ssys = mtkcompile(sys)
-    op = [ssys.pump.dP_pump_fn => dp_fn]
-    sol = solve_transient(ssys, op, range(0.0, 5.0; length=500); build_initializeprob=false)
+    @mtkcompile ssys = assembly(conns, pump, flapper, hx)
+    sol = solve_transient(ssys, range(0.0, 5.0; length=500))
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(2.0; idxs=ssys.pump.inlet.ṁ), 0.0; atol=1e-8)   # closed ⇒ no flow
     @test abs(sol(4.5; idxs=ssys.pump.inlet.ṁ)) > 1e-6                 # open ⇒ flow
@@ -459,8 +439,7 @@ end
         inparallel(ine, (R, flapper), hx),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, ine, R, flapper, hx)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, ine, R, flapper, hx)
     # The machine is :CLOSED for the steady solve; opening it at a time you already know is a
     # trip, the same idiom a fixed scram uses.
     sol_ss = solve_steady(ssys)
@@ -496,14 +475,13 @@ end
         inparallel(ine, (R, transistor), hx),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, ine, R, transistor, hx)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, ine, R, transistor, hx)
     # Python solves the driven steady state (transistor stiff, near-all flow through R), then
     # shuts the pump and coasts as the transistor collapses. Solve_steady on, then coast from it.
-    sol_ss = solve_steady(ssys, [ssys.transistor.k_fn => kfn])
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     sol = solve_transient(ssys, sol_ss, range(0.0, t_final; length=302);
-                          overrides=[ssys.pump.dP_pump => 0.0, ssys.transistor.k_fn => kfn],
+                          overrides=[ssys.pump.dP_pump => 0.0],
                           reltol=1e-6, abstol=1e-7)
     @test sol.retcode == ReturnCode.Success    # convergence is the gate
     # Two parallel quadratic resistors combine to an effective coefficient k_a·k_b/(√k_a+√k_b)².
@@ -549,8 +527,7 @@ end
         inseries(pump, HX_hot, G1, HX_cold, G2, R, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, HX_hot, HX_cold, G1, G2, R)
-    ssys = mtkcompile(sys)
+    @mtkcompile ssys = assembly(conns, pump, HX_hot, HX_cold, G1, G2, R)
     delta_rho = ρ(H2O, low_T) - ρ(H2O, high_T)   # = ρ(low_T) - ρ(high_T) > 0
     times = range(0.0, 10.0; length=10)
     ṁ = Float64[]
@@ -645,7 +622,6 @@ end
     # Coastdown: fixed-pressure pump, head = p_pump0·exp(-t) overridden per time-point.
     @named pump2 = Pump(p_pump0)
     ssys2 = build_coastdown(pump2)
-    Dt = Differential(t)
     times = range(0.0, 0.05; length=150)
     ṁ = Float64[]
     cold_cells = Float64[]   # every cell at every time (Python asserts allclose over the full T_cool array)
@@ -657,8 +633,6 @@ end
     # The root solve has no time step, so it cannot underflow dt at the stiff near-reversal
     # point.
     carry = [
-        Dt(ssys2.cold.inlet.ṁ) => 0.0,
-        Dt(ssys2.hot.inlet.ṁ) => 0.0,
         ssys2.cold.T => fill(T_cold, nz),
         ssys2.hot.T => fill(T_hot, nz),
     ]
@@ -804,35 +778,9 @@ end
     ]
     ssys = mtkcompile(assembly(conns, rodss..., pk, pumps..., bcs...; name=:sys5))
 
-    # Consistent cold critical IC. ref_temp = T0, so seeding every coolant / contact / fuel
-    # temperature to T0 makes the initial feedback reactivity exactly zero (the loop starts
-    # critical). Seed every member of each connection set (port temperatures default to 26.85 °C and
-    # which alias representative survives is not stable across MTK versions), matching build_loop_pk.
-    pk_ic = point_kinetics_steady_state(1.0)
-    ic = Pair{Any,Any}[
-        ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P_neutron => pk_ic.P_neutron,
-        ssys.pk.C => pk_ic.C_k,
-    ]
-    for i in 1:N
-        rods = getproperty(ssys, Symbol(:rods, i))
-        cac = getproperty(rods, Symbol(:cac, i))
-        fuel = getproperty(rods, Symbol(:fuel, i))
-        pump = getproperty(ssys, Symbol(:pump, i))
-        bc = getproperty(ssys, Symbol(:bc, i))
-        push!(ic, cac.inlet.ṁ => ṁs[i])
-        push!(ic, cac.T => fill(T0, n))
-        push!(ic, fuel.T => fill(T0, nz, nx))
-        push!(ic, cac.inlet.T => T0)
-        push!(ic, cac.outlet.T => T0)
-        push!(ic, pump.inlet.T => T0)
-        push!(ic, pump.outlet.T => T0)
-        push!(ic, bc.inlet.T => T0)
-        push!(ic, bc.outlet.T => T0)
-        for part in (cac, fuel), face in (:thermal_left, :thermal_right)
-            append!(ic, port(part, face, :T) .=> T0)
-        end
-    end
+    # Every temperature at ref_temp = T0, so the loop starts critical: the initial feedback
+    # reactivity is exactly zero.
+    ic = uniform(ssys, T0, :T)
 
     sol = solve_transient(ssys, ic, range(0.0, 200.0; length=200); maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success

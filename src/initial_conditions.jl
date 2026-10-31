@@ -29,6 +29,29 @@ function uniform(systems, value, variables::Symbol...)
 end
 
 """
+    uniform(ssys::System, value, variables...) -> Vector{Pair}
+
+Give `value` to every unknown of the compiled system `ssys` whose own name is one of
+`variables`, in whichever component it sits.
+
+`uniform(ssys, 20.0, :T)` starts every temperature in a loop at 20 °C: each cell, and each
+port and contact temperature `mtkcompile` kept, whichever member of a connection set that
+is.
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `value`: the value to give
+- `variables`: `Symbol`s naming the variables, without their namespace
+
+# Returns
+A vector of `unknown => value` pairs to splice into an operating point.
+"""
+function uniform(ssys::ModelingToolkit.AbstractSystem, value, variables::Symbol...)
+    path(u) = split(string(ModelingToolkit.getname(u)), ModelingToolkit.NAMESPACE_SEPARATOR)
+    return [u => value for u in unknowns(ssys) if Symbol(last(path(u))) in variables]
+end
+
+"""
     steady_state_guess(; T_inlet, Q_wall, ṁ_guess, n, liquid=H2O) -> Vector{Float64}
 
 Generate a linear temperature guess for steady-state initialization.

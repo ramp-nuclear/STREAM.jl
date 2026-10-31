@@ -136,11 +136,11 @@ connections2 = [inseries(pump2, flywheel2, loss2, hx2, pump2), pump2.inlet.p ~ 1
 @named loop2 = assembly(connections2, pump2, flywheel2, loss2, hx2)
 sys2 = mtkcompile(loop2);
 
-# The function becomes a parameter of the model, `dP_pump_fn`, which the operating point
-# gives a value like any other. At ``t = 0`` the head is still the full 0.3 bar, so the loop
+# The function becomes a parameter of the model, `dP_pump_fn`, whose value is `head` unless
+# an operating point replaces it. At ``t = 0`` the head is still the full 0.3 bar, so the loop
 # starts at the design flow, the one state the compiled system keeps:
 
-sol2 = solve_transient(sys2, [sys2.loss2.inlet.ṁ => ṁ0, sys2.pump2.dP_pump_fn => head], times)
+sol2 = solve_transient(sys2, [sys2.loss2.inlet.ṁ => ṁ0], times)
 sol2.retcode
 
 #-

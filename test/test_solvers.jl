@@ -102,8 +102,7 @@ using STREAM.Components
             inseries(pump, ine, res, hx, pump),
             pump.inlet.p ~ 1.0e5,
         ]
-        @named sys = assembly(conns, pump, ine, res, hx)
-        ssys = mtkcompile(sys)
+        @mtkcompile ssys = assembly(conns, pump, ine, res, hx)
         sol_ss = solve_steady(ssys)
         @test sol_ss.retcode == ReturnCode.Success
 
