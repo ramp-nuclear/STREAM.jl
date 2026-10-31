@@ -218,7 +218,7 @@ _all_variables(vars) =
 Build the composed `System` for a channel variant. Every variant states the heat flow into
 each face and whatever extra variables, equations, observables, and ports it adds, then hands
 them here; the shared core equations and the `compose` call live in one place. The system
-carries `geometry`, for [`duct`](@ref) to read back.
+carries `geometry` and `liquid`, for [`duct`](@ref) and [`coolant`](@ref) to read back.
 """
 function _channel_system(;
     name, n::Int, geometry::Duct, g, darcy, liquid,
@@ -229,14 +229,14 @@ function _channel_system(;
         n, inlet, outlet, geometry, g, darcy, q_face, vars, liquid, T_wall,
     )
     all_vars = vcat(_all_variables(vars), extra_vars...)
-    sys = compose(
+    return compose(
         System(_flat(core.eqs, extra_eqs), t, all_vars, pars;
-               observed=_flat(core.obs, extra_obs), name),
+               observed=_flat(core.obs, extra_obs), name,
+               metadata=(_DuctKey => geometry, _CoolantKey => liquid)),
         inlet,
         outlet,
         extra_ports...,
     )
-    return _with_duct(sys, geometry)
 end
 
 """
@@ -260,7 +260,8 @@ function _h_cells(h, n, name)
 end
 
 """
-    Channel(; name, n, geometry, g=0.0, h=0.0, darcy=Blasius(), liquid=H2O) -> System
+    Channel(; name, n, geometry, g=0.0, h=0.0, darcy=Blasius(),
+            liquid=coolant()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells, heated through a given
 convective coefficient against a wall temperature the caller binds.
@@ -284,7 +285,8 @@ into a cell, `heated` being the face's heated width.
   Handed `(T_wall, T_bulk, ṁ, liquid, geometry)` per cell, with the mean of the faces' wall
   temperatures. Regime switching and the heated-wall viscosity correction are
   [`Friction.RegimeDependent`](@ref).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref STREAM.Substances.Liquid) to
+- `liquid`: coolant (`AbstractLiquid`), default [`coolant()`](@ref
+  STREAM.Substances.coolant). Pass a [`Liquid`](@ref STREAM.Substances.Liquid) to
   drive the energy balance, friction, and dimensionless observables with fixed properties.
 
 # External-input variables
@@ -308,7 +310,7 @@ function Channel(;
     g=0.0,
     h=0.0,
     darcy::AbstractDarcyFactor=Blasius(),
-    liquid::AbstractLiquid=H2O,
+    liquid::AbstractLiquid=coolant(),
 )
     vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)
@@ -339,7 +341,8 @@ end
 
 
 """
-    ChannelHeatFlux(; name, n, geometry, g=0.0, darcy=Blasius(), liquid=H2O) -> System
+    ChannelHeatFlux(; name, n, geometry, g=0.0, darcy=Blasius(),
+                    liquid=coolant()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells, with the heat flux on each
 face prescribed per cell by the caller.
@@ -355,7 +358,8 @@ The channel has one face per heated wall of its duct, named after the wall, as f
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_bulk, ṁ, liquid, geometry)` per cell, having no wall temperature of
   its own. Regime switching is [`Friction.RegimeDependent`](@ref).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
+- `liquid`: coolant (`AbstractLiquid`), default
+  [`coolant()`](@ref STREAM.Substances.coolant).
 
 # External-input variables
 - `q_<face>(t)[1:n]`: the face's per-cell heat flux density [W/m^2], such as `q_left`
@@ -379,7 +383,7 @@ function ChannelHeatFlux(;
     geometry::Duct,
     g=0.0,
     darcy::AbstractDarcyFactor=Blasius(),
-    liquid::AbstractLiquid=H2O,
+    liquid::AbstractLiquid=coolant(),
 )
     vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)
@@ -396,7 +400,7 @@ end
 
 """
     ChannelAndContacts(; name, n, geometry, g=0.0, htc=DittusBoelter(), darcy=Blasius(),
-                       liquid=H2O) -> System
+                       liquid=coolant()) -> System
 
 Convective channel with a per-cell `ThermalPort` array on each face, for conjugate heat
 transfer (the variant that connects to `HeatDiffusion`). The channel has one face per heated
@@ -418,7 +422,8 @@ heated width.
   Handed `(T_wall, T_bulk, ṁ, liquid, geometry)` per cell, with the mean of the faces' wall
   temperatures. Regime switching and the heated-wall viscosity correction are
   [`Friction.RegimeDependent`](@ref).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). It drives the energy balance,
+- `liquid`: coolant (`AbstractLiquid`), default [`coolant()`](@ref
+  STREAM.Substances.coolant). It drives the energy balance,
   friction, the HTC model, and the dimensionless observables.
 
 # Ports
@@ -433,7 +438,7 @@ function ChannelAndContacts(;
     g=0.0,
     htc::AbstractHTC=DittusBoelter(),
     darcy::AbstractDarcyFactor=Blasius(),
-    liquid::AbstractLiquid=H2O,
+    liquid::AbstractLiquid=coolant(),
 )
     vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)

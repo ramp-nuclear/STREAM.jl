@@ -2,7 +2,7 @@
 const _C_FLOOR = 1.0e-6   # [W/K]
 
 @doc raw"""
-    HeatExchanger(T_bc; UA=nothing, liquid=H2O, name) -> System
+    HeatExchanger(T_bc; UA=nothing, liquid=coolant(), name) -> System
 
 A heat exchanger to a sink held at `T_bc`: the cooling a loop gets from something outside the
 model, such as a cooling tower, a pond or the air.
@@ -28,7 +28,8 @@ a resistor in series for one. See [Heat exchangers and the heat sink](@ref).
 - `T_bc`: sink temperature [°C], the parameter `T_bc`
 - `UA`: overall conductance [W/K]. `nothing` gives the ideal exchanger. A number is held as
   the parameter `UA`. A function `(ṁ) -> UA` of the mass flow makes it the unknown `UA_eff`.
-- `liquid`: the coolant, for its specific heat (default `H2O`); unused when ideal
+- `liquid`: the coolant, for its specific heat, default
+  [`coolant()`](@ref STREAM.Substances.coolant); unused when ideal
 - `name`: system name (Symbol)
 
 # Ports
@@ -38,7 +39,7 @@ a resistor in series for one. See [Heat exchangers and the heat sink](@ref).
 Uncompiled `System`. With a `UA` it has the observed `Q`, the heat the liquid takes up [W],
 negative when the sink cools it.
 """
-function HeatExchanger(T_bc; UA=nothing, liquid::AbstractLiquid=H2O, name)
+function HeatExchanger(T_bc; UA=nothing, liquid::AbstractLiquid=coolant(), name)
     pars = @parameters T_bc = T_bc
     @named inlet = FlowPort()
     @named outlet = FlowPort(; ṁ=-FLOW_START)
@@ -59,7 +60,7 @@ function HeatExchanger(T_bc; UA=nothing, liquid::AbstractLiquid=H2O, name)
 end
 
 @doc raw"""
-    HeatExchanger(; UA, arrangement=HTC.Counterflow(), primary_liquid=H2O,
+    HeatExchanger(; UA, arrangement=HTC.Counterflow(), primary_liquid=coolant(),
                   secondary_liquid=H2O, name) -> System
 
 A heat exchanger between two flowing streams, the primary and the secondary, solved by the
@@ -87,7 +88,10 @@ the reverse, and the model switches formulas to match. A side that stops flowing
   [`HTC.flow_scaled_UA`](@ref STREAM.HTC.flow_scaled_UA), makes it the unknown `UA_eff`.
 - `arrangement`: [`HTC.Counterflow()`](@ref STREAM.HTC.Counterflow) or
   [`HTC.ParallelFlow()`](@ref STREAM.HTC.ParallelFlow), for forward flow on both sides
-- `primary_liquid`, `secondary_liquid`: the coolant on each side (default `H2O`)
+- `primary_liquid`: the coolant on the primary side, default
+  [`coolant()`](@ref STREAM.Substances.coolant)
+- `secondary_liquid`: the coolant on the secondary side, default [`H2O`](@ref). The secondary
+  is another loop, so [`@coolant`](@ref) does not set it
 - `name`: system name (Symbol)
 
 # Ports
@@ -99,7 +103,7 @@ primary is the hot side. Each side has `T_in` (the temperature arriving, whichev
 flows), `C` and `ΔT`, the rise from its inlet to its outlet.
 """
 function HeatExchanger(; UA, arrangement::HTC.AbstractArrangement=HTC.Counterflow(),
-                       primary_liquid::AbstractLiquid=H2O,
+                       primary_liquid::AbstractLiquid=coolant(),
                        secondary_liquid::AbstractLiquid=H2O, name)
     primary = _ExchangerSide(; liquid=primary_liquid, name=:primary)
     secondary = _ExchangerSide(; liquid=secondary_liquid, name=:secondary)

@@ -224,6 +224,7 @@ end
         @test state.ṁ == 0.5
         @test state.gravity == 9.81
         @test state.duct === pipe
+        @test state.liquid === H2O   # built by hand, outside any @coolant block
     end
 
     @testset "bergles_rohsenow_t_onb on a ChannelState" begin
@@ -366,6 +367,24 @@ end
         # The result is the worsened flux at onset, so the margin against the worsened local
         # flux, q_OSV / (f q), is what falls.
         @test all(q_OSV_saha_zuber(state; inhomogeneity_factor=1.2) ./ 1.2 .< q_OSV_saha_zuber(state))
+    end
+end
+
+@testset "a ChannelState carries its channel's coolant" begin
+    d2o = @coolant D2O build_loop(; n=5)
+    state = ChannelState(solve_steady(d2o), d2o.ch)
+    @test state.liquid === D2O
+    @testset "$(nameof(f)) defaults to the channel's coolant" for f in (
+        q_boiling_onset, q_CHF_sudo_kaminaga, q_OFI_whittle_forgan, q_OSV_saha_zuber,
+    )
+        @test f(state) == f(state; liquid=D2O)
+        @test f(state) != f(state; liquid=H2O)
+    end
+    @testset "the coolant holds under local_sensitivities" begin
+        ofi(sol) = [q_OFI_whittle_forgan(ChannelState(sol, d2o.ch))]
+        s = UQ.local_sensitivities(UQ.SteadyUQ(d2o, [], [d2o.bc.T_bc]; output=ofi))
+        @test only(s.nominal) ≈ q_OFI_whittle_forgan(state; liquid=D2O)
+        @test !(only(s.nominal) ≈ q_OFI_whittle_forgan(state; liquid=H2O))
     end
 end
 

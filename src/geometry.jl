@@ -334,13 +334,6 @@ function duct(sys::ModelingToolkit.AbstractSystem)
     return d
 end
 
-"""
-    _with_duct(sys, d::Duct) -> System
-
-`sys` carrying `d`, for [`duct`](@ref) to read back.
-"""
-_with_duct(sys, d::Duct) = ModelingToolkit.setmetadata(sys, _DuctKey, d)
-
 # A duct is one value in a broadcast, as a coolant is.
 Base.broadcastable(d::Duct) = Ref(d)
 

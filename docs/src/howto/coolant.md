@@ -1,9 +1,11 @@
 # Change the coolant
 
-Every component that reads coolant properties takes a `liquid` keyword, light water ([`H2O`](@ref))
-by default.
+A component takes its coolant as the `liquid` keyword, light water ([`H2O`](@ref)) by
+default. A model can instead name its coolant once with [`@coolant`](@ref) and leave the
+keyword out. An explicit keyword wins over a `@coolant` block, a block over the session's
+coolant, and that is `H2O` until `@coolant` sets it.
 
-## Heavy water
+## Per component
 
 Pass [`D2O`](@ref) to each component that carries coolant:
 
@@ -25,6 +27,48 @@ passes them, so they need no change. The property functions take any liquid:
 ```@example coolant
 (ρ(H2O, 50.0), ρ(D2O, 50.0), Tsat(H2O, 1.0e5), Tsat(D2O, 1.0e5))
 ```
+
+## Once for a whole model
+
+Build the components inside a `@coolant` block, and every `liquid` keyword left out takes the
+block's coolant:
+
+```@example coolant
+using STREAM.Components: HeatExchanger, Pump
+using STREAM.Assemblies: inseries
+
+@coolant D2O begin
+    @named pump = Pump(3.0e4)
+    @named hx = HeatExchanger(40.0)
+    @named core = ChannelAndContacts(; n=10, geometry=geom)
+end
+@named model = assembly([inseries(pump, hx, core, pump), pump.inlet.p ~ ATM], pump, hx, core)
+@assert Substances.coolant(model.core) === D2O   # the channel keeps the block's coolant
+Substances.coolant()
+```
+
+The components assigned inside the block stay defined after it, and `Substances.coolant()` is
+back to `H2O` outside it. Every channel records the coolant it was built with, so a
+`ChannelState` reads the right one after the block ends. `steady_state_guess` runs before any
+model exists, so it reads the coolant in effect when it is called: call it inside the block, or
+pass `liquid=`.
+
+Without a block, `@coolant` sets the coolant for the rest of the session, until the next
+`@coolant`:
+
+```@example coolant
+@coolant D2O
+Substances.coolant()
+```
+
+```@example coolant
+@coolant H2O
+nothing # hide
+```
+
+A two-stream [`HeatExchanger`](@ref STREAM.Components.HeatExchanger) takes the coolant in
+effect on its primary side only. Its secondary is another loop and stays `H2O` unless given
+`secondary_liquid`.
 
 ## Properties frozen at one state
 
