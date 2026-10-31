@@ -138,6 +138,13 @@ simple_parameters = (vec=[1.0, 2.0, 3.0], v1=2.0, v2=3.0)
         @test c.nested.cells.stat == c_flat.stat[2:3, :]
         @test c.nested.field.sys == reshape(c_flat.sys[4:7, :], 2, 2, 2)
 
+        rows = table(r)
+        @test first(rows) == (output="total", index=1, nominal=5.0, sys=expected.sys[1],
+                              stat=expected.stat[1])
+        @test last(rows).output == "nested.field" && last(rows).index == 4
+        @test getproperty.(rows, :stat) == expected.stat
+        @test only(unique(getproperty.(table(expected), :output))) == ""
+
         m = monte_carlo(prob, given...; n=5, rng=Xoshiro(1))
         @test size(m.total.samples) == (5,)
         @test size(m.nested.field.samples) == (2, 2, 5)

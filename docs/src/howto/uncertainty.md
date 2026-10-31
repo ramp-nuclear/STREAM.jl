@@ -347,6 +347,22 @@ r = monte_carlo(ofi, :T_in => Uniform(38.0, 42.0); n=2000)
 A vector input takes a multivariate distribution of its length, and an `MvNormal` with a full
 covariance carries correlations between its entries, which an `Uncertainty` cannot.
 
+## Get a table
+
+[`table`](@ref STREAM.UQ.table) turns the result of `uq` into rows, one per entry of the
+outputs, with each row naming its output. DataFrames.jl reads them as they are, and so does
+anything else that takes Tables.jl rows:
+
+```@example uq
+using DataFrames: DataFrame
+
+margin_table = DataFrame(table(result))
+```
+
+```@example uq
+@assert margin_table.output == ["chfr", "onb"]
+```
+
 ## Get the outputs as Measurements
 
 With Measurements.jl loaded, [`measurements`](@ref STREAM.UQ.measurements) returns the outputs

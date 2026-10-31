@@ -474,7 +474,7 @@ include("uq/inputs.jl")
 include("uq/uncertainty.jl")
 include("uq/sampling.jl")
 export FunctionUQ, SteadyUQ, TransientUQ, LocalSensitivities, local_sensitivities, jacobian
-export Uncertainty, as_absolute, uq, contributions, measurements, monte_carlo
+export Uncertainty, as_absolute, uq, contributions, table, measurements, monte_carlo
 end
 
 # The public surface. Everything not listed here is reached through its module.

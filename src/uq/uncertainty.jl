@@ -183,6 +183,48 @@ function _contributions(s, uncertainties::Pair...)
     return (; inputs=first.(uncertainties), sys=columns(1), stat=columns(2))
 end
 
+"""
+    table(r::NamedTuple) -> Vector{<:NamedTuple}
+
+The result of [`uq`](@ref) as rows, one per entry of the outputs, in the flat order of
+`s.nominal`. `DataFrame(table(r))` reads them with DataFrames.jl, as does anything else that
+takes Tables.jl rows.
+
+# Arguments
+- `r`: the result of [`uq`](@ref)
+
+# Returns
+A vector of `(; output, index, nominal, sys, stat)`: the output's path through a named result,
+such as `"hot.chfr"`, or `""` for a plain one; the entry's linear index within it; and its
+values.
+
+# Examples
+```jldoctest
+julia> s = UQ.local_sensitivities(UQ.FunctionUQ(x -> (sum=x.a + x.b, b=[x.b]), (a=2.0, b=3.0)));
+
+julia> rows = UQ.table(UQ.uq(s, :a => UQ.Uncertainty(statistical_absolute=2.0)));
+
+julia> first(rows)
+(output = "sum", index = 1, nominal = 5.0, sys = 0.0, stat = 2.0)
+```
+"""
+table(r::NamedTuple) = _rows(r, ())
+
+"""
+    _rows(r, path) -> Vector{<:NamedTuple}
+
+The rows of [`table`](@ref) under `path`, a tuple of keys: those of every entry of a `NamedTuple`
+of results, or those of one leaf.
+"""
+function _rows(r::NamedTuple{K,<:Tuple{Vararg{NamedTuple}}}, path) where {K}
+    return mapreduce(k -> _rows(r[k], (path..., k)), vcat, keys(r))
+end
+function _rows(r, path)
+    output = join(path, '.')
+    return [(; output, index=i, nominal=r.nominal[i], sys=r.sys[i], stat=r.stat[i])
+            for i in eachindex(r.nominal)]
+end
+
 @doc raw"""
     measurements(s::LocalSensitivities, uncertainties::Pair...) -> Vector{Measurement{Float64}}
 
