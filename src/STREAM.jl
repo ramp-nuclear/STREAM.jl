@@ -442,8 +442,8 @@ A problem says what to solve and which inputs are uncertain, and computes nothin
 [`FunctionUQ`](@ref) for a plain function, [`SteadyUQ`](@ref) for the steady state of a compiled
 system, [`TransientUQ`](@ref) for a transient of one. Two calls compute.
 [`local_sensitivities`](@ref) solves the nominal state and differentiates the outputs there,
-and [`uq`](@ref) propagates [`Uncertainty`](@ref)s through those derivatives to first order.
-[`monte_carlo`](@ref) samples the problem instead, for where first order is not enough. The
+and [`uq`](@ref) propagates [`Uncertainty`](@ref)s through those derivatives to first order,
+with [`contributions`](@ref) splitting the result by input. [`monte_carlo`](@ref) samples the problem instead, for where first order is not enough. The
 derivatives come from forward-mode automatic differentiation, and a steady state is
 differentiated through the implicit function theorem rather than through its solver.
 
@@ -474,7 +474,7 @@ include("uq/inputs.jl")
 include("uq/uncertainty.jl")
 include("uq/sampling.jl")
 export FunctionUQ, SteadyUQ, TransientUQ, LocalSensitivities, local_sensitivities, jacobian
-export Uncertainty, as_absolute, uq, measurements, monte_carlo
+export Uncertainty, as_absolute, uq, contributions, measurements, monte_carlo
 end
 
 # The public surface. Everything not listed here is reached through its module.

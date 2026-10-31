@@ -29,7 +29,9 @@ solve, so the result does not depend on the number of threads.
 # Returns
 `(; nominal, samples, mean, std, failed)`: the outputs at the nominal inputs; the outputs of
 every sample that solved, a column each; the mean and the standard deviation of each output
-over them; and how many samples failed to solve.
+over them; and how many samples failed to solve. A model returning a `NamedTuple` gets its keys
+and nesting back instead, with these at each leaf in that leaf's shape, and the samples along
+a last dimension.
 
 # Examples
 ```jldoctest
@@ -48,6 +50,7 @@ julia> round.(r.std; digits=2)
 function monte_carlo(prob::AbstractUQ, uncertainties::Pair...; n=1000,
                      rng::AbstractRNG=default_rng())
     prepared = _prepare(prob)
+    nominal = Float64.(_outputs(prepared.output))
     x0 = _flat(prepared.values)
     drawn = [prepared.slices[_position(prepared.parameters, p)] => u for (p, u) in uncertainties]
     inputs = repeat(x0, 1, n)
@@ -55,7 +58,10 @@ function monte_carlo(prob::AbstractUQ, uncertainties::Pair...; n=1000,
         inputs[slice, k] = _draw(rng, uncertainty, x0[slice])
     end
     results = Vector{Union{Nothing,Vector{Float64}}}(nothing, n)
-    sample(k) = results[k] = prepared.resolve(inputs[:, k])
+    function sample(k)
+        y = prepared.resolve(inputs[:, k])
+        results[k] = y === nothing ? nothing : _outputs(y)
+    end
     if prepared.threaded
         Threads.@threads for k in 1:n
             sample(k)
@@ -64,9 +70,10 @@ function monte_carlo(prob::AbstractUQ, uncertainties::Pair...; n=1000,
         foreach(sample, 1:n)
     end
     solved = filter(!isnothing, results)
-    samples = reduce(hcat, solved; init=zeros(length(prepared.nominal), 0))
-    return (; prepared.nominal, samples, mean=vec(mean(samples; dims=2)),
-            std=vec(std(samples; dims=2)), failed=n - length(solved))
+    samples = reduce(hcat, solved; init=zeros(length(nominal), 0))
+    r = (; nominal, samples, mean=vec(mean(samples; dims=2)), std=vec(std(samples; dims=2)),
+         failed=n - length(solved))
+    return _mirror(r, prepared.output)
 end
 
 """

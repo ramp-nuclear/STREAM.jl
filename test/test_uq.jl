@@ -101,6 +101,49 @@ simple_parameters = (vec=[1.0, 2.0, 3.0], v1=2.0, v2=3.0)
         @test all(iszero, none.sys) && all(iszero, none.stat)
     end
 
+    @testset "contributions add up to uq, and the signs survive" begin
+        given = (:vec => Uncertainty(systematic_absolute=[0.1, -0.1, 0.2],
+                                     statistical_relative=0.02),
+                 :v1 => Uncertainty(1.0, 0.5, 0.2, 0.1),
+                 :v2 => Uncertainty(systematic_relative=-0.05))
+        c, r = contributions(s, given...), uq(s, given...)
+        @test c.inputs == (:vec, :v1, :v2)
+        @test size(c.sys) == size(c.stat) == (7, 3)  # a vector input is one column
+        @test vec(sum(abs, c.sys; dims=2)) ≈ r.sys
+        @test vec(sqrt.(sum(abs2, c.stat; dims=2))) ≈ r.stat
+        @test c.sys[1, 3] ≈ -0.15  # v1 + v2 moves by the bias of v2, 3 * -0.05
+    end
+
+    @testset "named outputs come back in their own shape" begin
+        named(x) = (total=x.v1 + x.v2,
+                    nested=(cells=[x.v1, 2x.v2], field=[x.v1 x.v2; x.v2 x.v1]))
+        flat(x) = [x.v1 + x.v2, x.v1, 2x.v2, x.v1, x.v2, x.v2, x.v1]
+        scalars = (v1=2.0, v2=3.0)
+        given = (:v1 => Uncertainty(systematic_absolute=0.1, statistical_absolute=0.2),
+                 :v2 => Uncertainty(statistical_absolute=0.3))
+        prob = FunctionUQ(named, scalars)
+        by_name = local_sensitivities(prob)
+        plain = local_sensitivities(FunctionUQ(flat, scalars))
+        @test by_name.nominal == plain.nominal && jacobian(by_name) == jacobian(plain)
+        @test by_name.output.nested.cells == [2.0, 6.0]
+
+        r, expected = uq(by_name, given...), uq(plain, given...)
+        @test r.total == (nominal=5.0, sys=expected.sys[1], stat=expected.stat[1])
+        @test r.nested.cells.stat == expected.stat[2:3]
+        @test r.nested.field.sys == reshape(expected.sys[4:7], 2, 2)
+
+        c, c_flat = contributions(by_name, given...), contributions(plain, given...)
+        @test c.total.inputs == (:v1, :v2)
+        @test c.total.sys == c_flat.sys[1, :]
+        @test c.nested.cells.stat == c_flat.stat[2:3, :]
+        @test c.nested.field.sys == reshape(c_flat.sys[4:7, :], 2, 2, 2)
+
+        m = monte_carlo(prob, given...; n=5, rng=Xoshiro(1))
+        @test size(m.total.samples) == (5,)
+        @test size(m.nested.field.samples) == (2, 2, 5)
+        @test m.total.nominal == 5.0 && m.nested.field.failed == 0
+    end
+
     @testset "a second source only adds" begin
         one_source = uq(s, :v1 => Uncertainty(1.0, 0.5, 0.2, 0.1))
         two_sources = uq(s, :v1 => Uncertainty(1.0, 0.5, 0.2, 0.1),
@@ -227,6 +270,14 @@ end
         @test s.nominal ≈ [minimum(plain.chfr); minimum(plain.onb .- state.T_wall); plain.ofi]
     end
 
+    @testset "threshold_analysis as the output, by name" begin
+        limits = (chfr=chfr(q_CHF_sudo_kaminaga), ofi=q_OFI_whittle_forgan)
+        named(sol) = map(minimum, threshold_analysis(sol, ssys.cell.ch; limits...))
+        by_name = local_sensitivities(SteadyUQ(ssys, op, parameters; output=named))
+        @test by_name.output.chfr ≈ s.nominal[1]
+        @test jacobian(by_name) ≈ J[[1, 3], :]
+    end
+
     @testset "a wider gap in the operating point widens the state's duct" begin
         sol = solve_steady(ssys, with(op, gap => 0.003))
         @test ChannelState(sol, ssys.cell.ch).duct.shape.depth ≈ 0.003
@@ -288,6 +339,14 @@ end
     @testset "the nominal outputs are those of the transient" begin
         @test length(s.nominal) == length(times)
         @test s.nominal ≈ run_at(ssys.bc.T_bc, 60.0)[ssys.ch.T_out] rtol=1e-8
+    end
+
+    @testset "a named output keeps its time series" begin
+        output(sol) = (T_out=sol[ssys.ch.T_out],)
+        named = TransientUQ(ssys, op, parameters, times; output, abstol=1e-10, reltol=1e-10)
+        r = uq(local_sensitivities(named), ssys.bc.T_bc => Uncertainty(statistical_absolute=1.0))
+        @test r.T_out.nominal ≈ s.nominal
+        @test r.T_out.stat ≈ abs.(J[:, 1])
     end
 
     @testset "the outlet follows the inlet once the water has crossed the pipe" begin

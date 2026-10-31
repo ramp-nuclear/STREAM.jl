@@ -16,8 +16,8 @@ An uncertainty problem on any function of named inputs.
 over `Real`: no `Float64` annotations on its arguments, and no conversion to `Float64`.
 
 # Arguments
-- `f`: the model, taking a `NamedTuple` with the keys of `parameters` and returning a number
-  or an array
+- `f`: the model, taking a `NamedTuple` with the keys of `parameters` and returning a number,
+  an array, or a `NamedTuple` of these
 - `parameters`: the nominal inputs, each a number or an array of numbers
 
 # Returns
@@ -65,8 +65,9 @@ starting from the nominal one.
 - `op`: operating point for the steady solve, as for [`solve_steady`](@ref)
 - `parameters`: the inputs, each a parameter of `ssys`: a design knob, or a component
   parameter such as `ssys.pump.dP_pump`. Each takes its value from `op`, or its default.
-- `output`: the outputs. A function `sol -> number or array`, or a vector of variables of
-  `ssys`, read as `sol[v]`.
+- `output`: the outputs. A function of the solution returning a number, an array, or a
+  `NamedTuple` of these, which [`uq`](@ref) and [`monte_carlo`](@ref) return results in the
+  shape of; or a vector of variables of `ssys`, read as `sol[v]`.
 - `solver`, `abstol`, `reltol`: passed to `solve_steady`. The tolerances are tighter than its
   defaults, since the derivatives are taken at the root it returns.
 
@@ -125,7 +126,7 @@ the machine's state and trip time live outside the problem, where the duals do n
 - `op`: operating point: the start for `start=:op`, the steady solve's for `start=:steady`
 - `parameters`: the inputs, each a parameter of `ssys`
 - `t`: the times to save at
-- `output`: a function of the solution, `sol -> number or array`, such as
+- `output`: as for a [`SteadyUQ`](@ref): a function of the solution, such as
   `sol -> sol[ssys.ch.T_out]`, or a vector of variables, each read as its time series
 - `start`: `:op` or `:steady`
 - `overrides`: parameter changes at `t[1]` for `start=:steady`
@@ -181,20 +182,22 @@ end
 
 The outputs of an uncertainty problem at its nominal inputs, and their derivatives with respect
 to every input there. [`local_sensitivities`](@ref) returns one, and [`uq`](@ref),
-[`jacobian`](@ref) and [`measurements`](@ref) read it, so one computation serves any number of
-uncertainty sets.
+[`contributions`](@ref), [`jacobian`](@ref) and [`measurements`](@ref) read it, so one
+computation serves any number of uncertainty sets.
 
 # Fields
 - `parameters`: the inputs, in the order given
 - `values`: the nominal value of each input
 - `nominal`: the outputs at the nominal inputs, as one flat vector
+- `output`: the same outputs as the model returned them, named if it names them
 - `jacobian`: the derivatives, a row per output and a column per input entry
 """
-struct LocalSensitivities
+struct LocalSensitivities{O}
     parameters::Vector{Any}
     values::Vector{Any}
     slices::Vector{UnitRange{Int}}
     nominal::Vector{Float64}
+    output::O
     jacobian::Matrix{Float64}
 end
 
@@ -210,8 +213,8 @@ is no step size to choose. How a steady state and a transient are differentiated
 - `prob`: the problem
 
 # Returns
-A [`LocalSensitivities`](@ref), for [`uq`](@ref), [`jacobian`](@ref) and
-[`measurements`](@ref).
+A [`LocalSensitivities`](@ref), for [`uq`](@ref), [`contributions`](@ref), [`jacobian`](@ref)
+and [`measurements`](@ref).
 
 # Throws
 - `ArgumentError`: for a [`TransientUQ`](@ref) with callbacks, whose trips the derivatives
@@ -227,7 +230,7 @@ function local_sensitivities(prob::AbstractUQ)
     prepared = _prepare(prob)
     J = ForwardDiff.jacobian(prepared.evaluate, _flat(prepared.values))
     return LocalSensitivities(prepared.parameters, prepared.values, prepared.slices,
-                              prepared.nominal, J)
+                              Float64.(_outputs(prepared.output)), prepared.output, J)
 end
 
 """
@@ -270,23 +273,22 @@ _count(n, noun) = n == 1 ? "$n $noun" : "$n $(noun)s"
     _prepare(prob::AbstractUQ) -> NamedTuple
 
 Solve the nominal state of `prob` and build what [`local_sensitivities`](@ref) and
-[`monte_carlo`](@ref) run on: `(; evaluate, resolve, parameters, values, slices, nominal,
+[`monte_carlo`](@ref) run on: `(; evaluate, resolve, parameters, values, slices, output,
 threaded)`.
 
-`evaluate` maps the flat input vector, holding ForwardDiff duals, to the outputs, and is what
-ForwardDiff differentiates. `resolve` maps plain inputs to the outputs of the full model, or to
-`nothing` when it fails to solve. `monte_carlo` calls it from several threads at once unless
-`threaded` is false.
+`evaluate` maps the flat input vector, holding ForwardDiff duals, to the flat outputs, and is
+what ForwardDiff differentiates. `resolve` maps plain inputs to the output of the full model as
+it returns it, or to `nothing` when it fails to solve, and `output` is that at the nominal
+inputs. `monte_carlo` calls `resolve` from several threads at once unless `threaded` is false.
 """
 function _prepare(prob::FunctionUQ)
     (; f, parameters) = prob
     names = keys(parameters)
     values = collect(Any, Base.values(parameters))
     slices = _slices(values)
-    evaluate(x) = _outputs(f(NamedTuple{names}(Tuple(_unflatten(x, values, slices)))))
-    nominal = Float64.(_outputs(f(parameters)))
-    return (; evaluate, resolve=evaluate, parameters=collect(Any, names), values, slices,
-            nominal, threaded=true)
+    resolve(x) = f(NamedTuple{names}(Tuple(_unflatten(x, values, slices))))
+    return (; evaluate=_outputs ∘ resolve, resolve, parameters=collect(Any, names), values,
+            slices, output=f(parameters), threaded=true)
 end
 
 function _prepare(prob::SteadyUQ)
@@ -300,10 +302,10 @@ function _prepare(prob::SteadyUQ)
     end
     function resolve(x)
         sol = _resolve(steady, _unflatten(x, steady.values, slices))
-        return sol === nothing ? nothing : _outputs(readout(sol))
+        return sol === nothing ? nothing : readout(sol)
     end
-    nominal = Float64.(_outputs(readout(steady.sol)))
-    return (; evaluate, resolve, prob.parameters, steady.values, slices, nominal, threaded=true)
+    return (; evaluate, resolve, prob.parameters, steady.values, slices,
+            output=readout(steady.sol), threaded=true)
 end
 
 function _prepare(prob::TransientUQ)
@@ -362,10 +364,9 @@ function _prepare(prob::TransientUQ)
         foreach(reset!, machines)
         sol = _integrate(ode, set(ode, Any[u0; vals[kept]])..., t, solver, initializealg,
                          abstol, reltol, callbacks)
-        return SciMLBase.successful_retcode(sol) ? _outputs(readout(sol)) : nothing
+        return SciMLBase.successful_retcode(sol) ? readout(sol) : nothing
     end
-    nominal = resolve(_flat(values))
-    nominal === nothing && error("the nominal transient failed")
-    return (; evaluate, resolve, parameters, values, slices, nominal=Float64.(nominal),
-            threaded=isempty(machines))
+    output = resolve(_flat(values))
+    output === nothing && error("the nominal transient failed")
+    return (; evaluate, resolve, parameters, values, slices, output, threaded=isempty(machines))
 end

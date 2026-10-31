@@ -111,7 +111,9 @@ carries correlations between the entries.
 
 # Returns
 `(; nominal, sys, stat)`: the nominal outputs, and their systematic and statistical
-uncertainties, each a vector the length of `s.nominal`.
+uncertainties, each a vector the length of `s.nominal`. A model returning a `NamedTuple` gets
+its keys and nesting back instead, with `(; nominal, sys, stat)` at each leaf in that leaf's
+shape.
 
 # Examples
 ```jldoctest
@@ -120,18 +122,65 @@ julia> s = UQ.local_sensitivities(UQ.FunctionUQ(x -> x.a + x.b, (a=2.0, b=3.0)))
 julia> UQ.uq(s, :a => UQ.Uncertainty(systematic_absolute=1.0),
                 :b => UQ.Uncertainty(statistical_absolute=2.0))
 (nominal = [5.0], sys = [1.0], stat = [2.0])
+
+julia> s = UQ.local_sensitivities(UQ.FunctionUQ(x -> (sum=x.a + x.b, b=[x.b]), (a=2.0, b=3.0)));
+
+julia> UQ.uq(s, :a => UQ.Uncertainty(statistical_absolute=2.0)).sum
+(nominal = 5.0, sys = 0.0, stat = 2.0)
 ```
 """
 function uq(s::LocalSensitivities, uncertainties::Pair...)
-    n = length(s.nominal)
-    sys, variance = zeros(n), zeros(n)
-    for (parameter, input) in uncertainties
+    c = _contributions(s, uncertainties...)
+    r = (; nominal=s.nominal, sys=vec(sum(abs, c.sys; dims=2)),
+         stat=vec(sqrt.(sum(abs2, c.stat; dims=2))))
+    return _mirror(r, s.output)
+end
+
+"""
+    contributions(s::LocalSensitivities, uncertainties::Pair...) -> NamedTuple
+
+Split what [`uq`](@ref) gives by input, with the same arguments. `sys` keeps its sign, so
+`sum(abs, c.sys; dims=2)` is `uq`'s `sys` and `sum(c.sys; dims=2)` the shift
+[`monte_carlo`](@ref) sees, and `sqrt.(sum(abs2, c.stat; dims=2))` is `uq`'s `stat`. An array
+input is one column, since its entries combine before `uq` adds the inputs.
+
+# Arguments
+- `s`: the result of [`local_sensitivities`](@ref)
+- `uncertainties`: `parameter => Uncertainty` or `parameter => Distribution` pairs
+
+# Returns
+`(; inputs, sys, stat)`: the inputs of `uncertainties` in order, and matrices of each one's
+systematic and statistical part, a row per output and a column per input. A model returning
+a `NamedTuple` gets its keys and nesting back instead, with `(; inputs, sys, stat)` at each
+leaf, whose last dimension is the inputs.
+
+# Examples
+```jldoctest
+julia> s = UQ.local_sensitivities(UQ.FunctionUQ(x -> x.a - x.b, (a=2.0, b=3.0)));
+
+julia> UQ.contributions(s, :a => UQ.Uncertainty(systematic_absolute=1.0),
+                           :b => UQ.Uncertainty(systematic_absolute=1.0)).sys
+1×2 Matrix{Float64}:
+ 1.0  -1.0
+```
+"""
+function contributions(s::LocalSensitivities, uncertainties::Pair...)
+    return _mirror(_contributions(s, uncertainties...), s.output)
+end
+
+"""
+    _contributions(s, uncertainties...) -> NamedTuple
+
+[`contributions`](@ref) over the flat outputs, which [`uq`](@ref) adds up.
+"""
+function _contributions(s, uncertainties::Pair...)
+    parts = map(uncertainties) do (parameter, input)
         J = jacobian(s, parameter)
         bias, spread = _moments(input, s.values[_position(s.parameters, parameter)])
-        sys .+= abs.(J * bias)
-        variance .+= _variance(J, spread)
+        return J * bias, sqrt.(_variance(J, spread))
     end
-    return (; nominal=s.nominal, sys, stat=sqrt.(variance))
+    columns(i) = reduce(hcat, getindex.(parts, i); init=zeros(length(s.nominal), 0))
+    return (; inputs=first.(uncertainties), sys=columns(1), stat=columns(2))
 end
 
 @doc raw"""
