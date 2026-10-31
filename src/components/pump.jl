@@ -9,9 +9,9 @@ A pump, in one of three modes:
   whatever the flow. The loop's resistance sets the flow. `dP` becomes the parameter
   `dP_pump`, which an operating point or `overrides` can change.
 - **Head in time**, `Pump(f)` with a function `f(t)`, such as a coastdown: the same, with the
-  head `f(t)`. `f` becomes the callable parameter `dP_pump_fn`, which must also be given in the
-  operating point of the solve, as `sys.pump.dP_pump_fn => f`. See
-  [Drive an input from a function of time](@ref).
+  head `f(t)`. `f` becomes the callable parameter `dP_pump_fn`, which an operating point or
+  `overrides` can replace with another function of the same type, as
+  `sys.pump.dP_pump_fn => g`. See [Drive an input from a function of time](@ref).
 - **Fixed flow**, `Pump(; ṁ0)`: the flow is `ṁ0` and the head is whatever it takes. The
   pump states no pressure, so fix one elsewhere in the loop.
 
@@ -37,7 +37,7 @@ function Pump(dP_pump::Any; name)
     two = HydraulicTwoPort(; name)
     @unpack Δp, ṁ = two
     FType = typeof(dP_pump)
-    @parameters (dP_pump_fn::FType)(..)
+    @parameters (dP_pump_fn::FType)(..) = dP_pump
     return flow_relation(two, [Δp ~ dP_pump_fn(t)])
 end
 

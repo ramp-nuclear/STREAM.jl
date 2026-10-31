@@ -148,9 +148,9 @@ Resistor quadratic in volumetric flow: `ΔP = k·Q·|Q| + klow·Q`, where `Q = m
 volumetric flow rate. The `Q·|Q|` form keeps the drop direction-correct under flow reversal.
 
 A **time-dependent** resistance (the "transistor" pattern: a branch whose resistance
-collapses or grows over time) is expressed by passing `k` as a callable `(t) -> k`; the user
-then supplies `vfr.k_fn => fn` in the solve `op` dict (the MTK callable-parameter idiom, the
-same one `Channel`'s `h` uses).
+collapses or grows over time) is expressed by passing `k` as a callable `(t) -> k`. It becomes
+the callable parameter `k_fn`, which an operating point or `overrides` can replace with
+another function of the same type, as `vfr.k_fn => g`.
 
 # Arguments
 - `name`: system name (Symbol)
@@ -177,7 +177,7 @@ function VolumetricFlowResistor(;
         only(@parameters k = k)
     else  # a function or other callable: a time-varying resistance as a callable parameter
         FType = typeof(k)
-        only(@parameters (k_fn::FType)(..))(t)
+        only(@parameters (k_fn::FType)(..) = k)(t)
     end
     rho = density isa Real ? density : density(instream(inlet.T))
     q = ṁ / rho

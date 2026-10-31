@@ -350,6 +350,24 @@ end
         result_default = twall_limit(state)
         @test all(result_default .≈ 66.85)
     end
+
+    @testset "uncertainty factors on ONB and OSV" begin
+        # onb_factor scales the superheat over saturation, and inhomogeneity_factor is the
+        # correlation at a worse flux, on the hotter face (the left one, at 5e5 W/m²).
+        superheat = bergles_rohsenow_t_onb(state) .- state.T_sat
+        @test bergles_rohsenow_t_onb(state; onb_factor=1.2) .- state.T_sat ≈ 1.2 .* superheat
+        @test bergles_rohsenow_t_onb(state; inhomogeneity_factor=1.3) ≈
+              bergles_rohsenow_t_onb.(state.P, 1.3 .* state.q_fluxes.left, state.T_sat)
+
+        # The factor divides the ∫q dz / q term, so 1/q_OSV is linear in 1/f, and the very
+        # large f stands in for f → ∞.
+        inverse(f) = 1 ./ q_OSV_saha_zuber(state; inhomogeneity_factor=f)
+        @test q_OSV_saha_zuber(state; inhomogeneity_factor=1.0) == q_OSV_saha_zuber(state)
+        @test 2 .* (inverse(2.0) .- inverse(1e12)) ≈ inverse(1.0) .- inverse(1e12)
+        # The result is the worsened flux at onset, so the margin against the worsened local
+        # flux, q_OSV / (f q), is what falls.
+        @test all(q_OSV_saha_zuber(state; inhomogeneity_factor=1.2) ./ 1.2 .< q_OSV_saha_zuber(state))
+    end
 end
 
 @testset "a ChannelState carries its channel's coolant" begin
@@ -361,6 +379,12 @@ end
     )
         @test f(state) == f(state; liquid=D2O)
         @test f(state) != f(state; liquid=H2O)
+    end
+    @testset "the coolant holds under local_sensitivities" begin
+        ofi(sol) = [q_OFI_whittle_forgan(ChannelState(sol, d2o.ch))]
+        s = UQ.local_sensitivities(UQ.SteadyUQ(d2o, [], [d2o.bc.T_bc]; output=ofi))
+        @test only(s.nominal) ≈ q_OFI_whittle_forgan(state; liquid=D2O)
+        @test !(only(s.nominal) ≈ q_OFI_whittle_forgan(state; liquid=H2O))
     end
 end
 

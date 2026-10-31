@@ -198,8 +198,7 @@ end
     ]
     @named sys = assembly(conns, pump, bc, ch)
     ssys = mtkcompile(sys)
-    # Callable parameter goes into the same op dict as ICs.
-    sol = solve_steady(ssys, [ssys.ch.h_fn => h_fn])
+    sol = solve_steady(ssys)
     @named ch2 = Channel(; n=n, geometry=geom,
                            h=H_DEFAULT)
     conns = [
@@ -364,7 +363,7 @@ end
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = assembly(conns, pump, bc, cac, ct_l)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
 
     @test sol.retcode == ReturnCode.Success

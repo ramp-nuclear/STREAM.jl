@@ -85,7 +85,7 @@ coolant() = something(_COOLANT[], _GLOBAL_COOLANT[])
 
 function coolant(sys::ModelingToolkit.AbstractSystem)
     liquid = ModelingToolkit.getmetadata(sys, _CoolantKey, nothing)
-    liquid === nothing && throw(ArgumentError(
+    isnothing(liquid) && throw(ArgumentError(
         "$(nameof(sys)) carries no coolant: only a channel built by STREAM does",
     ))
     return liquid

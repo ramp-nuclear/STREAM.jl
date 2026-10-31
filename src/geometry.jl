@@ -12,10 +12,11 @@ abstract type AbstractShape end
 """
     _lengths(xs...) -> Tuple
 
-Coerce lengths to one element type: `Float64` for a fixed geometry, or `Num` as soon as one of
-them is a design knob, so the geometry derives symbolically.
+Coerce lengths to one element type, at least `Float64`: `Float64` for a fixed geometry, `Num`
+as soon as one of them is a design knob, so the geometry derives symbolically, and a dual
+number when one is a ForwardDiff dual, so the geometry carries its derivatives.
 """
-_lengths(xs...) = any(x -> x isa Num, xs) ? map(Num, xs) : map(Float64, xs)
+_lengths(xs...) = promote(map(x -> convert(promote_type(typeof(x), Float64), x), xs)...)
 
 """
     _ordered(a, b) -> (larger, smaller)
@@ -231,6 +232,18 @@ function _check_heated(shape, heated)
             "heated width $width of wall :$wall is outside (0, $(available[wall])]"))
     end
 end
+
+"""
+    _map_lengths(f, x)
+
+The duct or shape `x` with `f` applied to each of its lengths.
+"""
+_map_lengths(f, s::Rectangular) = Rectangular(f(s.width), f(s.depth))
+_map_lengths(f, s::Circular) = Circular(f(s.D))
+_map_lengths(f, s::Annular) = Annular(f(s.D_in), f(s.D_out))
+_map_lengths(f, s::Effective) =
+    Effective(; area=f(s.area), wetted_perimeter=f(s.wetted_perimeter))
+_map_lengths(f, d::Duct) = Duct(f(d.L), _map_lengths(f, d.shape); heated=map(f, d.heated))
 
 """
     flow_area(x) -> m^2

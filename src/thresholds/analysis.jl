@@ -12,43 +12,71 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 
 # Fields
 - `n::Int`: number of axial cells
-- `T_bulk::Vector{Float64}`: bulk coolant temperature per cell [°C]
-- `T_wall::Vector{Float64}`: the hottest face's wall temperature per cell [°C]
+- `T_bulk::Vector{T}`: bulk coolant temperature per cell [°C]
+- `T_wall::Vector{T}`: the hottest face's wall temperature per cell [°C]
 - `T_walls::NamedTuple`: each face's wall temperature per cell, by face name [°C]
-- `T_sat::Vector{Float64}`: saturation temperature per cell [°C]
-- `T_ONB::Vector{Float64}`: onset of nucleate boiling temperature per cell [°C]
-- `T_inlet::Float64`: temperature of the coolant entering the channel, at whichever end is
+- `T_sat::Vector{T}`: saturation temperature per cell [°C]
+- `T_ONB::Vector{T}`: onset of nucleate boiling temperature per cell [°C]
+- `T_inlet::T`: temperature of the coolant entering the channel, at whichever end is
   upstream, from the channel's `T_in` [°C]
-- `P::Vector{Float64}`: absolute pressure per cell [Pa]
-- `q_flux::Vector{Float64}`: the largest face heat flux per cell [W/m²]
+- `P::Vector{T}`: absolute pressure per cell [Pa]
+- `q_flux::Vector{T}`: the largest face heat flux per cell [W/m²]
 - `q_fluxes::NamedTuple`: each face's heat flux per cell, by face name [W/m²]
-- `ṁ::Float64`: mass flow rate from `inlet.ṁ` [kg/s]
-- `velocity::Vector{Float64}`: absolute fluid velocity per cell [m/s]
-- `duct::Union{Duct, Nothing}`: the channel's [`Duct`](@ref), or `nothing` for a state built
-  by hand without one
-- `gravity::Float64`: gravitational acceleration [m/s²]
-- `liquid::AbstractLiquid`: the channel's coolant, which the correlations on a `ChannelState`
-  read by default. Built by hand it is
-  [`coolant()`](@ref STREAM.Substances.coolant) unless given.
+- `ṁ::T`: mass flow rate from `inlet.ṁ` [kg/s]
+- `velocity::Vector{T}`: absolute fluid velocity per cell [m/s]
+- `duct::Union{Duct, Nothing}`: the channel's [`Duct`](@ref) in numbers, its design knobs at
+  their solved values, or `nothing` for a state built by hand without one
+- `gravity::T`: gravitational acceleration [m/s²]
+- `liquid::L`: the channel's coolant, which the correlations on a `ChannelState` read by
+  default. Built by hand it is [`coolant()`](@ref STREAM.Substances.coolant) unless given.
+
+`T` is the one number type of every field, `Float64` for a solved state and a ForwardDiff dual
+for one read under [`UQ.local_sensitivities`](@ref STREAM.UQ.local_sensitivities). A state built
+by hand takes the promotion of the numbers it is given.
 """
-@kwdef struct ChannelState{
-    W<:NamedTuple,Q<:NamedTuple,G<:Union{Duct,Nothing},L<:AbstractLiquid,
+struct ChannelState{
+    T<:Real,W<:NamedTuple,Q<:NamedTuple,G<:Union{Duct,Nothing},L<:AbstractLiquid,
 }
     n::Int
-    T_bulk::Vector{Float64}
-    T_wall::Vector{Float64}
-    T_walls::W = (;)
-    T_sat::Vector{Float64}
-    T_ONB::Vector{Float64}
-    T_inlet::Float64
-    P::Vector{Float64}
-    q_flux::Vector{Float64}
-    q_fluxes::Q = (;)
-    ṁ::Float64
-    velocity::Vector{Float64}
-    duct::G = nothing
-    gravity::Float64
-    liquid::L = coolant()
+    T_bulk::Vector{T}
+    T_wall::Vector{T}
+    T_walls::W
+    T_sat::Vector{T}
+    T_ONB::Vector{T}
+    T_inlet::T
+    P::Vector{T}
+    q_flux::Vector{T}
+    q_fluxes::Q
+    ṁ::T
+    velocity::Vector{T}
+    duct::G
+    gravity::T
+    liquid::L
+end
+
+function ChannelState(;
+    n,
+    T_bulk,
+    T_wall,
+    T_walls=(;),
+    T_sat,
+    T_ONB,
+    T_inlet,
+    P,
+    q_flux,
+    q_fluxes=(;),
+    ṁ,
+    velocity,
+    duct=nothing,
+    gravity,
+    liquid=coolant(),
+)
+    T = promote_type(eltype.((T_bulk, T_wall, T_sat, T_ONB, T_inlet, P, q_flux, ṁ, velocity,
+                              gravity))...)
+    return ChannelState{T,typeof(T_walls),typeof(q_fluxes),typeof(duct),typeof(liquid)}(
+        n, T_bulk, T_wall, T_walls, T_sat, T_ONB, T_inlet, P, q_flux, q_fluxes, ṁ, velocity,
+        duct, gravity, liquid,
+    )
 end
 
 """
@@ -86,8 +114,11 @@ the position of a saved time in `sol.t`. To run the correlations over a whole tr
 [`threshold_analysis`](@ref), which builds a `ChannelState` at every saved time.
 
 The face fluxes divide each face's heat flow by its area, read off the channel's own
-[`duct`](@ref): `q_fluxes.left[i] = q_wall_left[i] / (heated.left * dz)`. `liquid` is the
-coolant the channel was built with.
+[`duct`](@ref): `q_fluxes.left[i] = q_wall_left[i] / (heated.left * dz)`. A duct built from
+design knobs takes the values the solution was solved at, so the geometry follows the knobs
+and, under [`UQ.local_sensitivities`](@ref STREAM.UQ.local_sensitivities), carries their
+derivatives. `liquid` is the coolant the channel
+was built with.
 
 `channel_sys` must expose a wall temperature, so `Channel` or `ChannelAndContacts`.
 `ChannelHeatFlux` prescribes its flux and leaves its wall temperatures unconstrained for
@@ -107,10 +138,13 @@ A `ChannelState` for that instant.
   not a STREAM channel, or a channel whose wall temperature did not survive compilation
 """
 function ChannelState(sol, channel_sys; gravity=G_EARTH, index=nothing)
-    geometry = duct(channel_sys)
     n = length(channel_sys.T)
     k = _time_index(sol, index)
     value(sym) = k === nothing ? sol[sym] : sol[sym, k]
+    # A duct built from design knobs holds its lengths as expressions in them, `width * gap`,
+    # so they are read off the solution like every other field, duals under UQ included. A
+    # knob holds through a transient, and a transient refuses a time index on a parameter.
+    geometry = _map_lengths(x -> x isa Num ? sol[x] : x, duct(channel_sys))
     cells(sym) = value(scalarize(sym))
 
     # `velocity` is the unsigned speed and only ChannelAndContacts declares it. The other
@@ -326,13 +360,14 @@ function _face_flux(s::ChannelState, face::Symbol)
 end
 
 """
-    bergles_rohsenow_t_onb(state::ChannelState; face=:max)
+    bergles_rohsenow_t_onb(state::ChannelState; face=:max, onb_factor=1.0,
+                           inhomogeneity_factor=1.0)
     q_boiling_onset(state::ChannelState; liquid=state.liquid)
     q_CHF_mirshak(state::ChannelState)
     q_CHF_fabrega(state::ChannelState)
     q_CHF_sudo_kaminaga(state::ChannelState; liquid=state.liquid)
     q_OFI_whittle_forgan(state::ChannelState; liquid=state.liquid)
-    q_OSV_saha_zuber(state::ChannelState; face=:max, liquid=state.liquid)
+    q_OSV_saha_zuber(state::ChannelState; face=:max, liquid=state.liquid, inhomogeneity_factor=1.0)
     twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
 
 Every threshold correlation also accepts a solved channel, taking its arguments out of the
@@ -345,7 +380,11 @@ per cell, except `q_OFI_whittle_forgan`, which is one power for the channel.
 - `face` picks the face flux, as in [`chfr`](@ref): a face of the channel, or `:max` for
   the largest.
 - `inhomogeneity_factor` makes the local flux worse, for fuel inhomogeneity, as the scalar
-  [`twall_limit`](@ref) does.
+  [`twall_limit`](@ref) does. In `bergles_rohsenow_t_onb` it raises the flux the ONB superheat
+  is taken at. Compare the result with `twall_limit(state; inhomogeneity_factor)`, the wall
+  temperature at that same flux: their difference is Python STREAM's ONB margin.
+- `onb_factor` scales the Bergles-Rohsenow superheat `T_ONB - T_sat`, for the uncertainty of
+  the correlation itself.
 - `q_boiling_onset` takes `cₚ` at the inlet temperature.
 - `q_CHF_mirshak` takes the signed velocity, so reversed flow lowers the limit.
 - `q_OFI_whittle_forgan` reads its saturation temperature from the downstream cell, since
@@ -357,9 +396,11 @@ What each correlation computes is in its own docstring.
 # A wall that is not heating the coolant cannot boil it, and the correlation's fractional
 # power has no real value for a negative flux, so those cells report no onset, as chfr does.
 # After a scram the coolant rising through the core can run hotter than parts of the plate.
-function bergles_rohsenow_t_onb(s::ChannelState; face=:max)
-    q = _face_flux(s, face)
-    T_ONB = s.T_sat .+ _bergles_rohsenow_dT_ONB.(s.P, max.(q, 0.0))
+function bergles_rohsenow_t_onb(
+    s::ChannelState; face=:max, onb_factor=1.0, inhomogeneity_factor=1.0
+)
+    q = _face_flux(s, face) .* inhomogeneity_factor
+    T_ONB = s.T_sat .+ onb_factor .* _bergles_rohsenow_dT_ONB.(s.P, max.(q, 0.0))
     return ifelse.(q .> 0, T_ONB, Inf)
 end
 
@@ -385,11 +426,14 @@ function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=s.liquid)
     return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.duct; liquid=liquid)
 end
 
-function q_OSV_saha_zuber(s::ChannelState; face=:max, liquid::AbstractLiquid=s.liquid)
+function q_OSV_saha_zuber(
+    s::ChannelState; face=:max, liquid::AbstractLiquid=s.liquid, inhomogeneity_factor=1.0
+)
     props = liquid(s.T_bulk, s.P)
     return q_OSV_saha_zuber(
         s.T_inlet, s.ṁ, s.duct, props;
         flux_shape=_face_flux(s, face), dz=fill(s.duct.L / s.n, s.n),
+        inhomogeneity_factor,
     )
 end
 
