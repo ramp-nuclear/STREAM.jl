@@ -168,7 +168,8 @@ src/
     implicit.jl             # the implicit derivatives of a steady state and of a DAE start,
                             # and the solves they rest on
     inputs.jl               # named inputs and outputs to flat vectors and back
-    uncertainty.jl          # Uncertainty, as_absolute, uq, the measurements stub
+    uncertainty.jl          # Uncertainty, as_absolute, uq, contributions, table, the
+                            # measurements stub
     sampling.jl             # monte_carlo
 ext/
   STREAMDistributionsExt.jl # a Distribution as a UQ input, loaded with Distributions.jl

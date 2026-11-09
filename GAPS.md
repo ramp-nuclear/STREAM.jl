@@ -155,8 +155,8 @@ equations; and a component graph from the connection vectors `inseries`, `inpara
 
 The first-order part and sampling are in, as the `UQ` module: `Uncertainty` with Python's four
 parts, the problems `FunctionUQ`, `SteadyUQ` and `TransientUQ`, `local_sensitivities`, `uq`
-with Python's propagation, `jacobian`, `monte_carlo`, `measurements` through a Measurements.jl
-extension, and any `Distribution` as an input through a Distributions.jl one.
+with Python's propagation, `contributions`, `jacobian`, `monte_carlo`, `measurements` through a
+Measurements.jl extension, and any `Distribution` as an input through a Distributions.jl one.
 `Utilities.local_power_shift` ports the power-shape perturbation, and the threshold factors are
 there: `onb_factor` and `inhomogeneity_factor` on `bergles_rohsenow_t_onb`,
 `inhomogeneity_factor` on `q_OSV_saha_zuber`. `test_validation.jl` checks `uq` against Python's
