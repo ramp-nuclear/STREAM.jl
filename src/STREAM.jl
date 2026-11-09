@@ -52,7 +52,8 @@ include("constants.jl")
 Coolants and the property correlations behind them.
 
 A coolant is a singleton type such as `LightWater` (aliased [`H2O`](@ref)) answering nine
-property queries. Components take one as a keyword argument, or a model names its coolant
+property queries, from which the enthalpy, its inverse and the saturated vapor enthalpy are
+derived. Components take one as a keyword argument, or a model names its coolant
 once with [`@coolant`](@ref) and leaves the keyword out. [`coolant`](@ref) returns the
 coolant in effect, or the one a channel was built with.
 [`Liquid`](@ref) holds fixed property values and is itself an `AbstractLiquid`, for a coolant
@@ -68,6 +69,7 @@ A new coolant implements the nine [`AbstractLiquid`](@ref) methods.
 module Substances
 using ModelingToolkit
 using Base: ScopedValues
+using QuadGK: gauss
 using ..STREAM: ATM
 include("substances/liquid.jl")
 include("substances/light_water.jl")
@@ -76,6 +78,7 @@ include("substances/coolant_scope.jl")
 include("substances/solid.jl")
 export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, Solid
 export coolant, @coolant
+export enthalpy, temperature, vapor_enthalpy, hₗ, hᵥ
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
@@ -222,12 +225,10 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 """
 module Thresholds
 using ModelingToolkit
-using QuadGK
-using ForwardDiff: ForwardDiff
 using ..STREAM: AbstractLiquid, Liquid, G_EARTH, coolant
 using ..STREAM: Duct, Rectangular, Circular, Annular, flow_area, hydraulic_diameter
 using ..STREAM: heated_perimeter, duct, _map_lengths
-using ..STREAM: ρ, cₚ, μ, κ, Tsat
+using ..STREAM: ρ, cₚ, μ, κ, Tsat, enthalpy
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 include("thresholds/thresholds.jl")
@@ -493,6 +494,7 @@ export Assemblies, Utilities, UQ
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
+export enthalpy, temperature, vapor_enthalpy, hₗ, hᵥ
 export H2O, D2O, Solid, @coolant
 
 # Dimensionless numbers
